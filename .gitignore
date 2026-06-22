@@ -3,3 +3,6 @@ __pycache__/
 .venv/
 .idea/
 .DS_Store
+
+# Flight-log corpus and generated analysis artifacts (large / reproducible).
+data/
