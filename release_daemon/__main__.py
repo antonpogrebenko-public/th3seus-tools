@@ -16,6 +16,7 @@ from .publisher import (
     create_git_tag,
     find_binaries,
     publish_to_api,
+    upload_install_scripts,
     upload_to_s3,
 )
 
@@ -29,7 +30,17 @@ def cli() -> None:
 @click.option("--pre", is_flag=True, help="Mark as prerelease")
 @click.option("--artifacts-dir", type=click.Path(exists=True), help="Directory containing built binaries")
 @click.option("--dry-run", is_flag=True, help="Show what would be done without publishing")
-def publish(pre: bool, artifacts_dir: str | None, dry_run: bool) -> None:
+@click.option(
+    "--min-supported-version",
+    envvar="HITL_MIN_SUPPORTED_VERSION",
+    help=(
+        "Lowest daemon version current web clients can talk to. Required: the "
+        "API rejects a release whose compatibility floor is unknown."
+    ),
+)
+def publish(
+    pre: bool, artifacts_dir: str | None, dry_run: bool, min_supported_version: str | None
+) -> None:
     """Publish a new HITL daemon release."""
     config = ReleaseConfig.from_env(artifacts_dir=artifacts_dir)
     daemon_dir = config.daemon_dir
@@ -41,6 +52,16 @@ def publish(pre: bool, artifacts_dir: str | None, dry_run: bool) -> None:
 
     version = read_version_from_cargo_toml(cargo_path.read_text())
     click.echo(f"Version: {version}")
+
+    if not min_supported_version:
+        click.echo(
+            "Error: --min-supported-version (or HITL_MIN_SUPPORTED_VERSION) is "
+            "required. Clients use it to tell 'outdated but usable' from 'too "
+            "old to talk to this web app'.",
+            err=True,
+        )
+        sys.exit(1)
+    click.echo(f"Minimum supported daemon version: {min_supported_version}")
 
     changelog_path = Path(daemon_dir) / "CHANGELOG.md"
     if not changelog_path.exists():
@@ -80,11 +101,17 @@ def publish(pre: bool, artifacts_dir: str | None, dry_run: bool) -> None:
 
     click.echo("\nUploading to S3...")
     assets = upload_to_s3(config, version, binaries)
-    for platform, info in assets.items():
-        click.echo(f"  {platform}: {info['s3_key']} ({info['file_size_bytes']} bytes)")
+    assets.extend(upload_install_scripts(config, version))
+    for info in assets:
+        click.echo(
+            f"  {info['platform']}/{info['kind']}: {info['s3_key']} "
+            f"({info['file_size_bytes']} bytes)"
+        )
 
     click.echo("\nPublishing to API...")
-    publish_to_api(config, version, release_notes, commit_summary, pre, assets)
+    publish_to_api(
+        config, version, release_notes, commit_summary, pre, assets, min_supported_version
+    )
     click.echo("Published successfully.")
 
     tag_created = create_git_tag(version, daemon_dir)

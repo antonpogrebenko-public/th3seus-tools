@@ -6,6 +6,7 @@ import boto3
 import httpx
 
 from .config import ReleaseConfig
+from .signing import adhoc_sign, verify_signed
 
 PLATFORM_SUFFIXES = {
     "macos": "macos-arm64",
@@ -35,19 +36,81 @@ def find_binaries(config: ReleaseConfig, version: str) -> dict[str, Path]:
     return found
 
 
-def upload_to_s3(config: ReleaseConfig, version: str, binaries: dict[str, Path]) -> dict[str, dict]:
+SCRIPTS_DIR = Path(__file__).parent / "scripts"
+
+# install.sh serves both POSIX platforms; install.ps1 serves Windows.
+INSTALL_SCRIPTS = {
+    "install.sh": ("macos", "ubuntu"),
+    "install.ps1": ("windows",),
+}
+
+
+def upload_install_scripts(config: ReleaseConfig, version: str) -> list[dict]:
+    """Upload the install scripts and describe them as release assets.
+
+    install.sh is registered for both macOS and Linux against a single uploaded
+    object: the script detects the host itself, so duplicating the bytes per
+    platform would only create a way for the two copies to drift.
+    """
     s3 = boto3.client("s3")
-    results = {}
+    assets: list[dict] = []
+
+    for filename, platforms in INSTALL_SCRIPTS.items():
+        path = SCRIPTS_DIR / filename
+        if not path.exists():
+            raise FileNotFoundError(f"Install script missing: {path}")
+
+        s3_key = f"hitl-releases/{version}/{filename}"
+        s3.upload_file(str(path), config.s3_bucket, s3_key)
+        digest = compute_sha256(path)
+        size = path.stat().st_size
+
+        for platform in platforms:
+            assets.append(
+                {
+                    "platform": platform,
+                    "kind": "install_script",
+                    "s3_key": s3_key,
+                    "filename": filename,
+                    "file_size_bytes": size,
+                    "sha256": digest,
+                }
+            )
+
+    return assets
+
+
+def upload_to_s3(config: ReleaseConfig, version: str, binaries: dict[str, Path]) -> list[dict]:
+    """Sign, verify, then upload.
+
+    Signing happens before the hash is computed and before anything reaches the
+    bucket: `codesign` rewrites the binary, so hashing first would publish a
+    digest that no longer matches the artifact users download. Verification
+    failing aborts the whole publish rather than uploading an artifact Apple
+    Silicon would refuse to execute.
+    """
+    s3 = boto3.client("s3")
+    results: list[dict] = []
+
+    for platform, path in binaries.items():
+        adhoc_sign(platform, path)
+        verify_signed(platform, path)
 
     for platform, path in binaries.items():
         s3_key = f"hitl-releases/{version}/{path.name}"
         s3.upload_file(str(path), config.s3_bucket, s3_key)
-        results[platform] = {
-            "s3_key": s3_key,
-            "filename": path.name,
-            "file_size_bytes": path.stat().st_size,
-            "sha256": compute_sha256(path),
-        }
+        results.append(
+            {
+                "platform": platform,
+                "kind": "binary",
+                "s3_key": s3_key,
+                "filename": path.name,
+                # Hashed after signing: codesign rewrites the binary, so a
+                # digest taken earlier would not match what users download.
+                "file_size_bytes": path.stat().st_size,
+                "sha256": compute_sha256(path),
+            }
+        )
 
     return results
 
@@ -58,7 +121,8 @@ def publish_to_api(
     release_notes: str,
     commit_summary: str,
     is_prerelease: bool,
-    assets: dict[str, dict],
+    assets: list[dict],
+    min_supported_daemon_version: str,
 ) -> None:
     headers = {"X-Release-Token": config.release_token, "Content-Type": "application/json"}
 
@@ -70,14 +134,15 @@ def publish_to_api(
                 "release_notes": release_notes,
                 "commit_summary": commit_summary,
                 "is_prerelease": is_prerelease,
+                "min_supported_daemon_version": min_supported_daemon_version,
             },
         )
         resp.raise_for_status()
 
-        for platform, asset_data in assets.items():
+        for asset_data in assets:
             resp = client.post(
                 f"/api/hitl/releases/{version}/assets",
-                json={"platform": platform, **asset_data},
+                json=asset_data,
             )
             resp.raise_for_status()
 
