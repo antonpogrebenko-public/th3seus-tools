@@ -12,6 +12,7 @@ from .commits import (
     load_filter_config,
 )
 from .config import ReleaseConfig
+from .drift import check_drift, format_report, has_drift
 from .publisher import (
     create_git_tag,
     find_binaries,
@@ -142,6 +143,42 @@ def list_releases() -> None:
         pre_tag = " [pre-release]" if r["is_prerelease"] else ""
         platforms = ", ".join(a["platform"] for a in r.get("assets", []))
         click.echo(f"  v{r['version']}{pre_tag} — {r['published_at'][:10]} — [{platforms}]")
+
+
+@cli.command("check-drift")
+@click.option(
+    "--daemon-dir",
+    envvar="HITL_DAEMON_DIR",
+    default=None,
+    help="Path to the hitl-daemon source tree (default: ../hitl-daemon).",
+)
+def check_drift_command(daemon_dir: str | None) -> None:
+    """Report which environments serve a different daemon than this tree builds.
+
+    Read-only, and it publishes nothing. Publishing stays a separate, explicit
+    act per environment; this exists so the gap is visible before a user finds
+    it on the releases page.
+
+    Exits non-zero when any environment is out of step or could not be read, so
+    it is usable as a check rather than only as a thing to read.
+    """
+    daemon_path = Path(daemon_dir) if daemon_dir else Path.cwd().parent / "hitl-daemon"
+    cargo_path = daemon_path / "Cargo.toml"
+    if not cargo_path.exists():
+        click.echo(f"Error: Cargo.toml not found at {cargo_path}", err=True)
+        sys.exit(1)
+
+    local_version = read_version_from_cargo_toml(cargo_path.read_text())
+    click.echo(f"Local tree builds: {local_version}\n")
+
+    reports = check_drift(local_version)
+    for report in reports:
+        click.echo(f"  {format_report(report)}")
+
+    if has_drift(reports):
+        click.echo("\nOne or more environments are out of step.")
+        sys.exit(1)
+    click.echo("\nEvery environment is in sync.")
 
 
 if __name__ == "__main__":
