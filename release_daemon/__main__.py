@@ -2,6 +2,7 @@ import sys
 from pathlib import Path
 
 import click
+import httpx
 
 from .changelog import parse_changelog, read_version_from_cargo_toml
 from .commits import (
@@ -43,7 +44,12 @@ def publish(
     pre: bool, artifacts_dir: str | None, dry_run: bool, min_supported_version: str | None
 ) -> None:
     """Publish a new HITL daemon release."""
-    config = ReleaseConfig.from_env(artifacts_dir=artifacts_dir)
+    try:
+        config = ReleaseConfig.from_env(artifacts_dir=artifacts_dir)
+    except ValueError as exc:
+        # A missing credential is a thing to state, not a stack trace to read.
+        click.echo(f"Error: {exc}", err=True)
+        sys.exit(1)
     daemon_dir = config.daemon_dir
 
     cargo_path = Path(daemon_dir) / "Cargo.toml"
@@ -126,10 +132,11 @@ def publish(
 
 @cli.command(name="list")
 def list_releases() -> None:
-    """List published releases."""
-    config = ReleaseConfig.from_env()
+    """List published releases.
 
-    with httpx.Client(base_url=config.api_url, timeout=10) as client:
+    Reads the channel and nothing more, so it asks for no publishing token.
+    """
+    with httpx.Client(base_url=ReleaseConfig.api_url_from_env(), timeout=10) as client:
         resp = client.get("/api/hitl/releases")
         resp.raise_for_status()
         data = resp.json()
@@ -141,8 +148,17 @@ def list_releases() -> None:
 
     for r in releases:
         pre_tag = " [pre-release]" if r["is_prerelease"] else ""
-        platforms = ", ".join(a["platform"] for a in r.get("assets", []))
-        click.echo(f"  v{r['version']}{pre_tag} — {r['published_at'][:10]} — [{platforms}]")
+        # One entry per platform. A release carries an install script as well as
+        # a binary for each, and listing both printed every platform twice.
+        # Assets published before the kind column existed are all binaries.
+        seen: list[str] = []
+        for a in r.get("assets", []):
+            if a.get("kind", "binary") != "binary" or a["platform"] in seen:
+                continue
+            seen.append(a["platform"])
+        click.echo(
+            f"  v{r['version']}{pre_tag} — {r['published_at'][:10]} — [{', '.join(seen)}]"
+        )
 
 
 @cli.command("check-drift")
