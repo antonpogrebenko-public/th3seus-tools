@@ -6,3 +6,6 @@ __pycache__/
 
 # Flight-log corpus and generated analysis artifacts (large / reproducible).
 data/
+
+# Generated analysis output (reproducible).
+results/
