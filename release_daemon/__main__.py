@@ -14,6 +14,7 @@ from .commits import (
 )
 from .config import ReleaseConfig
 from .drift import check_drift, format_report, has_drift
+from .notify_web_rebuild import request_web_rebuild
 from .publisher import (
     create_git_tag,
     find_binaries,
@@ -127,7 +128,17 @@ def publish(
     else:
         click.echo(f"Git tag hitl-daemon-v{version} already exists.")
 
+    # The site prerenders its releases page from `/api/hitl/releases`, so the
+    # release is not visible to a visitor until the export is rebuilt. Asked
+    # for rather than assumed: the helper reports whether it actually asked.
+    rebuilt = request_web_rebuild(f"hitl-daemon {version} published")
+
     click.echo(f"\nDone! Release {version} is live.")
+    if not rebuilt:
+        click.echo(
+            "     The site's releases page still shows the previous release "
+            "until it is rebuilt."
+        )
 
 
 @cli.command(name="list")
