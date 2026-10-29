@@ -99,9 +99,12 @@ def vibration_evidence(noise: Sequence[dict], response: Sequence[dict]) -> Vibra
     """Median in-flight gyro noise over median at-rest density, or None without both.
 
     Conversion: the in-flight value is a per-sample std (rad/s) of the logged
-    angular velocity above the cut-off, at the logged rate f; its density is
-    std * sqrt(1 / f), the same basis as the at-rest density (rad/s/sqrt(Hz)).
-    This treats the in-flight signal as white, which it is not exactly."""
+    angular velocity minus its moving average, at the logged rate f; its density
+    is std * sqrt(1 / f), the same basis as the at-rest density (rad/s/sqrt(Hz)).
+    This treats the in-flight signal as white up to f / 2, which it is not: PX4
+    low-passes the logged angular velocity at IMU_GYRO_CUTOFF, usually well below
+    f / 2, so its noise power lies in a narrower band than the sqrt(f) divisor
+    assumes. The in-flight density, and so the ratio, is biased low."""
     rest = [v for v in (finite_number(e.get("measurements") or {}, AT_REST_GYRO) for e in noise)
             if v is not None]
     flights = [x for x in (_inflight_log(e.get("measurements") or {}) for e in response)

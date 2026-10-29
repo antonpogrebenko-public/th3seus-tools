@@ -433,3 +433,14 @@ def test_a_forbid_string_shorter_than_3_characters_is_refused(tmp_path, capsys):
                  "--run-info", str(paths["run_info"]), "--out-dir", str(tmp_path / "o"),
                  "--forbid", "ab"])
     assert code == 2 and "--forbid" in capsys.readouterr().err
+
+
+def test_vibration_ratio_says_it_is_biased_low():
+    from log_validation.calibration_noise import vibration_evidence
+
+    text = render_report(noise_entries(), battery_dict(), response_entries(), airframes_dict(),
+                         [], run_info())
+    gaps = " ".join(text.split("## Gaps TH3SEUS does not model")[1].split())
+    assert "biased low" in gaps and "IMU_GYRO_CUTOFF" in gaps
+    doc = " ".join(vibration_evidence.__doc__.split())
+    assert "biased low" in doc and "IMU_GYRO_CUTOFF" in doc

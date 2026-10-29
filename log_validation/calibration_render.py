@@ -162,13 +162,16 @@ def _vibration(noise: Sequence[dict], response: Sequence[dict]) -> str:
     v = vibration_evidence(noise, response)
     if v is None:
         return "Vibration: not modelled. No log gave both an at-rest and an in-flight gyro noise."
-    return ("Vibration: not modelled. In flight, the median gyro noise above the in-flight cut-off "
+    return ("Vibration: not modelled. In flight, the median gyro noise (the angular velocity "
+            "minus its moving average) "
             f"is {_num(v.median_inflight_std)} rad/s per sample at a median {_num(v.median_rate_hz)}"
             f" Hz. On the density basis (per-sample std times sqrt(1 / rate), which treats the "
             f"signal as white) that is {_num(v.inflight_density)} rad/s/sqrt(Hz), against "
             f"{_num(v.at_rest_density)} at rest: a ratio of {_num(v.ratio, '.3g')} "
-            f"({v.n_inflight} flight logs, {v.n_at_rest} at-rest logs). The two bases are "
-            "not exactly comparable, so both are given.")
+            f"({v.n_inflight} flight logs, {v.n_at_rest} at-rest logs). The ratio is biased "
+            "low: the logged in-flight signal is low-passed at IMU_GYRO_CUTOFF, usually well "
+            "below half the logged rate, while it is divided by sqrt(logged rate). The two "
+            "bases are not exactly comparable, so both are given.")
 
 
 def _esc(ranges: Sequence[RangeRow]) -> str:
