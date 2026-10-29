@@ -458,3 +458,16 @@ def test_noise_cutoff_help_describes_the_moving_average(capsys):
     text = " ".join(capsys.readouterr().out.split())
     assert "moving-average window of 1/f seconds" in text
     assert "first null at f" in text and "-3 dB near 0.44 f" in text
+
+
+def test_filtered_load_keeps_the_angular_acceleration(monkeypatch):
+    """flight_segments classifies windows with vehicle_angular_acceleration, so the
+    filtered load must keep it or a flight is classified differently from a full load."""
+    from log_validation import response
+
+    calls = []
+    monkeypatch.setattr(response, "ULog",
+                        lambda path, message_name_filter_list=None: calls.append(
+                            message_name_filter_list))
+    response.load_response_topics(Path("x.ulg"))
+    assert "vehicle_angular_acceleration" in calls[0]

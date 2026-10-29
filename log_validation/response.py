@@ -130,6 +130,7 @@ RATES_SP_FIELDS = ("roll", "pitch", "yaw")
 # The topics the pass reads: the signals, the instrument and what detect_flight_segments needs.
 RESPONSE_TOPICS = (TOPIC_TORQUE, TOPIC_RATE, TOPIC_RATES_SP, "vehicle_status",
                    "vehicle_land_detected", "vehicle_local_position",
+                   "vehicle_angular_acceleration",
                    "vehicle_thrust_setpoint", "hover_thrust_estimate", "esc_status",
                    "actuator_motors", "battery_status")
 
