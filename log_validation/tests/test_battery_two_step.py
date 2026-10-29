@@ -1,0 +1,93 @@
+"""Tests for the two-step battery flow: extract to folders, fit from them, and the CLI."""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import pytest
+
+from log_validation import battery_extract
+from log_validation.battery_fit import (
+    analyze_logs,
+    extract_dir,
+    fit_obs_dir,
+    main,
+    result_to_dict,
+    save_extracted,
+)
+from log_validation.tests.battery_fakes import (
+    CORPUS,
+    load_by_stem,
+    make_data,
+    make_log_dir,
+    make_manifest,
+)
+
+
+class TestFitObsDir:
+    def test_manifest_one_shot_equals_extract_then_fit(self, tmp_path):
+        rows = {i: f"v{k % 6}" for k, i in enumerate(CORPUS) if i != "a09"}
+        manifest = make_manifest(tmp_path, rows)
+        log_dir = make_log_dir(tmp_path, CORPUS)
+        one_shot = analyze_logs(log_dir, manifest_path=manifest, loader=load_by_stem)
+        obs = tmp_path / "obs"
+        extract_dir(log_dir, obs, loader=load_by_stem)  # every log, no manifest
+        assert result_to_dict(fit_obs_dir(obs, manifest)) == result_to_dict(one_shot)
+        assert one_shot.logs_without_manifest_row == 1
+        assert "a09" not in one_shot.fit_log_ids + one_shot.holdout_log_ids
+        fit_vehicles = {rows[i] for i in one_shot.fit_log_ids}
+        assert not fit_vehicles & {rows[i] for i in one_shot.holdout_log_ids}
+
+    def test_cap_applies_to_the_fit(self, tmp_path):
+        ids = [f"a{k:02d}" for k in range(8)] + ["c3-01", "c3-02"]
+        manifest = make_manifest(tmp_path, {**{i: "v1" for i in ids[:8]}, "c3-01": "v2", "c3-02": "v3"})
+        obs = tmp_path / "obs"
+        extract_dir(make_log_dir(tmp_path, ids), obs, loader=load_by_stem)  # no cap here
+        result = fit_obs_dir(obs, manifest, max_per_vehicle=3)
+        counted = result.fit_log_ids + result.holdout_log_ids
+        assert sorted(i for i in counted if i.startswith("a")) == ["a00", "a01", "a02"]
+        assert result.real_log_count == 5
+
+    def test_log_id_with_two_files_is_refused(self, tmp_path):
+        obs = tmp_path / "obs"
+        save_extracted(make_data("a01"), obs)
+        (obs / "a01.sim").touch()
+        with pytest.raises(ValueError, match="a01"):
+            fit_obs_dir(obs)
+
+
+# ---------------------------------------------------------------------------
+# Command line
+# ---------------------------------------------------------------------------
+
+
+class TestCli:
+    def test_extract_then_fit_matches_log_dir(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(
+            battery_extract, "ULog", lambda path, message_name_filter_list=None: load_by_stem(Path(path))
+        )
+        log_dir = make_log_dir(tmp_path, CORPUS)
+        obs, out = tmp_path / "obs", tmp_path / "out"
+        assert main(["--log-dir", str(log_dir), "--extract-to", str(obs)]) == 0
+        assert len(list(obs.glob("*.npz"))) == 16
+        main(["--obs-dir", str(obs), "--out-json", str(out / "obs.json"),
+              "--out-md", str(out / "obs.md")])
+        main(["--log-dir", str(log_dir), "--out-json", str(out / "dir.json"),
+              "--out-md", str(out / "dir.md")])
+        text = (out / "dir.json").read_text()
+        assert (out / "obs.json").read_text() == text
+        assert (out / "obs.md").read_text() == (out / "dir.md").read_text()
+        assert str(tmp_path) not in text and str(tmp_path) not in (out / "dir.md").read_text()
+        doc = json.loads(text)
+        assert {"per_log_r", "fit_log_ids", "holdout_log_ids", "logs_without_manifest_row"} <= set(doc)
+        assert {"p10_mohm_per_cell", "p90_mohm_per_cell", "n_vehicles"} <= set(doc["r_fits"][0])
+        md = (out / "dir.md").read_text()
+        assert "p10" in md and doc["fit_log_ids"][0] in md and doc["holdout_log_ids"][0] in md
+
+    def test_relative_obs_dir_writes_its_json(self, tmp_path, monkeypatch):
+        extract_dir(make_log_dir(tmp_path, CORPUS), tmp_path / "obs", loader=load_by_stem)
+        monkeypatch.chdir(tmp_path)
+        code = main(["--obs-dir", "obs", "--out-json", "out/fit.json", "--out-md", "out/fit.md"])
+        assert code in (0, 1)  # 2 would be an error such as a refused output
+        assert "n_total_observations" in (tmp_path / "out" / "fit.json").read_text()
