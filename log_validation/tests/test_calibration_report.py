@@ -1,19 +1,44 @@
-"""Tests for the randomization ranges and the log-ID lists."""
+"""Tests for the randomization ranges, the log-ID lists and the calibration directory."""
 
 from __future__ import annotations
 
+import json
 import math
+from pathlib import Path
 
 import pytest
 
+from log_validation import reference_airframes
+from log_validation.batch_analyze import batch_analyze
+from log_validation.battery_fit import analyze_logs
+from log_validation.battery_output import result_to_dict
+from log_validation.calibration_render import SECTIONS
 from log_validation.calibration_report import (
     RangeRow,
     log_id_lists,
+    main,
+    noise_before_after,
     ranges_csv,
     ranges_table,
+    render_report,
     vehicle_percentiles,
+    write_calibration_dir,
 )
+from log_validation.outputs import write_json
+from log_validation.response import response_batch
+from log_validation.tests import battery_fakes
+from log_validation.tests.calibration_inputs import (
+    airframes_dict,
+    battery_dict,
+    noise_entries,
+    response_entries,
+    run_info,
+    write_inputs,
+)
+from log_validation.tests.test_batch_analyze import load_by_stem as noise_loader
+from log_validation.tests.test_response import load_by_stem as response_loader
 
+COMMAND_ARGS = ("noise", "battery", "response", "airframes", "run_info")
 EMPTY_BATTERY: dict = {"per_log_r": [], "fit_log_ids": [], "holdout_scored_log_ids": []}
 
 
@@ -141,36 +166,8 @@ def test_range_row_is_frozen():
 
 
 # ---- Task 12: noise before and after, the report, the directory ----
+# ---- Task 12: noise before and after, the report, the directory ----
 
-import json  # noqa: E402
-from pathlib import Path  # noqa: E402
-
-from log_validation.batch_analyze import batch_analyze  # noqa: E402
-from log_validation.battery_fit import analyze_logs  # noqa: E402
-from log_validation.battery_output import result_to_dict  # noqa: E402
-from log_validation import reference_airframes  # noqa: E402
-from log_validation.calibration_report import (  # noqa: E402
-    main,
-    noise_before_after,
-    render_report,
-    write_calibration_dir,
-)
-from log_validation.calibration_render import SECTIONS  # noqa: E402
-from log_validation.outputs import write_json  # noqa: E402
-from log_validation.response import response_batch  # noqa: E402
-from log_validation.tests import battery_fakes  # noqa: E402
-from log_validation.tests.calibration_inputs import (  # noqa: E402
-    airframes_dict,
-    battery_dict,
-    noise_entries,
-    response_entries,
-    run_info,
-    write_inputs,
-)
-from log_validation.tests.test_batch_analyze import load_by_stem as noise_loader  # noqa: E402
-from log_validation.tests.test_response import load_by_stem as response_loader  # noqa: E402
-
-COMMAND_ARGS = ("noise", "battery", "response", "airframes", "run_info")
 
 
 def _write(tmp_path, out_name="out", date="2026-10-29", extra=()):
@@ -270,24 +267,54 @@ def test_bad_input_shape_exits_2(tmp_path, capsys):
     assert code == 2 and "run-info" in capsys.readouterr().err
 
 
-def test_local_path_is_not_leaked(tmp_path):
-    ids = [f"{100 + i}" for i in range(10)]
+LEAKY = "leaky"
+
+
+def noise_loader_leaky(path: Path):
+    """The leaky log fails to load with a message that holds its path."""
+    if path.stem == LEAKY:
+        raise OSError(f"cannot open {path}")
+    return noise_loader(path)
+
+
+def response_loader_leaky(path: Path):
+    if path.stem == LEAKY:
+        raise OSError(f"cannot open {path}")
+    return response_loader(path)
+
+
+def _run_passes(tmp_path):
+    """Run the four passes on fake logs, one of which fails to load with its path in the error."""
+    ids = [f"{100 + i}" for i in range(10)] + [LEAKY]
     log_dir = battery_fakes.make_log_dir(tmp_path, ids)
     manifest = tmp_path / "m.csv"
     manifest.write_text("log_id,vehicle_id\n" + "".join(f"{i},v{i}\n" for i in ids))
     work = tmp_path / "work"
     forbidden = (str(log_dir.resolve()), str(Path.home()))
-
-    batch_analyze(log_dir, work / "noise.json", manifest_path=manifest, loader=noise_loader)
-    response_batch(log_dir, work / "response.json", manifest_path=manifest, loader=response_loader)
+    batch_analyze(log_dir, work / "noise.json", manifest_path=manifest, loader=noise_loader_leaky)
+    response_batch(log_dir, work / "response.json", manifest_path=manifest,
+                   loader=response_loader_leaky)
     fit = analyze_logs(log_dir, manifest_path=manifest, loader=battery_fakes.load_by_stem)
     write_json(work / "battery.json", result_to_dict(fit), forbidden)
-    assert reference_airframes.main([str(work / "response.json"), "-o", str(work / "airframes.json")]) == 0
+    response = str(work / "response.json")
+    assert reference_airframes.main([response, "-o", str(work / "airframes.json")]) == 0
     write_json(work / "run-info.json", run_info(), forbidden)
+    return log_dir, work
 
+
+def _calibrate_args(work: Path, out: Path) -> list[str]:
+    return ["--noise", str(work / "noise.json"), "--battery", str(work / "battery.json"),
+            "--response", str(work / "response.json"), "--airframes", str(work / "airframes.json"),
+            "--run-info", str(work / "run-info.json"), "--out-dir", str(out)]
+
+
+def test_local_path_is_not_leaked(tmp_path):
+    log_dir, work = _run_passes(tmp_path)
+    noise = json.loads((work / "noise.json").read_text())
+    leaky = next(e for e in noise if e["log_id"] == LEAKY)
+    assert leaky["errors"] == ["load failed: OSError"]
     out = tmp_path / "out"
-    write_calibration_dir(out, work / "noise.json", work / "battery.json", work / "response.json",
-                          work / "airframes.json", work / "run-info.json")
+    assert main(_calibrate_args(work, out)) == 0
     files = [f for f in out.rglob("*") if f.is_file()]
     assert len(files) == 11
     for f in files:
@@ -296,10 +323,27 @@ def test_local_path_is_not_leaked(tmp_path):
         assert str(work.resolve()) not in text
 
 
-def test_a_forbid_string_shorter_than_3_characters_is_refused(tmp_path, capsys):
+def test_logs_path_in_run_info_commands_is_refused_with_forbid(tmp_path, capsys):
+    log_dir, work = _run_passes(tmp_path)
+    info = run_info()
+    info["commands"] = [f"python -m log_validation.batch_analyze {log_dir.resolve()}"]
+    (work / "run-info.json").write_text(json.dumps(info))
+    out = tmp_path / "out"
+    code = main([*_calibrate_args(work, out), "--forbid", str(log_dir.resolve())])
+    assert code == 2 and "private data" in capsys.readouterr().err
+    assert not out.exists()
+
+
+def test_non_empty_out_dir_is_refused(tmp_path, capsys):
     paths = write_inputs(tmp_path / "in")
-    code = main(["--noise", str(paths["noise"]), "--battery", str(paths["battery"]),
-                 "--response", str(paths["response"]), "--airframes", str(paths["airframes"]),
-                 "--run-info", str(paths["run_info"]), "--out-dir", str(tmp_path / "o"),
-                 "--forbid", "ab"])
-    assert code == 2 and "--forbid" in capsys.readouterr().err
+    out = tmp_path / "out"
+    out.mkdir()
+    (out / "stale.txt").write_text("old")
+    args = ["--noise", str(paths["noise"]), "--battery", str(paths["battery"]),
+            "--response", str(paths["response"]), "--airframes", str(paths["airframes"]),
+            "--run-info", str(paths["run_info"]), "--out-dir", str(out)]
+    assert main(args) == 2
+    assert "not empty" in capsys.readouterr().err
+    assert [p.name for p in out.iterdir()] == ["stale.txt"]
+    (out / "stale.txt").unlink()
+    assert main(args) == 0  # an existing empty directory is fine

@@ -126,14 +126,15 @@ The calibration directory holds:
 
 Every file is checked before it is written: the write is refused (exit status 2, and
 nothing is written) when any output contains the home directory, the user or host
-name, the folder of an input file, or a `--forbid` string, such as a cloud account ID
-or a bucket name. The same inputs give the same files, except the Run date line of
-`report.md`.
+name, the folder of an input file, or a `--forbid` string. Only those are checked, so
+pass `--forbid` for every other private string, such as a cloud account ID or a
+bucket name. `--out-dir` must be new or empty. The same inputs give the same files,
+except the Run date line of `report.md`.
 
 Deployment note: re-seeding the TH3SEUS profiles from this run lowers the simulated
-IMU noise for every TH3SEUS user, because the old estimator overstated the noise
-density about 20 times. The report's before and after table gives the figures per MCU
-family; check them before deploying.
+IMU noise for every TH3SEUS user, because the old estimator overstated the per-sample
+noise. The report's before and after table gives the measured factor in its current
+and new columns, per MCU family; check them before deploying.
 
 ## Tests
 

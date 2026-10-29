@@ -80,6 +80,15 @@ def _airframe_id(params: dict[str, Any]) -> int | None:
     return value or None
 
 
+def _failure(log_id: str, what: str, error: Exception) -> str:
+    """The entry text for a failure: the exception type only, as the message can hold a path.
+
+    The full message goes to stderr with the log ID."""
+    name = type(error).__name__
+    print(f"{log_id}: {what}: {name}: {error}", file=sys.stderr)
+    return f"{what}: {name}"
+
+
 def analyze_log(
     path: Path,
     vehicle_id: str | None = None,
@@ -97,7 +106,7 @@ def analyze_log(
             log_id=log_id,
             hardware={},
             measurements={},
-            errors=[f"load failed: {e}"],
+            errors=[_failure(log_id, "load failed", e)],
             vehicle_id=vehicle_id,
         )
 
@@ -105,7 +114,7 @@ def analyze_log(
         airframe_id = _airframe_id(ulog.initial_parameters)
     except Exception as e:
         airframe_id = None
-        errors.append(f"parameters unavailable: {e}")
+        errors.append(_failure(log_id, "parameters unavailable", e))
 
     # Extract hardware info
     hw = None
@@ -114,7 +123,7 @@ def analyze_log(
         hw_dict = asdict(hw)
     except Exception as e:
         hw_dict = {}
-        errors.append(f"hardware extraction failed: {e}")
+        errors.append(_failure(log_id, "hardware extraction failed", e))
 
     # Skip simulation logs: SITL/HIL report synthetic noise that does not
     # represent real hardware, so they must not pollute the noise profiles.
@@ -139,8 +148,7 @@ def analyze_log(
             elif row.note:
                 errors.append(f"{key}: {row.note}")
     except Exception as e:
-        print(f"{log_id}: analysis failed: {type(e).__name__}: {e}", file=sys.stderr)
-        errors.append(f"analysis failed: {type(e).__name__}")
+        errors.append(_failure(log_id, "analysis failed", e))
 
     return LogResult(
         log_id=log_id,

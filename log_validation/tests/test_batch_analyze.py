@@ -144,3 +144,35 @@ def test_analysis_failure_entry_has_the_exception_type_only(tmp_path, monkeypatc
     assert results[0].errors == ["analysis failed: RuntimeError"]
     err = capsys.readouterr().err
     assert "a1" in err and "RuntimeError" in err and "secret detail" in err
+
+
+def test_load_failure_entry_has_the_exception_type_only(tmp_path, capsys):
+    def loader(path):
+        raise OSError(f"cannot open {path}")
+
+    log_dir = _touch(tmp_path, ["a1"])
+    results = batch_analyze(log_dir, None, loader=loader)
+    assert results[0].errors == ["load failed: OSError"]
+    err = capsys.readouterr().err
+    assert "a1" in err and "OSError" in err and str(log_dir) in err
+
+
+def test_hardware_failure_entry_has_the_exception_type_only(tmp_path, monkeypatch, capsys):
+    import log_validation.batch_analyze as module
+
+    def broken(_info, _params):
+        raise KeyError("/private/place")
+
+    monkeypatch.setattr(module, "extract_hardware_info", broken)
+    log_dir = _touch(tmp_path, ["a1"])
+    results = batch_analyze(log_dir, None, loader=load_by_stem)
+    assert "hardware extraction failed: KeyError" in results[0].errors
+    assert not any("private" in e for e in results[0].errors)
+    assert "/private/place" in capsys.readouterr().err
+
+
+def test_parameters_failure_entry_has_the_exception_type_only(tmp_path, capsys):
+    log_dir = _touch(tmp_path, ["noparams"])
+    results = batch_analyze(log_dir, None, loader=load_by_stem)
+    assert "parameters unavailable: AttributeError" in results[0].errors
+    assert "noparams" in capsys.readouterr().err

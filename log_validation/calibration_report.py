@@ -109,8 +109,11 @@ def write_calibration_dir(
 ) -> None:
     """Write report.md, ranges.csv, log-ids/{noise,battery,response}.txt and the normalized inputs.
 
-    Raises ValueError for an input of the wrong shape and PrivateDataError when any
+    Raises ValueError for an `out_dir` that exists and is not empty or an input of the wrong shape and PrivateDataError when any
     output would hold a private string; then nothing is written to `out_dir`."""
+    out = Path(out_dir)
+    if out.exists() and (not out.is_dir() or any(out.iterdir())):
+        raise ValueError("the output directory exists and is not empty; use a new or empty one")
     inputs = (noise_path, battery_path, response_path, airframes_path, run_info_path)
     noise = _by_log_id(_load(noise_path, list, "noise results"))
     battery = _load(battery_path, dict, "battery fit")
@@ -123,7 +126,7 @@ def write_calibration_dir(
     with tempfile.TemporaryDirectory() as tmp:
         stage = Path(tmp) / "calibration"
         _stage(stage, forbidden, noise, battery, response, airframes, run_info)
-        shutil.copytree(stage, Path(out_dir), dirs_exist_ok=True)
+        shutil.copytree(stage, out, dirs_exist_ok=True)
 
 
 def _build_parser() -> argparse.ArgumentParser:
