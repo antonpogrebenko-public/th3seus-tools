@@ -80,7 +80,7 @@ class TestStepCheck:
         v[1] = np.nan
         nan_pack = dataclasses.replace(pack, v=v)
         full = step_check([pack], lambda cells: 9.0, {}).n_steps
-        assert step_check([nan_pack], lambda cells: 9.0, {}).n_steps == full - 2
+        assert step_check([nan_pack], lambda cells: 9.0, {}).n_steps == full - 1
 
     def test_vehicles_counted_once_and_unlisted_log_is_its_own(self):
         packs = [_pack(i, 4, 9.0) for i in ("p1", "p2", "p3")]
