@@ -445,12 +445,17 @@ def _deployed_r(cell_count: int, r_fits: Sequence[PerCellRFit], overall: float) 
 
 
 def _holdout_mae(data: LogBatteryData, ocv: OcvCurve, r_mohm_per_cell: float) -> float | None:
-    """Median |predicted - measured| V/cell over one log; None when 'remaining' is flat or absent."""
+    """Median |predicted - measured| V/cell over the log's finite samples.
+
+    None, so the log is not scored, when 'remaining' is flat or absent or no
+    sample gives a finite error."""
     soc = data.remaining
     if soc is None or soc.max() - soc.min() < SOC_MIN_RANGE:
         return None
     v_pred = _predict_terminal_voltage(soc, data.i, data.cell_count, ocv, r_mohm_per_cell)
-    return float(np.median(np.abs(v_pred - data.v) / data.cell_count))
+    errors = np.abs(v_pred - data.v) / data.cell_count
+    finite = errors[np.isfinite(errors)]
+    return float(np.median(finite)) if finite.size else None
 
 
 def _step_errors(data: LogBatteryData, r_mohm_per_cell: float) -> np.ndarray:

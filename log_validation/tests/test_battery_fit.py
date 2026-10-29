@@ -10,7 +10,9 @@ production function and asserts the expectation.
 
 from __future__ import annotations
 
+import math
 import uuid
+from dataclasses import replace
 from pathlib import Path
 
 import numpy as np
@@ -492,3 +494,40 @@ class TestFitExtracted:
         assert NO_DATA_STATUSES == {"sim", "unusable", "load_error", "worker_died"}
         with pytest.raises(ValueError, match="unknown extract status"):
             fit_extracted([make_data(f"a{k}") for k in range(6)], {}, no_data={"x": status})
+
+    @staticmethod
+    def _with_holdout_voltage(datas, log_id, change):
+        """Copies of datas with one log's voltage changed by `change` (the inputs stay as they are)."""
+        out = []
+        for d in datas:
+            if d.log_id == log_id:
+                v = d.v.copy()
+                change(v)
+                d = replace(d, v=v)
+            out.append(d)
+        return out
+
+    def test_one_nan_voltage_in_a_holdout_log_gives_a_finite_mae(self):
+        datas = [make_data(f"a{k}") for k in range(10)]
+        clean = fit_extracted(datas, {})
+        target = clean.holdout_log_ids[0]
+
+        def one_nan(v):
+            v[5] = np.nan
+
+        result = fit_extracted(self._with_holdout_voltage(datas, target, one_nan), {})
+        assert math.isfinite(result.holdout_median_mae_v_per_cell)
+        assert math.isfinite(result.holdout_p75_mae_v_per_cell)
+        assert result.holdout_scored_count == clean.holdout_scored_count
+
+    def test_holdout_log_without_a_finite_voltage_is_not_scored(self):
+        datas = [make_data(f"a{k}") for k in range(10)]
+        clean = fit_extracted(datas, {})
+        target = clean.holdout_log_ids[0]
+
+        def all_nan(v):
+            v[:] = np.nan
+
+        result = fit_extracted(self._with_holdout_voltage(datas, target, all_nan), {})
+        assert result.holdout_scored_count == clean.holdout_scored_count - 1
+        assert math.isfinite(result.holdout_median_mae_v_per_cell)
