@@ -17,6 +17,14 @@ TAU_S = 0.020
 GYRO_CUTOFF_HZ = 40.0
 DGYRO_CUTOFF_HZ = 30.0
 AXES = ("roll", "pitch", "yaw")
+HOVER_THRUST = 0.35
+HOVER_ESTIMATE = 0.42
+THR_MDL_FAC = 0.3
+MPC_THR_HOVER = 0.45
+MOTOR_LAG_S = 0.028
+ESC_HZ = 200.0
+RPM_PER_COMMAND = 9000.0
+RPM_OFFSET = 1500.0
 
 
 def reference_lowpass(u: np.ndarray, dt_s: float, tau_s: float) -> np.ndarray:
@@ -129,6 +137,13 @@ class QuadSpec:
     # "unrelated" is an independent signal, "none" leaves the topic out.
     instrument: str = "torque"
     rates_sp_hz: float | None = None  # its logged rate; None: rate_hz
+    # The hover, motor and battery topics (None leaves the topic out).
+    hover_thrust: float | None = HOVER_THRUST  # collective thrust setpoint in the air
+    hover_estimate: float | None = HOVER_ESTIMATE  # hover_thrust_estimate, all valid
+    motor_lag_s: float | None = MOTOR_LAG_S  # ESC RPM follows the motor command through it
+    esc_hz: float = ESC_HZ  # logged rate of esc_status
+    motor_count: int = 4
+    cell_counts: tuple[float, ...] | None = (4.0, 4.0)  # battery_status, one per second
 
 
 def _rates_setpoint(t_s: np.ndarray, torque: np.ndarray, spec: QuadSpec,
@@ -170,6 +185,41 @@ def _torque(t_s: np.ndarray, spec: QuadSpec, rng: np.random.Generator) -> np.nda
     return np.column_stack(cols)
 
 
+def _hover_topics(t_lp_us: np.ndarray, spec: QuadSpec) -> dict:
+    out: dict = {}
+    if spec.hover_thrust is not None:
+        zeros, n = np.zeros(t_lp_us.size), t_lp_us.size
+        out["vehicle_thrust_setpoint"] = {
+            "timestamp": t_lp_us, "xyz[0]": zeros, "xyz[1]": zeros,
+            "xyz[2]": np.full(n, -spec.hover_thrust)}
+    if spec.hover_estimate is not None:
+        out["hover_thrust_estimate"] = {
+            "timestamp": t_lp_us, "hover_thrust": np.full(t_lp_us.size, spec.hover_estimate),
+            "valid": np.ones(t_lp_us.size)}
+    if spec.cell_counts is not None:
+        n = len(spec.cell_counts)
+        out["battery_status"] = {"timestamp": np.arange(n) * 1e6,
+                                 "cell_count": np.array(spec.cell_counts)}
+    return out
+
+
+def _motor_topics(t_us: np.ndarray, dt_s: float, spec: QuadSpec,
+                  rng: np.random.Generator) -> dict:
+    """actuator_motors at the control rate and esc_status at esc_hz, RPM a lagged command."""
+    if spec.motor_lag_s is None:
+        return {}
+    t_s = t_us * 1e-6
+    commands = [0.5 + sum_of_sines(t_s, 0.05, rng) for _ in range(spec.motor_count)]
+    motors = {"timestamp": t_us}
+    motors.update({f"control[{i}]": c for i, c in enumerate(commands)})
+    stride = max(1, int(round(spec.rate_hz / spec.esc_hz)))
+    esc = {"timestamp": t_us[::stride]}
+    for i, c in enumerate(commands):
+        rpm = RPM_PER_COMMAND * reference_lowpass(c, dt_s, spec.motor_lag_s) + RPM_OFFSET
+        esc[f"esc[{i}].esc_rpm"] = rpm[::stride]
+    return {"actuator_motors": motors, "esc_status": esc}
+
+
 def quad_datasets(spec: QuadSpec) -> dict[str, dict[str, np.ndarray]]:
     """The topics of one synthetic flight: setpoint, rate and its derivative, segments."""
     rng = np.random.default_rng(spec.seed)
@@ -196,7 +246,10 @@ def quad_datasets(spec: QuadSpec) -> dict[str, dict[str, np.ndarray]]:
     if spec.instrument != "none":
         datasets["vehicle_rates_setpoint"] = _rates_setpoint(t_s, torque, spec, rng)
     n_lp = int(spec.duration_s * 50)
-    datasets.update(_segment_topics(n_lp, np.arange(n_lp) * 2e4, spec))
+    t_lp_us = np.arange(n_lp) * 2e4
+    datasets.update(_segment_topics(n_lp, t_lp_us, spec))
+    datasets.update(_hover_topics(t_lp_us, spec))
+    datasets.update(_motor_topics(t_us, dt, spec, rng))
     return datasets
 
 
@@ -204,6 +257,7 @@ def quad_params(**overrides: float) -> dict[str, float]:
     params = {
         "MAV_TYPE": 2, "SYS_AUTOSTART": AIRFRAME, "CAL_GYRO0_ID": SPI_ICM20689_GYRO_ID,
         "IMU_GYRO_CUTOFF": GYRO_CUTOFF_HZ, "IMU_DGYRO_CUTOFF": DGYRO_CUTOFF_HZ,
+        "THR_MDL_FAC": THR_MDL_FAC, "MPC_THR_HOVER": MPC_THR_HOVER, "IMU_GYRO_RATEMAX": 400,
     }
     params.update(overrides)
     return {k: v for k, v in params.items() if v is not None}

@@ -12,6 +12,11 @@
   first-order ``AlphaFilter``; ``response.py`` says which of them sit on the logged
   angular acceleration path and cites the PX4 source.
 
+- ``hover_command``: the motor command that gives a collective thrust under PX4's
+  thrust model (``THR_MDL_FAC``).
+- ``inflight_noise_std``: the std of a signal around its moving average, what the
+  rate loop sees as noise.
+
 numpy only. No function changes its inputs.
 """
 
@@ -414,3 +419,48 @@ def first_order_group_delay_s(cutoff_hz: float) -> float:
     if not cutoff_hz > 0:
         return 0.0
     return 1.0 / (2.0 * math.pi * cutoff_hz)
+
+
+# ---------------------------------------------------------------------------
+# Hover command and in-flight noise
+# ---------------------------------------------------------------------------
+
+
+def hover_command(thrust: float, thr_mdl_fac: float) -> float:
+    """The motor command u with (1 - f) * u + f * u**2 == thrust, f = THR_MDL_FAC.
+
+    u = thrust for f == 0, else (-(1 - f) + sqrt((1 - f)**2 + 4 f thrust)) / (2 f).
+    ValueError when f is not in [0, 1] (or not finite) or the thrust is negative
+    or not finite.
+    """
+    if not (math.isfinite(thr_mdl_fac) and 0.0 <= thr_mdl_fac <= 1.0):
+        raise ValueError(f"THR_MDL_FAC must be in [0, 1], got {thr_mdl_fac}")
+    if not (math.isfinite(thrust) and thrust >= 0.0):
+        raise ValueError(f"thrust must be finite and >= 0, got {thrust}")
+    if thr_mdl_fac == 0.0:
+        return float(thrust)
+    f = thr_mdl_fac
+    return (-(1.0 - f) + math.sqrt((1.0 - f) ** 2 + 4.0 * f * thrust)) / (2.0 * f)
+
+
+def inflight_noise_std(x: np.ndarray, dt_s: float, cutoff_hz: float) -> float:
+    """Std of x minus its centred moving average over round(1 / (cutoff_hz * dt_s)) samples.
+
+    Only samples with a full window around them count (no edge bias). The std is
+    corrected by sqrt(N / (N - 1)) for the window length N: white noise of std s
+    leaves a residual of variance s**2 (1 - 1/N). ValueError when the cutoff or
+    dt_s is not positive, the window is under 2 samples, or x is shorter than it.
+    """
+    if not (dt_s > 0 and cutoff_hz > 0):
+        raise ValueError(f"need dt_s > 0 and cutoff_hz > 0, got {dt_s} and {cutoff_hz}")
+    window = int(round(1.0 / (cutoff_hz * dt_s)))
+    values = np.asarray(x, dtype=float)
+    if window < 2 or values.size < window:
+        raise ValueError(f"need a window of at least 2 samples and a signal at least as long "
+                         f"(window {window}, signal {values.size})")
+    values = values - values.mean()  # keeps the running sums small
+    sums = np.concatenate(([0.0], np.cumsum(values)))
+    average = (sums[window:] - sums[:-window]) / window
+    offset = (window - 1) // 2
+    residual = values[offset: offset + average.size] - average
+    return float(np.std(residual) * math.sqrt(window / (window - 1.0)))

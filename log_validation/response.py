@@ -65,6 +65,10 @@ but keeps its other measurements. Gates per axis: excitation (torque std), instr
 plausibility gates that no real plant can fail: a gain <= 0 ("implausible gain") or
 a lag below filter_delay_s ("lag below filter delay") gives no estimate.
 
+The other per-log measurements (hover command, motor lag, in-flight gyro noise, loop
+rates, gyro parameters, cell count) are in ``response_measures``; each group reports
+its own errors and never blocks another.
+
 Only real quadrotors are analyzed: simulation logs (``hardware.is_simulation``) and
 logs whose MAV_TYPE (or, without it, CA_ROTOR_COUNT) is not a quadrotor get no
 measurements and an error naming why.
@@ -84,11 +88,20 @@ from pyulog import ULog
 
 # The noise pass's airframe rule (SYS_AUTOSTART, None when absent or 0), so both outputs agree.
 from .batch_analyze import _airframe_id
-from .flight_segments import detect_flight_segments
+from .flight_segments import FlightSegment, detect_flight_segments
 from .hardware import extract_hardware_info, is_simulation
 from .manifest import DEFAULT_MAX_PER_VEHICLE, ManifestError, add_selection_args, select_logs
 from .outputs import PrivateDataError, forbidden_strings, write_json
 from .parallel import run_per_log
+from .response_measures import (
+    Measured,
+    cell_count_measurements,
+    hover_group,
+    median_interval,
+    motor_lag_measurements,
+    param_measurements,
+    rate_measurements,
+)
 from .sysid import (
     PlantFit,
     butterworth2_group_delay_s,
@@ -107,7 +120,9 @@ TOPIC_RATES_SP = "vehicle_rates_setpoint"
 RATES_SP_FIELDS = ("roll", "pitch", "yaw")
 # The topics the pass reads: the signals, the instrument and what detect_flight_segments needs.
 RESPONSE_TOPICS = (TOPIC_TORQUE, TOPIC_RATE, TOPIC_RATES_SP, "vehicle_status",
-                   "vehicle_land_detected", "vehicle_local_position")
+                   "vehicle_land_detected", "vehicle_local_position",
+                   "vehicle_thrust_setpoint", "hover_thrust_estimate", "esc_status",
+                   "actuator_motors", "battery_status")
 
 # Seconds cut from both ends of each in-air segment, leaving out takeoff and landing.
 TRIM_S = 2.0
@@ -128,8 +143,10 @@ LOGGED_RATE_TOLERANCE = 0.05
 # A logging gap longer than this many median intervals of its topic is left empty
 # (NaN) instead of bridged by interpolation. Up to two consecutive dropped samples,
 # which the logger drops under load, are still interpolated (15 ms for a 200 Hz rate
-# setpoint); anything longer would put invented samples into the fit.
-MAX_GAP_INTERVALS = 3.0
+# setpoint); anything longer would put invented samples into the fit. Two dropped
+# samples leave a gap of exactly 3 intervals, so the limit sits half an interval above
+# it: the outcome must not depend on rounding.
+MAX_GAP_INTERVALS = 3.5
 # Vehicle type: MAV_TYPE 2 is MAV_TYPE_QUADROTOR; without MAV_TYPE, four rotors.
 MAV_TYPE_QUADROTOR = 2
 QUADROTOR_ROTOR_COUNT = 4
@@ -148,8 +165,8 @@ class ResponseGates:
     # noise gives about k / N (6 instruments over N samples; under 0.001 on the test
     # fakes), real fits 0.1 and up; 0.05 sits between them with a wide margin.
     min_r2: float = 0.05
-    noise_cutoff_hz: float = 20.0  # in-flight noise cut-off (Task 8)
-    min_motor_cmd_std: float = 0.02  # motor command variation for motor lag (Task 8)
+    noise_cutoff_hz: float = 20.0  # in-flight noise: the cut-off below which the signal is not noise
+    min_motor_cmd_std: float = 0.02  # motor lag: the least std of the motor command in a window
     min_first_stage_r2: float = 0.05  # instrument strength: R^2 of the torque on it
 
 
@@ -249,9 +266,8 @@ def _refusal(ulog: Any, header: _Header) -> str | None:
 # ---------------------------------------------------------------------------
 
 
-def _in_air_windows(ulog: Any) -> tuple[list[tuple[float, float]], float]:
+def _in_air_windows(segments: list[FlightSegment]) -> tuple[list[tuple[float, float]], float]:
     """(used windows, total in-air seconds): each in-air segment trimmed by TRIM_S at both ends."""
-    segments = detect_flight_segments(ulog)
     in_air_s = float(sum(s.end_s - s.start_s for s in segments))
     windows = [(s.start_s + TRIM_S, s.end_s - TRIM_S) for s in segments
                if s.end_s - s.start_s > 2 * TRIM_S]
@@ -279,14 +295,6 @@ def _vector(data: dict, fields: tuple[str, ...], stamp: str) -> tuple[np.ndarray
     t_s = np.asarray(data[stamp], dtype=float) * US_TO_S
     values = np.column_stack([np.asarray(data[f], dtype=float) for f in fields])
     return increasing_samples(t_s, values)
-
-
-def _median_interval(t_s: np.ndarray, windows: list[tuple[float, float]]) -> float:
-    inside = np.zeros(t_s.size, dtype=bool)
-    for start, end in windows:
-        inside |= (t_s >= start) & (t_s <= end)
-    steps = np.diff(t_s)[inside[1:] & inside[:-1]]
-    return float(np.median(steps)) if steps.size else float("nan")
 
 
 def _on_grid(t_s: np.ndarray, values: np.ndarray, grid: np.ndarray,
@@ -335,7 +343,7 @@ def _resampled(ulog: Any, windows: list[tuple[float, float]],
     t_y, y = _vector(rate_data, _xyz("xyz_derivative" if has_derivative else "xyz"), stamp)
     t_u, u = _vector(ulog.get_dataset(TOPIC_TORQUE).data, _xyz("xyz"), "timestamp")
     t_z, z = _vector(ulog.get_dataset(TOPIC_RATES_SP).data, RATES_SP_FIELDS, "timestamp")
-    intervals = {topic: _median_interval(t, windows)
+    intervals = {topic: median_interval(t, windows)
                  for topic, t in ((TOPIC_TORQUE, t_u), (TOPIC_RATE, t_y), (TOPIC_RATES_SP, t_z))}
     error = _logging_error(intervals)
     if error:
@@ -432,9 +440,9 @@ def _battery_scaling(params: dict[str, Any]) -> dict[str, float]:
 
 
 def _effectiveness_and_lag(
-    ulog: Any, params: dict[str, Any], gates: ResponseGates
-) -> tuple[dict[str, float], list[str]]:
-    windows, in_air_s = _in_air_windows(ulog)
+    ulog: Any, params: dict[str, Any], gates: ResponseGates, segments: list[FlightSegment]
+) -> Measured:
+    windows, in_air_s = _in_air_windows(segments)
     if not windows:
         return {}, [f"no in-air segment longer than {2 * TRIM_S:.0f} s"]
     has_derivative = _has_derivative(ulog)
@@ -469,6 +477,44 @@ def _result(log_id: str, vehicle_id: str | None, header: _Header,
                           measurements, [*header.errors, *errors])
 
 
+def _guarded(group: str, log_id: str, measure: Callable[[], Measured]) -> Measured:
+    """One measurement group: an unexpected failure is an error of that group alone."""
+    try:
+        return measure()
+    except Exception as e:
+        print(f"{log_id}: {group} failed: {type(e).__name__}: {e}", file=sys.stderr)
+        return {}, [f"{group} failed: {type(e).__name__}"]
+
+
+def _measure(ulog: Any, log_id: str, params: dict[str, Any], gates: ResponseGates) -> Measured:
+    """Every measurement group of one real quadrotor log, merged; groups do not block each other."""
+    try:
+        segments = detect_flight_segments(ulog)
+    except Exception as e:
+        print(f"{log_id}: flight segments failed: {type(e).__name__}: {e}", file=sys.stderr)
+        segments = None
+    measurements: dict[str, float] = dict(_battery_scaling(params))
+    errors: list[str] = []
+    groups: list[Measured] = []
+    if segments is None:
+        groups.append(({}, ["flight segments failed (effectiveness, hover, noise and motor "
+                            "lag not measured)"]))
+    else:
+        groups.append(_effectiveness_and_lag(ulog, params, gates, segments))
+        windows, _ = _in_air_windows(segments)
+        groups.append(_guarded("hover", log_id, lambda: hover_group(
+            ulog, params, segments, gates.noise_cutoff_hz, MAX_GAP_INTERVALS)))
+        groups.append(_guarded("motor lag", log_id, lambda: motor_lag_measurements(
+            ulog, windows, gates.min_motor_cmd_std, gates.min_r2, MAX_GAP_INTERVALS)))
+    groups.append(_guarded("rates", log_id, lambda: rate_measurements(ulog)))
+    groups.append(param_measurements(params))
+    groups.append(_guarded("cell count", log_id, lambda: cell_count_measurements(ulog)))
+    for group_measurements, group_errors in groups:
+        measurements.update(group_measurements)
+        errors.extend(group_errors)
+    return measurements, errors
+
+
 def analyze_response(
     ulog: Any, log_id: str, vehicle_id: str | None, gates: ResponseGates
 ) -> ResponseResult:
@@ -483,9 +529,8 @@ def analyze_response(
         refusal = _refusal(ulog, header)
         if refusal:
             return _result(log_id, vehicle_id, header, {}, [refusal])
-        measurements, errors = _effectiveness_and_lag(ulog, header.params, gates)
-        return _result(log_id, vehicle_id, header,
-                       {**_battery_scaling(header.params), **measurements}, errors)
+        measurements, errors = _measure(ulog, log_id, header.params, gates)
+        return _result(log_id, vehicle_id, header, measurements, errors)
     except Exception as e:
         print(f"{log_id}: analysis failed: {type(e).__name__}: {e}", file=sys.stderr)
         return _result(log_id, vehicle_id, header, {}, [f"analysis failed: {type(e).__name__}"])

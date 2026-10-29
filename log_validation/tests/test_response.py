@@ -206,8 +206,10 @@ def test_rate_setpoint_logged_too_slowly_gets_no_fit():
 
 
 def _only_log_level(measurements: dict) -> bool:
-    """No per-axis value, but the log-level ones a blocked fit still reports."""
-    return (not any("." in k for k in measurements)
+    """No per-axis fit value, but the log-level ones a blocked fit still reports."""
+    fit_keys = ("effectiveness.", "lag_s.", "fit_r2.", "first_stage_r2.", "reduced_form_r2.",
+                "lag_minus_filter_s.", "used_fraction.")
+    return (not any(k.startswith(fit_keys) for k in measurements)
             and {"filter_delay_s", "angular_accel_from_rate"} <= set(measurements))
 
 

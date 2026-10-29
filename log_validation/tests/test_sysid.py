@@ -14,6 +14,8 @@ from log_validation.sysid import (
     first_order_lowpass,
     fit_first_order_plant,
     fit_first_order_plant_runs,
+    hover_command,
+    inflight_noise_std,
     resample_on,
     uniform_resample,
 )
@@ -229,3 +231,64 @@ def test_first_order_group_delay_is_the_time_constant():
 def test_disabled_filters_have_no_delay(cutoff):
     assert butterworth2_group_delay_s(cutoff) == 0.0
     assert first_order_group_delay_s(cutoff) == 0.0
+
+
+# ---------------------------------------------------------------------------
+# Hover command and in-flight noise
+# ---------------------------------------------------------------------------
+
+
+def test_quadratic_thrust_model():
+    assert hover_command(0.25, 1.0) == pytest.approx(0.5)
+
+
+def test_linear_thrust_model():
+    assert hover_command(0.4, 0.0) == pytest.approx(0.4)
+
+
+@pytest.mark.parametrize("f", [0.3, 0.7])
+def test_hover_command_inverts_the_thrust_model(f):
+    u = hover_command(0.35, f)
+    assert (1 - f) * u + f * u * u == pytest.approx(0.35)
+
+
+@pytest.mark.parametrize("f", [-0.1, 1.5, float("nan")])
+def test_thr_mdl_fac_outside_unit_interval_is_refused(f):
+    with pytest.raises(ValueError, match="THR_MDL_FAC"):
+        hover_command(0.4, f)
+
+
+def test_negative_or_non_finite_thrust_is_refused():
+    for thrust in (-0.1, float("nan"), float("inf")):
+        with pytest.raises(ValueError, match="thrust"):
+            hover_command(thrust, 0.3)
+
+
+def test_inflight_noise_of_a_slow_sine_plus_white_noise():
+    rng = np.random.default_rng(5)
+    dt = 1.0 / 800.0
+    t = np.arange(8000) * dt
+    x = 0.2 * np.sin(2 * np.pi * 1.0 * t) + rng.normal(0.0, 0.05, t.size)
+    assert inflight_noise_std(x, dt, 20.0) == pytest.approx(0.05, rel=0.05)
+
+
+def test_inflight_noise_of_a_constant_is_zero():
+    assert inflight_noise_std(np.full(400, 3.0), 1 / 800, 20.0) == pytest.approx(0.0, abs=1e-12)
+
+
+def test_inflight_noise_does_not_change_its_input():
+    x = np.random.default_rng(1).normal(size=500)
+    before = x.copy()
+    inflight_noise_std(x, 1 / 800, 20.0)
+    assert np.array_equal(x, before)
+
+
+@pytest.mark.parametrize("x, dt, cutoff", [
+    (np.zeros(10), 1 / 800, 20.0),  # fewer samples than the window
+    (np.zeros(400), 1 / 800, 0.0),
+    (np.zeros(400), 0.0, 20.0),
+    (np.zeros(400), 1 / 800, 700.0),  # window below 2 samples
+])
+def test_inflight_noise_refuses_unusable_input(x, dt, cutoff):
+    with pytest.raises(ValueError):
+        inflight_noise_std(x, dt, cutoff)
