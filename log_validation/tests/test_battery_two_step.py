@@ -216,3 +216,19 @@ class TestInterruptedExtraction:
             extract_dir(batch, obs, loader=load_by_stem)
         one_shot = analyze_logs(make_log_dir(tmp_path, CORPUS), loader=load_by_stem)
         assert result_to_dict(fit_obs_dir(obs)) == result_to_dict(one_shot)
+
+
+class TestCliErrors:
+    def test_value_error_exits_2(self, tmp_path, capsys):
+        obs = tmp_path / "obs"
+        extract_dir(make_log_dir(tmp_path, CORPUS), obs, loader=load_by_stem)
+        (obs / "a01.sim").touch()  # a01 now has two files
+        assert main(["--obs-dir", str(obs), "--out-json", str(tmp_path / "o.json")]) == 2
+        assert capsys.readouterr().err.strip().splitlines()[-1].startswith("Error: ")
+
+    def test_malformed_npz_exits_2(self, tmp_path, capsys):
+        obs = tmp_path / "obs"
+        extract_dir(make_log_dir(tmp_path, CORPUS), obs, loader=load_by_stem)
+        (obs / "a01.npz").write_bytes(b"PK\x03\x04 cut short")
+        assert main(["--obs-dir", str(obs), "--out-json", str(tmp_path / "o.json")]) == 2
+        assert "Error: a01.npz" in capsys.readouterr().err

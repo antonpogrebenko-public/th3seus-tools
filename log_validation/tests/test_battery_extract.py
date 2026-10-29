@@ -118,3 +118,12 @@ class TestExtract:
         extract_dir(make_log_dir(tmp_path, ["a01", "sim01"]), out, loader=load_by_stem)
         assert read_statuses(out) == {"a01": "ok", "sim01": "sim"}
         assert load_named(out, "a01").log_id == "a01"
+
+    @pytest.mark.parametrize("damage", ["garbage", "empty", "truncated"])
+    def test_unreadable_file_is_a_value_error(self, tmp_path, damage):
+        path = save_extracted(make_data("a01"), tmp_path)
+        whole = path.read_bytes()
+        path.write_bytes({"garbage": b"not an npz file", "empty": b"",
+                          "truncated": whole[: len(whole) // 2]}[damage])
+        with pytest.raises(ValueError, match="a01.npz"):
+            load_extracted(path)

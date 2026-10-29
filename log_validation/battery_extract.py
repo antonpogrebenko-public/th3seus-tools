@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import hashlib
 import os
+import zipfile
+import zlib
 from collections import Counter
 from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass
@@ -185,11 +187,10 @@ def save_extracted(data: LogBatteryData, out_dir: Path) -> Path:
 def load_extracted(path: Path) -> LogBatteryData:
     """Read a file written by save_extracted; ValueError if it is malformed."""
     name = Path(path).name
-    with np.load(path, allow_pickle=False) as npz:
-        missing = [k for k in _REQUIRED_KEYS if k not in npz.files]
-        if missing:
-            raise ValueError(f"{name}: missing {', '.join(missing)}")
-        arrays = {k: npz[k] for k in npz.files}
+    arrays = _read_npz(Path(path))
+    missing = [k for k in _REQUIRED_KEYS if k not in arrays]
+    if missing:
+        raise ValueError(f"{name}: missing {', '.join(missing)}")
     data = LogBatteryData(
         log_id=str(arrays["log_id"]),
         cell_count=int(arrays["cell_count"]),
@@ -204,6 +205,16 @@ def load_extracted(path: Path) -> LogBatteryData:
     if len(shapes) != 1 or len(next(iter(shapes))) != 1:
         raise ValueError(f"{name}: series must be one-dimensional and of one length")
     return data
+
+
+def _read_npz(path: Path) -> dict[str, np.ndarray]:
+    """Every array of an .npz file; a file numpy cannot read as one is a ValueError."""
+    try:
+        with np.load(path, allow_pickle=False) as npz:
+            return {k: npz[k] for k in npz.files}
+    except (ValueError, EOFError, AttributeError, zipfile.BadZipFile, zlib.error) as e:
+        # AttributeError: numpy returned a plain array (an .npy), which has no `files`.
+        raise ValueError(f"{path.name}: not a readable extract file ({type(e).__name__})") from e
 
 
 def extract_dir(

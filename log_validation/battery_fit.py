@@ -71,10 +71,10 @@ from .battery_model import (  # noqa: F401
 )
 from .battery_output import emit_rust_constants, result_to_dict, write_markdown_summary
 from .manifest import (
-    DEFAULT_MAX_PER_VEHICLE, ManifestError, add_selection_args, cap_per_vehicle,
+    DEFAULT_MAX_PER_VEHICLE, add_selection_args, cap_per_vehicle,
     check_max_per_vehicle, read_manifest,
 )
-from .outputs import PrivateDataError, forbidden_strings, write_json
+from .outputs import forbidden_strings, write_json
 
 # ---------------------------------------------------------------------------
 # Constants — all named with rationale
@@ -700,11 +700,14 @@ def _run_fit(args: argparse.Namespace) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
+    # Exit 2 with one line for any refused input: ValueError covers ManifestError,
+    # PrivateDataError, duplicate or unreadable extract files and a fit with no
+    # holdout scored; OSError covers missing files.  Exit 1 means target missed.
     try:
         if args.extract_to is not None:
             return _run_extract(args)
         return _run_fit(args)
-    except (ManifestError, PrivateDataError, FileNotFoundError) as e:
+    except (ValueError, OSError) as e:
         print(f"Error: {e}", file=sys.stderr)
         return 2
 
