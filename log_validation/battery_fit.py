@@ -52,7 +52,6 @@ import tempfile
 from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
-from itertools import groupby, islice
 from pathlib import Path
 from typing import Any, Optional
 
@@ -71,7 +70,10 @@ from .battery_model import (  # noqa: F401
     PerCellRFit,
 )
 from .battery_output import emit_rust_constants, result_to_dict, write_markdown_summary
-from .manifest import DEFAULT_MAX_PER_VEHICLE, ManifestError, add_selection_args, read_manifest
+from .manifest import (
+    DEFAULT_MAX_PER_VEHICLE, ManifestError, add_selection_args, cap_per_vehicle,
+    check_max_per_vehicle, read_manifest,
+)
 from .outputs import PrivateDataError, forbidden_strings, write_json
 
 # ---------------------------------------------------------------------------
@@ -525,16 +527,12 @@ def _select_extracted(
     ids: Sequence[str], manifest_path: Path | None, max_per_vehicle: int
 ) -> tuple[list[str], dict[str, str], int]:
     """(kept log IDs, their vehicles, logs without a manifest row), as select_logs does for .ulg files."""
+    check_max_per_vehicle(max_per_vehicle)
     if manifest_path is None:
         return sorted(ids), {}, 0
     manifest = read_manifest(manifest_path)
     listed = [i for i in ids if i in manifest]
-    by_vehicle = sorted(listed, key=lambda i: (manifest[i], i))
-    # Sorted by vehicle, then log ID: the smallest IDs of each vehicle win.
-    kept = sorted(
-        i for _, group in groupby(by_vehicle, key=lambda i: manifest[i])
-        for i in islice(group, max_per_vehicle)
-    )
+    kept = cap_per_vehicle(listed, manifest, max_per_vehicle)
     return kept, {i: manifest[i] for i in kept}, len(ids) - len(listed)
 
 

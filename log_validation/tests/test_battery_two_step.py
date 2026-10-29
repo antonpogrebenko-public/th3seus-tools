@@ -113,3 +113,17 @@ def test_outputs_do_not_import_the_fit(tmp_path):
     done = subprocess.run([sys.executable, "-c", script], cwd=REPO_ROOT,
                           capture_output=True, text=True, check=True)
     assert done.stdout.strip() == "False"
+
+
+@pytest.mark.parametrize("path", ["one_shot", "two_step"])
+def test_negative_cap_is_refused_on_both_paths(tmp_path, path):
+    manifest = make_manifest(tmp_path, {i: "v1" for i in CORPUS})
+    log_dir = make_log_dir(tmp_path, CORPUS)
+    obs = tmp_path / "obs"
+    if path == "two_step":
+        extract_dir(log_dir, obs, loader=load_by_stem)
+    with pytest.raises(ValueError, match="max_per_vehicle"):
+        if path == "one_shot":
+            analyze_logs(log_dir, manifest_path=manifest, max_per_vehicle=-1, loader=load_by_stem)
+        else:
+            fit_obs_dir(obs, manifest, max_per_vehicle=-1)

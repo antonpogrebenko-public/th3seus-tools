@@ -105,3 +105,21 @@ def test_selection_args_defaults(tmp_path):
     assert args.jobs == 1
     args = parser.parse_args(["--manifest", "m.csv", "--max-per-vehicle", "2", "--jobs", "4"])
     assert (args.manifest, args.max_per_vehicle, args.jobs) == (Path("m.csv"), 2, 4)
+
+
+def test_cap_per_vehicle_keeps_the_smallest_ids_of_each_vehicle():
+    from log_validation.manifest import cap_per_vehicle
+
+    vehicle_of = {"b2": "v1", "a1": "v1", "a2": "v1", "c1": "v2", "a3": "v1"}
+    assert cap_per_vehicle(vehicle_of, vehicle_of, 2) == ["a1", "a2", "c1"]
+    assert cap_per_vehicle(vehicle_of, vehicle_of, 0) == []
+
+
+def test_negative_cap_is_refused(tmp_path):
+    log_dir = _make_logs(tmp_path / "logs", ["1", "2"])
+    with pytest.raises(ValueError, match="max_per_vehicle"):
+        select_logs(log_dir, None, -1)
+    parser = argparse.ArgumentParser()
+    add_selection_args(parser)
+    with pytest.raises(SystemExit):
+        parser.parse_args(["--max-per-vehicle", "-1"])
