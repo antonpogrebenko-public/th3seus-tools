@@ -1,6 +1,6 @@
-"""Aggregate batch results by hardware configuration.
+"""Aggregate batch results into grouped noise profiles.
 
-Computes statistics per hardware group with IQR outlier filtering.
+Computes statistics per MCU family, board and IMU group with IQR outlier filtering.
 
 Usage:
     python -m log_validation.aggregate results.json -o aggregated.json
@@ -28,8 +28,10 @@ class SensorStats:
     param: str
     count: int
     median: float
+    p5: float
     p25: float
     p75: float
+    p95: float
     mean: float
     std: float
     model_value: float
@@ -37,13 +39,29 @@ class SensorStats:
 
 
 @dataclass(frozen=True)
-class HardwareGroup:
-    """Statistics grouped by hardware configuration."""
+class ProfileGroup:
+    """Statistics for one group: an MCU family, a board or an IMU chip."""
 
-    fc_board: str
-    imu_name: str | None
+    kind: str
+    key: str
     sample_count: int
     sensors: dict[str, SensorStats]
+
+
+ALL_KEY = "ALL"
+
+
+def mcu_family(mcu: str | None) -> str | None:
+    """Map an MCU string to the family name used by the TH3SEUS seeding script."""
+    if not mcu:
+        return None
+    upper = mcu.upper()
+    for family in ("STM32F4", "STM32F7", "STM32H7"):
+        if family in upper:
+            return family
+    if "KINETIS" in upper or "K66" in upper:
+        return "NXP_K66"
+    return None
 
 
 def iqr_filter(values: np.ndarray, k: float = 1.5) -> np.ndarray:
@@ -77,103 +95,89 @@ def get_model_ref(param: str) -> tuple[float, str]:
     return 0.0, ""
 
 
-def aggregate_by_hardware(
-    results: list[dict[str, Any]],
-    group_by: list[str] = ["fc_board", "imu_name"],
-) -> list[HardwareGroup]:
-    """Group results by hardware and compute filtered statistics."""
+def _compute_sensors(
+    measurements_list: list[dict[str, Any]], min_logs: int
+) -> dict[str, SensorStats]:
+    """Compute outlier-filtered statistics per parameter."""
+    all_params: set[str] = set()
+    for m in measurements_list:
+        all_params.update(m.keys())
 
-    # Group measurements by hardware key
-    groups: dict[tuple, list[dict[str, float]]] = defaultdict(list)
+    sensors: dict[str, SensorStats] = {}
+    for param in sorted(all_params):
+        values = [m[param] for m in measurements_list if m.get(param) is not None]
+        if len(values) < min_logs:
+            continue
+        filtered = iqr_filter(np.array(values, dtype=float))
+        if len(filtered) < 2:
+            continue
+        p5, p25, p75, p95 = np.percentile(filtered, [5, 25, 75, 95])
+        model_val, model_unit = get_model_ref(param)
+        sensors[param] = SensorStats(
+            param=param,
+            count=len(filtered),
+            median=float(np.median(filtered)),
+            p5=float(p5),
+            p25=float(p25),
+            p75=float(p75),
+            p95=float(p95),
+            mean=float(np.mean(filtered)),
+            std=float(np.std(filtered, ddof=1)),
+            model_value=model_val,
+            model_unit=model_unit,
+        )
+    return sensors
+
+
+def aggregate_profiles(
+    results: list[dict[str, Any]], min_logs: int = 3
+) -> list[ProfileGroup]:
+    """Group results by MCU family (plus ALL), board and IMU chip."""
+    buckets: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
 
     for r in results:
-        hw = r.get("hardware", {})
-        if not hw:
+        measurements = r.get("measurements")
+        if not measurements:
             continue
+        hw = r.get("hardware") or {}
+        buckets[("mcu_family", ALL_KEY)].append(measurements)
+        family = mcu_family(hw.get("mcu"))
+        if family:
+            buckets[("mcu_family", family)].append(measurements)
+        if hw.get("fc_board"):
+            buckets[("board", str(hw["fc_board"]))].append(measurements)
+        if hw.get("imu_name"):
+            buckets[("imu", str(hw["imu_name"]))].append(measurements)
 
-        # Build group key
-        key_parts = []
-        for field in group_by:
-            val = hw.get(field)
-            key_parts.append(str(val) if val else "UNKNOWN")
-        key = tuple(key_parts)
-
-        # Collect valid measurements
-        measurements = r.get("measurements", {})
-        if measurements:
-            groups[key].append(measurements)
-
-    # Compute statistics per group
-    output: list[HardwareGroup] = []
-
-    for key, measurements_list in groups.items():
-        if len(measurements_list) < 3:
+    output: list[ProfileGroup] = []
+    for (kind, key), measurements_list in buckets.items():
+        if len(measurements_list) < min_logs:
             continue
-
-        # Collect all params across this group
-        all_params: set[str] = set()
-        for m in measurements_list:
-            all_params.update(m.keys())
-
-        sensors: dict[str, SensorStats] = {}
-
-        for param in sorted(all_params):
-            values = []
-            for m in measurements_list:
-                if param in m and m[param] is not None:
-                    values.append(m[param])
-
-            if len(values) < 3:
-                continue
-
-            arr = np.array(values)
-            filtered = iqr_filter(arr)
-
-            if len(filtered) < 2:
-                continue
-
-            model_val, model_unit = get_model_ref(param)
-
-            sensors[param] = SensorStats(
-                param=param,
-                count=len(filtered),
-                median=float(np.median(filtered)),
-                p25=float(np.percentile(filtered, 25)),
-                p75=float(np.percentile(filtered, 75)),
-                mean=float(np.mean(filtered)),
-                std=float(np.std(filtered, ddof=1)),
-                model_value=model_val,
-                model_unit=model_unit,
-            )
-
+        sensors = _compute_sensors(measurements_list, min_logs)
         if sensors:
-            output.append(HardwareGroup(
-                fc_board=key[0] if len(key) > 0 else "UNKNOWN",
-                imu_name=key[1] if len(key) > 1 and key[1] != "UNKNOWN" else None,
-                sample_count=len(measurements_list),
-                sensors=sensors,
-            ))
+            output.append(ProfileGroup(kind, key, len(measurements_list), sensors))
 
-    # Sort by sample count descending
-    output.sort(key=lambda g: g.sample_count, reverse=True)
+    output.sort(key=lambda g: (g.kind, -g.sample_count, g.key))
     return output
 
 
-def to_json(groups: list[HardwareGroup]) -> list[dict[str, Any]]:
+def to_json(groups: list[ProfileGroup]) -> list[dict[str, Any]]:
     """Convert to JSON-serializable format."""
     out = []
     for g in groups:
         out.append({
-            "fc_board": g.fc_board,
-            "imu_name": g.imu_name,
+            "kind": g.kind,
+            "key": g.key,
             "sample_count": g.sample_count,
             "sensors": {
                 k: {
                     "param": v.param,
                     "count": v.count,
                     "median": v.median,
+                    "p5": v.p5,
                     "p25": v.p25,
                     "p75": v.p75,
+                    "p95": v.p95,
                     "mean": v.mean,
                     "std": v.std,
                     "model_value": v.model_value,
@@ -186,14 +190,14 @@ def to_json(groups: list[HardwareGroup]) -> list[dict[str, Any]]:
     return out
 
 
-def print_summary(groups: list[HardwareGroup]) -> None:
+def print_summary(groups: list[ProfileGroup]) -> None:
     """Print human-readable summary."""
     print(f"\n{'='*80}")
-    print(f"Aggregated {len(groups)} hardware configurations")
+    print(f"Aggregated {len(groups)} profile groups")
     print(f"{'='*80}\n")
 
     for g in groups[:10]:  # Top 10
-        print(f"FC: {g.fc_board} | IMU: {g.imu_name or 'N/A'} | n={g.sample_count}")
+        print(f"{g.kind}: {g.key} | n={g.sample_count}")
         for param, s in sorted(g.sensors.items()):
             ratio = s.median / s.model_value if s.model_value else 0
             verdict = "ok" if 0.33 <= ratio <= 3.0 else "FLAG"
@@ -215,7 +219,7 @@ def main() -> None:
     with open(args.input) as f:
         results = json.load(f)
 
-    groups = aggregate_by_hardware(results)
+    groups = aggregate_profiles(results)
 
     if args.summary or not args.output:
         print_summary(groups)
