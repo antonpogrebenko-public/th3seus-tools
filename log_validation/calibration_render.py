@@ -17,6 +17,12 @@ RUN_DATE_PREFIX = "- Run date: "
 NA = "n/a"
 RESPONSE_QUANTITIES = ("effectiveness.", "lag_minus_filter_s.", "hover.command", "motor_lag_s",
                        "rate.", "inflight_gyro_noise.")
+# The optional run-info `inputs` counts, from the download step and the passes' stderr.
+INPUT_LABELS = (("manifest_rows", "Manifest rows"),
+                ("rows_without_log", "Manifest rows without a log"),
+                ("logs_without_row", "Logs without a manifest row"),
+                ("capped_out", "Logs over the per-vehicle cap"),
+                ("download_failed", "Failed downloads"))
 
 
 def _num(value: Any, spec: str = ".4g") -> str:
@@ -193,13 +199,24 @@ def _counts_block(c: PassCounts) -> list[str]:
     return lines
 
 
-def _counts(noise: Sequence[dict], battery: Mapping[str, Any],
-            response: Sequence[dict]) -> list[str]:
+def _inputs_block(inputs: Mapping[str, Any] | None) -> list[str]:
+    """The run-info `inputs` counts as a table: the known names first, then any other, sorted."""
+    lines = ["### Inputs", ""]
+    if inputs is None:
+        return lines + ["The input counts were not provided: run-info.json has no `inputs` "
+                        "object. Each pass prints its selection counts to stderr.", ""]
+    labels = dict(INPUT_LABELS)
+    keys = [k for k, _ in INPUT_LABELS if k in inputs] + sorted(k for k in inputs if k not in labels)
+    return lines + _table(["Input", "Count"], [[labels.get(k, k), str(inputs[k])] for k in keys])
+
+
+def _counts(noise: Sequence[dict], battery: Mapping[str, Any], response: Sequence[dict],
+            inputs: Mapping[str, Any] | None) -> list[str]:
     ids = log_id_lists(noise, battery, response)
     blocks = (entry_counts("noise", noise, ids["noise"]),
               battery_counts(battery, ids["battery"]),
               entry_counts("response", response, ids["response"]))
-    return [line for block in blocks for line in _counts_block(block)]
+    return _inputs_block(inputs) + [line for block in blocks for line in _counts_block(block)]
 
 
 def render_report(noise: Sequence[dict], battery: Mapping[str, Any], response: Sequence[dict],
@@ -208,7 +225,7 @@ def render_report(noise: Sequence[dict], battery: Mapping[str, Any], response: S
     """The calibration report; sections in the order of `SECTIONS`."""
     bodies = (_run(run_info), _noise(noise), _battery(battery), _response(ranges),
               _airframes(airframes), _ranges(ranges), _gaps(noise, response, ranges),
-              _counts(noise, battery, response))
+              _counts(noise, battery, response, run_info.get("inputs")))
     lines = ["# TH3SEUS calibration from public PX4 flight logs", ""]
     for title, body in zip(SECTIONS, bodies):
         lines += _section(title, body)

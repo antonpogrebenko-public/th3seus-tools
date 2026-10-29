@@ -396,6 +396,18 @@ def test_cap_keeps_the_smallest_log_ids_of_a_vehicle(tmp_path):
     assert [r.log_id for r in results] == ["10", "11", "12"]
 
 
+def test_selection_counts_go_to_stderr(tmp_path, capsys):
+    log_dir = _touch(tmp_path, ["10", "11", "u1"])
+    manifest = tmp_path / "m.csv"
+    manifest.write_text("log_id,vehicle_id\n10,v1\n11,v1\ngone,v2\n")
+    results = response_batch(log_dir, None, manifest_path=manifest, max_per_vehicle=1,
+                             loader=load_by_stem)
+    err = capsys.readouterr().err
+    assert [r.log_id for r in results] == ["10"]
+    assert "manifest_rows_without_log: 1" in err
+    assert "logs_without_manifest_row: 1" in err and "capped_out: 1" in err
+
+
 def test_bad_and_dying_logs_do_not_stop_the_run(tmp_path):
     log_dir = _touch(tmp_path, ["a1", "bad", "die"])
     out = tmp_path / "r.json"

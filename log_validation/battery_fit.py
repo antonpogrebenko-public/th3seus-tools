@@ -72,7 +72,7 @@ from .battery_model import (  # noqa: F401
 from .battery_output import emit_rust_constants, result_to_dict, write_markdown_summary
 from .manifest import (
     DEFAULT_MAX_PER_VEHICLE, add_selection_args, cap_per_vehicle,
-    check_max_per_vehicle, read_manifest,
+    check_max_per_vehicle, format_counts, read_manifest,
 )
 from .outputs import forbidden_strings, write_json
 
@@ -696,7 +696,7 @@ def _run_extract(args: argparse.Namespace) -> int:
     counts = extract_dir(
         Path(args.log_dir), args.extract_to, args.manifest, args.max_per_vehicle, args.jobs
     )
-    print(" | ".join(f"{k}: {v}" for k, v in counts.items()), file=sys.stderr)
+    print(format_counts(counts), file=sys.stderr)
     return 0
 
 

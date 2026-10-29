@@ -21,7 +21,9 @@ from .manifest import (
     DEFAULT_MAX_PER_VEHICLE,
     ManifestError,
     add_selection_args,
+    format_counts,
     select_logs,
+    selection_counts,
 )
 from .parallel import run_per_log
 from .outputs import PrivateDataError, forbidden_strings, write_json
@@ -171,6 +173,7 @@ def batch_analyze(
 ) -> list[LogResult]:
     """Analyze the selected logs of a directory; results are sorted by log ID."""
     selection = select_logs(log_dir, manifest_path, max_per_vehicle)
+    print(f"Selection: {format_counts(selection_counts(selection))}", file=sys.stderr)
     paths = list(selection.paths)
     if limit:
         paths = paths[:limit]

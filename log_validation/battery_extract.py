@@ -23,7 +23,7 @@ import numpy as np
 from pyulog import ULog
 
 from .hardware import extract_hardware_info, is_simulation
-from .manifest import DEFAULT_MAX_PER_VEHICLE, select_logs
+from .manifest import DEFAULT_MAX_PER_VEHICLE, select_logs, selection_counts
 from .parallel import run_per_log
 from .ulog_loader import US_TO_S
 
@@ -244,7 +244,8 @@ def extract_dir(
     gets an empty <log_id>.no_manifest_row marker, so the fit counts it.  Only
     a run that finishes writes extract-<digest>.done listing its logs; the fit
     refuses logs no done file lists.  The counts also hold the selection's
-    logs_without_manifest_row and capped_out.
+    manifest_rows_without_log, logs_without_manifest_row and capped_out
+    (manifest.selection_counts).
     """
     selection = select_logs(Path(log_dir), manifest_path, max_per_vehicle)
     if not selection.paths:
@@ -260,11 +261,7 @@ def extract_dir(
     for log_id in selection.unlisted_ids:
         _record_status(out, log_id, STATUS_NO_MANIFEST_ROW)
     _write_done(done, [p.stem for p in selection.paths] + list(selection.unlisted_ids))
-    return {
-        **{s: statuses.count(s) for s in STATUSES},
-        "logs_without_manifest_row": selection.logs_without_manifest_row,
-        "capped_out": selection.capped_out,
-    }
+    return {**{s: statuses.count(s) for s in STATUSES}, **selection_counts(selection)}
 
 
 def _extract_task(task: tuple[Path, Path, Callable[[Path], Any]]) -> str:

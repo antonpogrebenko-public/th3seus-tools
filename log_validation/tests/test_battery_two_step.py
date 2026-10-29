@@ -127,6 +127,16 @@ class TestCli:
         md = (out / "dir.md").read_text()
         assert "p10" in md and doc["fit_log_ids"][0] in md and doc["holdout_log_ids"][0] in md
 
+    def test_extract_prints_the_manifest_rows_without_a_log(self, tmp_path, monkeypatch, capsys):
+        monkeypatch.setattr(
+            battery_extract, "ULog", lambda path, message_name_filter_list=None: load_by_stem(Path(path))
+        )
+        log_dir = make_log_dir(tmp_path, ["a01"])
+        manifest = make_manifest(tmp_path, {"a01": "v1", "gone01": "v2"})
+        assert main(["--log-dir", str(log_dir), "--extract-to", str(tmp_path / "obs"),
+                     "--manifest", str(manifest)]) == 0
+        assert "manifest_rows_without_log: 1" in capsys.readouterr().err
+
     def test_relative_obs_dir_writes_its_json(self, tmp_path, monkeypatch):
         extract_dir(make_log_dir(tmp_path, CORPUS), tmp_path / "obs", loader=load_by_stem)
         monkeypatch.chdir(tmp_path)

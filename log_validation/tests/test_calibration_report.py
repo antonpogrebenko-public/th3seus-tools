@@ -223,6 +223,39 @@ def test_report_labels_the_airframe_lag_as_an_upper_bound():
     assert "| lag | body-rate lag minus filter delay (upper bound on motor lag) |" in text
 
 
+INPUTS = {"manifest_rows": 10, "rows_without_log": 1, "logs_without_row": 2, "capped_out": 3,
+          "download_failed": 4}
+
+
+def _counts_section(info: dict) -> str:
+    text = render_report(noise_entries(), battery_dict(), response_entries(), airframes_dict(),
+                         [], info)
+    return text.split("## Counts")[1]
+
+
+def test_report_renders_the_input_counts():
+    counts = _counts_section({**run_info(), "inputs": INPUTS})
+    for line in ("| Manifest rows | 10 |", "| Manifest rows without a log | 1 |",
+                 "| Logs without a manifest row | 2 |", "| Logs over the per-vehicle cap | 3 |",
+                 "| Failed downloads | 4 |"):
+        assert line in counts
+    assert counts.index("### Inputs") < counts.index("### Noise")
+
+
+def test_report_states_that_the_input_counts_are_absent():
+    counts = _counts_section(run_info())
+    assert "The input counts were not provided" in counts and "| Manifest rows |" not in counts
+
+
+def test_bad_input_counts_are_refused(tmp_path, capsys):
+    paths = write_inputs(tmp_path / "in")
+    paths["run_info"].write_text(json.dumps({**run_info(), "inputs": {"capped_out": "3"}}))
+    code = main(["--noise", str(paths["noise"]), "--battery", str(paths["battery"]),
+                 "--response", str(paths["response"]), "--airframes", str(paths["airframes"]),
+                 "--run-info", str(paths["run_info"]), "--out-dir", str(tmp_path / "o")])
+    assert code == 2 and "inputs" in capsys.readouterr().err
+
+
 def test_directory_has_every_listed_file(tmp_path):
     out, _ = _write(tmp_path)
     names = set(_files(out))

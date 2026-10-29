@@ -79,6 +79,12 @@ class TestExtract:
         assert file_names(out) == ["a00.npz", "a01.npz", "a02.npz"]
         assert counts["ok"] == 3 and counts["capped_out"] == 5
 
+    def test_counts_hold_manifest_rows_without_a_log(self, tmp_path):
+        manifest = make_manifest(tmp_path, {"a01": "v1", "gone01": "v2"})
+        counts = extract_dir(make_log_dir(tmp_path, ["a01"]), tmp_path / "obs", manifest,
+                             loader=load_by_stem)
+        assert counts["manifest_rows_without_log"] == 1 and counts["ok"] == 1
+
     def test_every_selected_log_leaves_one_file(self, tmp_path):
         out = tmp_path / "obs"
         counts = extract_dir(make_log_dir(tmp_path, ["a01", "sim01", "bad01", "flat01"]), out,

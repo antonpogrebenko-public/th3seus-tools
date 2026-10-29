@@ -64,7 +64,15 @@ and vehicles only by the manifest's vehicle ID, never by a path, user or host na
 The manifest is an optional CSV with the columns `log_id` and `vehicle_id`. With it,
 logs not listed are skipped, at most `--max-per-vehicle` logs (default 3, the
 smallest IDs) are kept per vehicle, and the split and the ranges count each vehicle
-once. The count of logs without a manifest row is reported.
+once. Where each count is reported:
+
+- Manifest rows without a log, logs without a manifest row and logs over the cap:
+  printed to stderr by `batch_analyze`, `response` and the battery extract
+  (`battery_fit --extract-to`).
+- Logs without a manifest row: also in the battery fit's JSON
+  (`logs_without_manifest_row`) and markdown, and in the report's battery counts.
+- All of them, with the failed downloads, in the report's Counts section, when
+  `run-info.json` carries them as `inputs` (below).
 
 The passes, each reading the same folder and manifest:
 
@@ -84,7 +92,11 @@ python -m log_validation.reference_airframes response.json -o airframes.json
 ```
 
 Write a `run-info.json` with `date`, `tool_commit`, `parameters` (caps, gates,
-cut-offs, seeds, N) and `commands`, then build the directory:
+cut-offs, seeds, N) and `commands`, and optionally `inputs`, the input counts, for
+example `{"manifest_rows": N, "rows_without_log": N, "logs_without_row": N,
+"capped_out": N, "download_failed": N}`. The report's Counts section shows `inputs`
+as a table, or says that the input counts were not provided. Then build the
+directory:
 
 ```bash
 python -m log_validation.calibration_report --noise noise.json --battery battery.json \

@@ -90,7 +90,14 @@ from pyulog import ULog
 from .batch_analyze import _airframe_id
 from .flight_segments import FlightSegment, detect_flight_segments
 from .hardware import extract_hardware_info, is_simulation
-from .manifest import DEFAULT_MAX_PER_VEHICLE, ManifestError, add_selection_args, select_logs
+from .manifest import (
+    DEFAULT_MAX_PER_VEHICLE,
+    ManifestError,
+    add_selection_args,
+    format_counts,
+    select_logs,
+    selection_counts,
+)
 from .outputs import PrivateDataError, forbidden_strings, write_json
 from .parallel import run_per_log
 from .response_measures import (
@@ -592,6 +599,7 @@ def response_batch(
 ) -> list[ResponseResult]:
     """Analyze the selected logs of log_dir; results sorted by log ID, output guarded."""
     selection = select_logs(log_dir, manifest_path, max_per_vehicle)
+    print(f"Selection: {format_counts(selection_counts(selection))}", file=sys.stderr)
     tasks = [(p, selection.vehicle_of.get(p.stem), gates, loader) for p in selection.paths]
     results = sorted(run_per_log(_response_task, tasks, jobs, _died_result),
                      key=lambda r: r.log_id)

@@ -78,6 +78,20 @@ def select_logs(
     )
 
 
+def selection_counts(selection: Selection) -> dict[str, int]:
+    """The selection's input counts, in a fixed order, for a pass to report."""
+    return {
+        "manifest_rows_without_log": selection.manifest_rows_without_log,
+        "logs_without_manifest_row": selection.logs_without_manifest_row,
+        "capped_out": selection.capped_out,
+    }
+
+
+def format_counts(counts: Mapping[str, int]) -> str:
+    """Counts on one line, "name: N | name: N", as the passes print them to stderr."""
+    return " | ".join(f"{name}: {n}" for name, n in counts.items())
+
+
 def check_max_per_vehicle(max_per_vehicle: int) -> None:
     """Refuse a negative per-vehicle cap (0 keeps no log)."""
     if max_per_vehicle < 0:

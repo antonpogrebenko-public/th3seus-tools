@@ -95,6 +95,16 @@ def test_cap_applies(tmp_path):
     assert {e["vehicle_id"] for e in entries} == {"v1"}
 
 
+def test_selection_counts_go_to_stderr(tmp_path, capsys):
+    log_dir = _touch(tmp_path, ["a1", "a2", "a3", "a4", "u1"])
+    manifest = tmp_path / "m.csv"
+    manifest.write_text("log_id,vehicle_id\na1,v1\na2,v1\na3,v1\na4,v1\ngone,v2\n")
+    batch_analyze(log_dir, None, manifest_path=manifest, max_per_vehicle=3, loader=load_by_stem)
+    err = capsys.readouterr().err
+    assert "manifest_rows_without_log: 1" in err
+    assert "logs_without_manifest_row: 1" in err and "capped_out: 1" in err
+
+
 def test_corrupt_log_does_not_stop_the_run(tmp_path):
     log_dir = _touch(tmp_path, ["a1", "bad", "c3"])
     out = tmp_path / "r.json"

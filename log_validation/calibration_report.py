@@ -62,6 +62,13 @@ def _check_run_info(run_info: dict) -> None:
     for key, kind in RUN_INFO_KEYS.items():
         if not isinstance(run_info.get(key), kind):
             raise ValueError(f"run-info needs {key!r} as a {kind.__name__}")
+    inputs = run_info.get("inputs")
+    if inputs is None:
+        return
+    counts_ok = isinstance(inputs, dict) and all(
+        isinstance(v, int) and not isinstance(v, bool) and v >= 0 for v in inputs.values())
+    if not counts_ok:
+        raise ValueError("run-info 'inputs', when given, must map names to counts of 0 or more")
 
 
 def _check_airframes(airframes: dict) -> None:
@@ -139,7 +146,8 @@ def _build_parser() -> argparse.ArgumentParser:
                        ("battery", "battery fit JSON (battery_fit --out-json)"),
                        ("response", "response pass results JSON"),
                        ("airframes", "reference-airframe comparison JSON"),
-                       ("run-info", "run info JSON: date, tool_commit, parameters, commands")):
+                       ("run-info", "run info JSON: date, tool_commit, parameters, commands, "
+                                    "and optionally inputs (counts)")):
         parser.add_argument(f"--{name}", type=Path, required=True, help=what)
     parser.add_argument("--out-dir", type=Path, required=True, help="calibration directory")
     parser.add_argument("--forbid", action="append", default=[], metavar="STR",
