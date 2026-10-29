@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import dataclasses
 import re
+from pathlib import Path
 
 import numpy as np
 import pytest
 
+from log_validation import battery_model, battery_output
 from log_validation.battery_fit import (
     StepCheck,
     emit_rust_constants,
@@ -141,3 +143,27 @@ def test_emitted_rust_keeps_its_format(pattern):
     _, result = _corpus_result()
     lines = emit_rust_constants(result).splitlines()
     assert any(re.match(pattern, line) for line in lines), pattern
+
+
+LONG_DASHES = ("—", "–")  # em dash, en dash
+
+
+def _markdown(tmp_path, result) -> str:
+    out = tmp_path / "s.md"
+    write_markdown_summary(result, out)
+    return out.read_text(encoding="utf-8")
+
+
+def test_markdown_title_has_no_date_and_names_the_rust_format(tmp_path):
+    _, result = _corpus_result()
+    md = _markdown(tmp_path, result)
+    assert md.splitlines()[0] == "# Battery Model Fit"
+    assert "compiled into" not in md
+    assert "the format `hitl-physics/src/battery.rs` uses" in " ".join(md.split())
+
+
+def test_battery_outputs_and_sources_have_no_long_dashes(tmp_path):
+    _, result = _corpus_result()
+    texts = [_markdown(tmp_path, result), emit_rust_constants(result)]
+    texts += [Path(m.__file__).read_text(encoding="utf-8") for m in (battery_output, battery_model)]
+    assert [d for t in texts for d in LONG_DASHES if d in t] == []

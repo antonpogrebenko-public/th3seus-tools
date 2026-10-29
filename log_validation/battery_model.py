@@ -23,7 +23,7 @@ MIN_R_OBSERVATIONS_PER_CLASS: int = 200
 # consumer LiPo cell does not sit below ~4 mΩ/cell; high-cell-count packs are
 # NOT 4× lower resistance per cell than low-cell packs.  When a class's fitted
 # median falls below this floor it indicates unreliable data (few packs, biased
-# current sensing — observed for 12S, which fits ~2 mΩ/cell).  Such classes
+# current sensing, observed for 12S, which fits ~2 mΩ/cell).  Such classes
 # fall back to the pooled median.  Held-out validation confirmed the sub-floor
 # 12S value badly under-predicts sag, so this fallback is corrective, not cosmetic.
 R_PLAUSIBLE_FLOOR_MOHM_PER_CELL: float = 4.0

@@ -100,14 +100,14 @@ def write_markdown_summary(
     """Write a short Markdown summary of the fit results."""
     sc = r.step_check
     lines = [
-        "# Battery Model Fit — 2026-06-23",
+        "# Battery Model Fit",
         "",
         "Fit from real PX4 flight logs (SIM excluded via `hardware.is_simulation`).",
         "",
         f"Canonical run: deterministic, split seed = `{r.split_seed}`.  "
         "The R table, OCV table, and held-out MAE below all derive from this "
-        "single run and are the exact values compiled into "
-        "`hitl-physics/src/battery.rs`.",
+        "single run; `--emit-rust` prints the tables in the format "
+        "`hitl-physics/src/battery.rs` uses.",
         "",
         "## Corpus",
         "",
@@ -128,14 +128,14 @@ def write_markdown_summary(
         f"A class falls back to the pooled median (the **Deployed** column, which "
         f"is what Rust uses) when it has fewer than {MIN_R_OBSERVATIONS_PER_CLASS} "
         f"step events OR its fitted median is implausibly low "
-        f"(< {R_PLAUSIBLE_FLOOR_MOHM_PER_CELL:.0f} mΩ/cell — a sign of biased data).",
+        f"(< {R_PLAUSIBLE_FLOOR_MOHM_PER_CELL:.0f} mΩ/cell, a sign of biased data).",
         "",
         "| Cell count | Median (mΩ/cell) | p10 | p90 | Deployed (mΩ/cell) | IQR "
         "| n step events | Vehicles | fallback reason |",
         "|---|---|---|---|---|---|---|---|---|",
     ]
     for f in r.r_fits:
-        iqr = f"{f.p25_mohm_per_cell:.2f}–{f.p75_mohm_per_cell:.2f}"
+        iqr = f"{f.p25_mohm_per_cell:.2f} to {f.p75_mohm_per_cell:.2f}"
         if not f.low_n:
             reason = "none"
         elif f.n_observations < MIN_R_OBSERVATIONS_PER_CLASS:
@@ -189,7 +189,7 @@ def write_markdown_summary(
         "- **Monotone enforcement:** isotonic regression (pool-adjacent-violators) applied to "
         "bin medians before Rust porting.",
         f"- **Low-n classes:** any cell-count class with < {MIN_R_OBSERVATIONS_PER_CLASS} "
-        "step events (e.g. 12S — very few packs in the corpus) is too noisy to trust and "
+        "step events (e.g. 12S, with very few packs in the corpus) is too noisy to trust and "
         "falls back to the pooled median.  The **Deployed** column reflects this and matches Rust.",
         "",
     ]
@@ -201,12 +201,12 @@ def write_markdown_summary(
 def emit_rust_constants(r: BatteryFitResult) -> str:
     """Render the deployed R table + OCV table as Rust source constants.
 
-    The output is copied verbatim into ``hitl-physics/src/battery.rs`` so the
-    deployed Rust values are guaranteed to equal the canonical run.
+    The output is in the format ``hitl-physics/src/battery.rs`` uses, so the
+    tables can be copied there as they are.
     """
     lines: list[str] = []
     lines.append(
-        "// FITTED_R_TABLE — deployed per-cell R (mΩ/cell), keyed by cell count."
+        "// FITTED_R_TABLE: deployed per-cell R (mΩ/cell), keyed by cell count."
     )
     lines.append(
         f"// Canonical run, split seed={r.split_seed}, {r.real_log_count} real logs, "
