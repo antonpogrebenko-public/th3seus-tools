@@ -37,6 +37,18 @@ filter_delay_s holds the IMU_GYRO_CUTOFF low-pass only. The measurement
 ``angular_accel_from_rate`` records the source: 1.0 for this fallback, 0.0 for
 ``xyz_derivative``.
 
+Closed loop and the plausibility gates. Source: PX4-Autopilot
+``src/lib/rate_control/rate_control.cpp`` (``RateControl::update``) and
+``src/modules/mc_rate_control/MulticopterRateControl.cpp`` at tag v1.14.0. The torque
+setpoint is P * rate error + integral - D * angular_accel + FF * rate setpoint, and
+the angular_accel passed in is ``vehicle_angular_velocity.xyz_derivative``: the very
+signal fitted here. So the setpoint holds -D * y at zero delay, and coloured
+disturbances in y bias the least-squares gain low (even negative) and the lag short.
+An instrumental-variable fit with the rate setpoint as instrument was tried and not
+adopted (it gave no more plausible estimates on real logs); instead an axis whose
+best fit has a gain <= 0 ("implausible gain") or a lag below filter_delay_s ("lag
+below filter delay"), neither of which a real plant can have, gets no estimate.
+
 Only real quadrotors are analyzed: simulation logs (``hardware.is_simulation``) and
 logs whose MAV_TYPE (or, without it, CA_ROTOR_COUNT) is not a quadrotor get no
 measurements and an error naming why.
@@ -62,6 +74,7 @@ from .manifest import DEFAULT_MAX_PER_VEHICLE, ManifestError, add_selection_args
 from .outputs import PrivateDataError, forbidden_strings, write_json
 from .parallel import run_per_log
 from .sysid import (
+    PlantFit,
     butterworth2_group_delay_s,
     first_order_group_delay_s,
     fit_first_order_plant_runs,
@@ -291,6 +304,16 @@ def _axis_runs(signals: _Signals, k: int) -> list[tuple[np.ndarray, np.ndarray]]
             for run in _finite_runs(u[:, k], y[:, k], min_len)]
 
 
+def _implausibility(axis: str, fit: PlantFit, filter_delay_s: float) -> str | None:
+    """Why a fit no real plant could produce is refused, or None (see the module docstring)."""
+    if not fit.gain > 0:
+        return f"{axis}: implausible gain ({fit.gain:.3g} rad/s^2 per unit torque, need > 0)"
+    if not fit.lag_s >= filter_delay_s:
+        return (f"{axis}: lag below filter delay (lag {fit.lag_s * 1e3:.1f} ms "
+                f"< filter delay {filter_delay_s * 1e3:.1f} ms)")
+    return None
+
+
 def _axis_response(
     axis: str, runs: list[tuple[np.ndarray, np.ndarray]], signals: _Signals,
     in_air_s: float, filter_delay_s: float, gates: ResponseGates,
@@ -311,9 +334,9 @@ def _axis_response(
     measurements[f"fit_r2.{axis}"] = fit.r2
     if not fit.r2 >= gates.min_r2:
         return measurements, [f"{axis}: low fit quality (R^2 {fit.r2:.3f} < {gates.min_r2})"]
-    if not fit.gain > 0:
-        return measurements, [f"{axis}: non-positive effectiveness ({fit.gain:.3g}) "
-                              "at the best fit"]
+    implausible = _implausibility(axis, fit, filter_delay_s)
+    if implausible:
+        return measurements, [implausible]
     measurements[f"effectiveness.{axis}"] = fit.gain
     measurements[f"lag_s.{axis}"] = fit.lag_s
     measurements[f"lag_minus_filter_s.{axis}"] = fit.lag_s - filter_delay_s

@@ -66,6 +66,9 @@ class QuadSpec:
     noise_only: bool = False  # angular acceleration unrelated to the torque
     params: dict = field(default_factory=dict)
     board: str = "PX4_FMU_V5"
+    gain: float = GAIN  # the plant: angular acceleration per unit torque
+    delay_s: float = DELAY_S
+    tau_s: float = TAU_S
 
 
 def _segment_topics(n_lp: int, t_lp_us: np.ndarray, spec: QuadSpec) -> dict:
@@ -102,7 +105,7 @@ def quad_datasets(spec: QuadSpec) -> dict[str, dict[str, np.ndarray]]:
     torque = _torque(t_s, spec, rng)
     accel = np.column_stack([
         rng.normal(0.0, 4.0, n) if spec.noise_only
-        else simulate_plant(torque[:, k], dt, GAIN, DELAY_S, TAU_S, 0.5, rng)
+        else simulate_plant(torque[:, k], dt, spec.gain, spec.delay_s, spec.tau_s, 0.5, rng)
         for k in range(3)
     ])
     rate = np.cumsum(accel, axis=0) * dt

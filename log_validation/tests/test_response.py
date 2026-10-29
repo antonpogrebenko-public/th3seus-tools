@@ -75,6 +75,28 @@ def test_low_fit_quality_axis_gets_no_estimate():
         assert any(axis in e and "fit quality" in e for e in result.errors)
 
 
+def _no_estimate(measurements: dict) -> bool:
+    return not any(k.startswith(("effectiveness.", "lag_s.", "lag_minus_filter_s."))
+                   for k in measurements)
+
+
+def test_negative_gain_is_an_implausible_gain():
+    result = _analyze(replace(FAST, gain=-GAIN))
+    assert _no_estimate(result.measurements)
+    for axis in AXES:
+        assert result.measurements[f"fit_r2.{axis}"] > 0.5  # a good fit, refused for its sign
+        assert any(e.startswith(f"{axis}: implausible gain (-") for e in result.errors)
+
+
+def test_lag_below_the_filter_delay_gets_no_estimate():
+    # No plant lag at all: the fitted lag (about 0) is below the 10.9 ms filter delay.
+    result = _analyze(replace(FAST, delay_s=0.0, tau_s=0.0))
+    assert _no_estimate(result.measurements)
+    for axis in AXES:
+        assert any(e.startswith(f"{axis}: lag below filter delay") and "10.9 ms" in e
+                   for e in result.errors)
+
+
 def test_fixed_wing_log():
     result = _analyze(QuadSpec(params={"MAV_TYPE": 1}))
     assert result.measurements == {}
