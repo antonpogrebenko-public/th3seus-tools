@@ -1,222 +1,158 @@
-"""Randomization ranges and log-ID lists for the calibration report.
+"""Write the calibration directory: report, ranges, log-ID lists and normalized inputs.
 
-Turns the per-log noise entries, the battery fit result and the response entries
-into the ranges TH3SEUS randomizes over, and into the lists of Flight Review log
-IDs that contributed to each analysis.
+Usage:
+    python -m log_validation.calibration_report --noise noise.json --battery battery.json \\
+        --response response.json --airframes airframes.json --run-info run-info.json \\
+        --out-dir calibration [--forbid STR ...]
 
-Ranges rules:
-
-* Each log gives at most one value per quantity. Within a class, a vehicle's
-  logs are reduced to the vehicle's median first, and the p5, p25, p50, p75 and
-  p95 are taken over those vehicle medians with numpy's default linear
-  interpolation, so a vehicle with many logs counts once.
-* A log without a vehicle ID is its own vehicle, keyed so that it cannot collide
-  with a real vehicle ID.
-* Non-finite values never enter a percentile.
-* A class, and the "all" row of a quantity, is omitted when fewer than
-  `min_vehicles` vehicles contributed.
-* The lag quantity is `lag_minus_filter_s.<axis>`, not `lag_s.<axis>`: the
-  filter delay depends on each log's PX4 parameters, and a simulator running
-  PX4's own filters would count it twice.
-* Effectiveness uses the same values as the reference-airframe comparison: logs
-  with `bat_scale_en` == 1 are left out and the rest are converted to
-  motor-command space (`reference_airframes.log_effectiveness`).
-* Classes: the battery cell count and the airframe ID. A response entry's cell
-  count is `measurements["cell_count"]` and its airframe ID is top level; a
-  battery row carries its own cell count (and an airframe ID if it has one); a
-  noise entry has an airframe ID only. Class values are written as integers
-  ("4", "4019").
-* Rows are sorted by quantity, class kind, class value (plain string order).
+Everything is written through `outputs` with the forbidden strings (home, user, host,
+the folders of the input files and each `--forbid` value), into a staging folder first,
+so a refused write leaves the output folder as it was. The same inputs give the same
+files, except the Run date line of report.md (and `run-info.json`, whose date is the
+input's).
 """
 
 from __future__ import annotations
 
-import math
-from collections import defaultdict
-from dataclasses import dataclass
-from typing import Any, Mapping, Sequence
+import argparse
+import json
+import shutil
+import sys
+import tempfile
+from pathlib import Path
+from typing import Any, Sequence
 
-import numpy as np
+from .aggregate import aggregate_profiles, to_json
+from .calibration_noise import noise_before_after
+from .calibration_ranges import (
+    DEFAULT_MIN_VEHICLES,
+    RangeRow,
+    log_id_lists,
+    ranges_csv,
+    ranges_table,
+    vehicle_percentiles,
+)
+from .calibration_render import render_report
+from .outputs import (
+    MIN_FORBIDDEN_LEN,
+    PrivateDataError,
+    forbidden_strings,
+    write_json,
+    write_text,
+)
 
-from .reference_airframes import finite_number, log_effectiveness, vehicle_key
-from .th3seus_model import AXES
+__all__ = ["RangeRow", "log_id_lists", "noise_before_after", "ranges_csv", "ranges_table",
+           "render_report", "vehicle_percentiles", "write_calibration_dir", "main"]
 
-DEFAULT_MIN_VEHICLES = 5
-PERCENTILE_POINTS = (5, 25, 50, 75, 95)
-CSV_FLOAT_FORMAT = ".6g"
-CSV_HEADER = "quantity,class_kind,class_value,n_logs,n_vehicles,p5,p25,p50,p75,p95"
-
-ALL = "all"
-CELL_COUNT = "cell_count"
-AIRFRAME = "airframe"
-
-NOISE_DENSITY_KEYS = ("gyro.gyro_noise_density", "accel.accel_noise_density")
-BATTERY_QUANTITY = "battery.r_mohm_per_cell"
-PLAIN_RESPONSE_KEYS = ("hover.command", "motor_lag_s", "rate.torque_setpoint_hz",
-                       *(f"inflight_gyro_noise.{a}" for a in AXES))
-
-
-@dataclass(frozen=True)
-class RangeRow:
-    quantity: str
-    class_kind: str  # "all", "cell_count" or "airframe"
-    class_value: str
-    n_logs: int
-    n_vehicles: int
-    p5: float
-    p25: float
-    p50: float
-    p75: float
-    p95: float
+RUN_INFO_KEYS = {"date": str, "tool_commit": str, "parameters": dict, "commands": list}
+AIRFRAME_KEYS = ("min_vehicles", "comparisons", "recommendations")
 
 
-@dataclass(frozen=True)
-class _Sample:
-    log_id: str
-    vehicle: tuple[str, Any]
-    value: float
-    classes: tuple[tuple[str, str], ...]
+def _load(path: Path, kind: type, what: str) -> Any:
+    try:
+        value = json.loads(Path(path).read_text(encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        raise ValueError(f"{what} is not valid JSON: {e.msg} (line {e.lineno})") from e
+    if not isinstance(value, kind):
+        raise ValueError(f"{what} must hold a JSON {kind.__name__}")
+    return value
 
 
-def vehicle_percentiles(
-    values: Sequence[tuple[str, str | None, float]],
-) -> tuple[int, int, dict[int, float]]:
-    """(n_logs, n_vehicles, {5, 25, 50, 75, 95: value}) over vehicle medians.
-
-    Input is (log_id, vehicle_id, value). A missing vehicle ID makes the log its
-    own vehicle. Non-finite values are ignored. With no finite value the
-    percentiles are NaN."""
-    by_vehicle: dict[tuple[str, Any], list[float]] = defaultdict(list)
-    n_logs = 0
-    for log_id, vehicle_id, value in values:
-        if not _is_finite(value):
-            continue
-        n_logs += 1
-        by_vehicle[vehicle_key({"log_id": log_id, "vehicle_id": vehicle_id})].append(float(value))
-    medians = [float(np.median(v)) for v in by_vehicle.values()]
-    if not medians:
-        return 0, 0, {p: math.nan for p in PERCENTILE_POINTS}
-    points = np.percentile(medians, PERCENTILE_POINTS)
-    return n_logs, len(medians), {p: float(x) for p, x in zip(PERCENTILE_POINTS, points)}
+def _check_run_info(run_info: dict) -> None:
+    for key, kind in RUN_INFO_KEYS.items():
+        if not isinstance(run_info.get(key), kind):
+            raise ValueError(f"run-info needs {key!r} as a {kind.__name__}")
 
 
-def ranges_table(noise: Sequence[dict], battery: Mapping[str, Any], response: Sequence[dict],
-                 min_vehicles: int = DEFAULT_MIN_VEHICLES) -> list[RangeRow]:
-    """Percentile rows for every quantity, overall and per class, sorted."""
-    samples: dict[str, list[_Sample]] = defaultdict(list)
-    for entry in noise:
-        _add_noise(samples, entry)
-    for row in battery.get("per_log_r") or []:
-        _add_battery(samples, row)
-    for entry in response:
-        _add_response(samples, entry)
-    rows: list[RangeRow] = []
-    for quantity, quantity_samples in samples.items():
-        rows.extend(_quantity_rows(quantity, quantity_samples, min_vehicles))
-    return sorted(rows, key=lambda r: (r.quantity, r.class_kind, r.class_value))
+def _check_airframes(airframes: dict) -> None:
+    missing = [k for k in AIRFRAME_KEYS if k not in airframes]
+    if missing:
+        raise ValueError(f"airframes JSON lacks {', '.join(missing)}")
 
 
-def ranges_csv(rows: Sequence[RangeRow]) -> str:
-    """Header plus one line per row, sorted; floats use a fixed `.6g` format."""
-    ordered = sorted(rows, key=lambda r: (r.quantity, r.class_kind, r.class_value))
-    lines = [CSV_HEADER]
-    for r in ordered:
-        floats = ",".join(format(x, CSV_FLOAT_FORMAT) for x in (r.p5, r.p25, r.p50, r.p75, r.p95))
-        lines.append(f"{r.quantity},{r.class_kind},{r.class_value},{r.n_logs},{r.n_vehicles},{floats}")
-    return "\n".join(lines) + "\n"
+def _by_log_id(entries: list) -> list[dict]:
+    if not all(isinstance(e, dict) and isinstance(e.get("log_id"), str) for e in entries):
+        raise ValueError("per-log results must be objects with a log_id")
+    return sorted(entries, key=lambda e: e["log_id"])
 
 
-def log_id_lists(noise: Sequence[dict], battery: Mapping[str, Any],
-                 response: Sequence[dict]) -> dict[str, list[str]]:
-    """Sorted log IDs that contributed, under `noise`, `battery` and `response`.
+def _forbidden(inputs: Sequence[Path], extra: Sequence[str]) -> tuple[str, ...]:
+    """Home, user, host and the input folders, plus each extra as a literal string.
 
-    Noise: entries with a finite gyro or accel density. Battery: the fit log IDs
-    plus the scored holdout log IDs. Response: entries that give at least one
-    value to a ranges-table quantity after the table's filters."""
-    scratch: dict[str, list[_Sample]] = defaultdict(list)
-    for entry in noise:
-        _add_noise(scratch, entry)
-    noise_ids = {s.log_id for group in scratch.values() for s in group}
-    scratch = defaultdict(list)
-    for entry in response:
-        _add_response(scratch, entry)
-    response_ids = {s.log_id for group in scratch.values() for s in group}
-    battery_ids = set(battery.get("fit_log_ids") or []) | set(
-        battery.get("holdout_scored_log_ids") or [])
-    return {"noise": sorted(noise_ids), "battery": sorted(battery_ids),
-            "response": sorted(response_ids)}
+    An extra is a cloud account ID or a bucket name, not a path, so it is not
+    resolved the way `forbidden_strings` resolves its arguments."""
+    if any(len(s) < MIN_FORBIDDEN_LEN for s in extra):
+        raise ValueError(f"a --forbid string needs at least {MIN_FORBIDDEN_LEN} characters")
+    folders = sorted({Path(p).resolve().parent for p in inputs})
+    return (*forbidden_strings(*folders), *extra)
 
 
-# ---- samples ----
-
-def _is_finite(value: Any) -> bool:
-    return (isinstance(value, (int, float)) and not isinstance(value, bool)
-            and math.isfinite(value))
-
-
-def _class_text(value: Any) -> str | None:
-    """Stable text for a class value: integers without a decimal point; None if unusable."""
-    if not _is_finite(value) or value <= 0 or float(value) != int(value):
-        return None
-    return str(int(value))
-
-
-def _classes(cell_count: Any, airframe_id: Any) -> tuple[tuple[str, str], ...]:
-    out = []
-    for kind, raw in ((CELL_COUNT, cell_count), (AIRFRAME, airframe_id)):
-        text = _class_text(raw)
-        if text is not None:
-            out.append((kind, text))
-    return tuple(out)
+def _stage(stage: Path, forbidden: Sequence[str], noise: list[dict], battery: dict,
+           response: list[dict], airframes: dict, run_info: dict) -> None:
+    ranges = ranges_table(noise, battery, response)
+    write_text(stage / "report.md",
+               render_report(noise, battery, response, airframes, ranges, run_info), forbidden)
+    write_text(stage / "ranges.csv", ranges_csv(ranges), forbidden)
+    for name, ids in log_id_lists(noise, battery, response).items():
+        write_text(stage / "log-ids" / f"{name}.txt", "".join(f"{i}\n" for i in ids), forbidden)
+    write_json(stage / "noise-results.json", noise, forbidden)
+    write_json(stage / "noise-profiles.json", to_json(aggregate_profiles(noise)), forbidden)
+    write_json(stage / "battery-fit.json", battery, forbidden)
+    write_json(stage / "response-results.json", response, forbidden)
+    write_json(stage / "airframes.json", airframes, forbidden)
+    write_json(stage / "run-info.json", run_info, forbidden)
 
 
-def _add_noise(samples: dict[str, list[_Sample]], entry: Mapping[str, Any]) -> None:
-    measurements = entry.get("measurements") or {}
-    classes = _classes(None, entry.get("airframe_id"))
-    for key in NOISE_DENSITY_KEYS:
-        value = finite_number(measurements, key)
-        if value is not None:
-            samples[key].append(_Sample(entry["log_id"], vehicle_key(entry), value, classes))
+def write_calibration_dir(
+    out_dir: Path, noise_path: Path, battery_path: Path, response_path: Path,
+    airframes_path: Path, run_info_path: Path, extra_forbidden: Sequence[str] = (),
+) -> None:
+    """Write report.md, ranges.csv, log-ids/{noise,battery,response}.txt and the normalized inputs.
+
+    Raises ValueError for an input of the wrong shape and PrivateDataError when any
+    output would hold a private string; then nothing is written to `out_dir`."""
+    inputs = (noise_path, battery_path, response_path, airframes_path, run_info_path)
+    noise = _by_log_id(_load(noise_path, list, "noise results"))
+    battery = _load(battery_path, dict, "battery fit")
+    response = _by_log_id(_load(response_path, list, "response results"))
+    airframes = _load(airframes_path, dict, "airframes")
+    run_info = _load(run_info_path, dict, "run-info")
+    _check_airframes(airframes)
+    _check_run_info(run_info)
+    forbidden = _forbidden(inputs, extra_forbidden)
+    with tempfile.TemporaryDirectory() as tmp:
+        stage = Path(tmp) / "calibration"
+        _stage(stage, forbidden, noise, battery, response, airframes, run_info)
+        shutil.copytree(stage, Path(out_dir), dirs_exist_ok=True)
 
 
-def _add_battery(samples: dict[str, list[_Sample]], row: Mapping[str, Any]) -> None:
-    value = row.get("median_mohm_per_cell")
-    if _is_finite(value):
-        classes = _classes(row.get("cell_count"), row.get("airframe_id"))
-        samples[BATTERY_QUANTITY].append(
-            _Sample(row["log_id"], vehicle_key(row), float(value), classes))
+def _build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="python -m log_validation.calibration_report",
+        description="Write the calibration directory from the pass outputs.",
+        epilog="Exit status: 0 done, 2 error or private data refused.")
+    for name, what in (("noise", "noise pass results JSON (batch_analyze)"),
+                       ("battery", "battery fit JSON (battery_fit --out-json)"),
+                       ("response", "response pass results JSON"),
+                       ("airframes", "reference-airframe comparison JSON"),
+                       ("run-info", "run info JSON: date, tool_commit, parameters, commands")):
+        parser.add_argument(f"--{name}", type=Path, required=True, help=what)
+    parser.add_argument("--out-dir", type=Path, required=True, help="calibration directory")
+    parser.add_argument("--forbid", action="append", default=[], metavar="STR",
+                        help="a string no output may contain (repeatable), such as an account ID")
+    return parser
 
 
-def _add_response(samples: dict[str, list[_Sample]], entry: Mapping[str, Any]) -> None:
-    measurements = entry.get("measurements") or {}
-    classes = _classes(measurements.get("cell_count"), entry.get("airframe_id"))
-    values: dict[str, float | None] = {k: finite_number(measurements, k) for k in PLAIN_RESPONSE_KEYS}
-    for axis in AXES:
-        values[f"effectiveness.{axis}"] = log_effectiveness(measurements, axis)
-        values[f"lag_minus_filter_s.{axis}"] = finite_number(
-            measurements, f"lag_minus_filter_s.{axis}")
-    for quantity, value in values.items():
-        if value is not None:
-            samples[quantity].append(_Sample(entry["log_id"], vehicle_key(entry), value, classes))
+def main(argv: list[str] | None = None) -> int:
+    args = _build_parser().parse_args(argv)
+    try:
+        write_calibration_dir(args.out_dir, args.noise, args.battery, args.response,
+                              args.airframes, args.run_info, args.forbid)
+    except (PrivateDataError, ValueError, OSError) as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 2
+    return 0
 
 
-# ---- rows ----
-
-def _quantity_rows(quantity: str, samples: Sequence[_Sample], min_vehicles: int) -> list[RangeRow]:
-    groups: dict[tuple[str, str], list[_Sample]] = {(ALL, ALL): list(samples)}
-    for sample in samples:
-        for cls in sample.classes:
-            groups.setdefault(cls, []).append(sample)
-    rows = []
-    for (kind, value), group in groups.items():
-        n_logs, n_vehicles, p = vehicle_percentiles(
-            [(s.log_id, _vehicle_id(s), s.value) for s in group])
-        if n_vehicles >= min_vehicles:
-            rows.append(RangeRow(quantity, kind, value, n_logs, n_vehicles,
-                                 p[5], p[25], p[50], p[75], p[95]))
-    return rows
-
-
-def _vehicle_id(sample: _Sample) -> str | None:
-    kind, ident = sample.vehicle
-    return str(ident) if kind == "vehicle" else None
+if __name__ == "__main__":
+    sys.exit(main())

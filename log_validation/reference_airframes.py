@@ -180,19 +180,20 @@ def to_command_space(effectiveness: float, thr_mdl_fac: float | None,
     f = THR_MDL_FAC > 0 shows the effectiveness divided by dT/du at hover. The
     value is multiplied by (1 - f) + 2 f u_hover. None when f or u_hover is
     missing, not finite, or the hover command is not positive."""
-    if not _finite(thr_mdl_fac) or not _finite(hover_command) or hover_command <= 0.0:
+    if not is_finite_number(thr_mdl_fac) or not is_finite_number(hover_command) or hover_command <= 0.0:
         return None
     return effectiveness * ((1.0 - thr_mdl_fac) + 2.0 * thr_mdl_fac * hover_command)
 
 
-def _finite(value: Any) -> bool:
+def is_finite_number(value: Any) -> bool:
+    """True for a real, finite int or float (not a bool)."""
     return (isinstance(value, (int, float)) and not isinstance(value, bool)
             and math.isfinite(value))
 
 
 def finite_number(measurements: Mapping[str, Any], key: str) -> float | None:
     value = measurements.get(key)
-    return float(value) if _finite(value) else None
+    return float(value) if is_finite_number(value) else None
 
 
 def _log_lag(measurements: Mapping[str, Any]) -> float | None:
