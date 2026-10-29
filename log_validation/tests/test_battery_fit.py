@@ -472,7 +472,7 @@ class TestExtract:
 
     @pytest.mark.parametrize(
         "stem, status",
-        [("a01", "ok"), ("sim01", "sim"), ("bad01", "unusable"),
+        [("a01", "ok"), ("sim01", "sim"), ("bad01", "load_error"),
          ("nobat01", "unusable"), ("flat01", "unusable")],
     )
     def test_extract_log_status(self, stem, status):
@@ -508,8 +508,8 @@ class TestExtract:
         out = tmp_path / "obs"
         counts = extract_dir(_log_dir(tmp_path, ["a01", "sim01", "bad01", "flat01"]), out,
                              loader=load_by_stem)
-        assert _names(out) == ["a01.npz", "bad01.unusable", "flat01.unusable", "sim01.sim"]
-        assert (counts["ok"], counts["sim"], counts["unusable"]) == (1, 1, 2)
+        assert _names(out) == ["a01.npz", "bad01.load_error", "flat01.unusable", "sim01.sim"]
+        assert (counts["ok"], counts["sim"], counts["unusable"], counts["load_error"]) == (1, 1, 1, 1)
 
     def test_jobs_do_not_change_the_extraction(self, tmp_path):
         log_dir = _log_dir(tmp_path, ["a01", "sim01", "c3-01", "bad01"])
@@ -573,9 +573,21 @@ class TestFitExtracted:
     def test_sim_and_unusable_logs_keep_their_place_in_the_split(self, tmp_path):
         result = analyze_logs(_log_dir(tmp_path, CORPUS), loader=load_by_stem)
         fit, holdout = split_logs(CORPUS, {}, DEFAULT_HOLDOUT_FRAC, DEFAULT_SPLIT_SEED)
-        assert result.holdout_log_ids == [i for i in holdout if not i.startswith("sim")]
+        assert result.holdout_log_ids == [i for i in holdout if not i.startswith(("sim", "bad"))]
         assert set(result.fit_log_ids) <= set(fit)
-        assert (result.real_log_count, result.sim_log_count, result.skipped_log_count) == (19, 2, 3)
+        assert (result.real_log_count, result.sim_log_count, result.skipped_log_count) == (18, 2, 3)
+
+    def test_load_errors_and_dead_workers_are_skipped_but_not_real(self):
+        datas = [_data(f"a{k}") for k in range(8)]
+        no_data = {"e1": "load_error", "w1": "worker_died", "u1": "unusable", "s1": "sim"}
+        ids = [d.log_id for d in datas] + list(no_data)
+        seed = next(s for s in range(100)
+                    if {"e1", "w1", "u1"} <= set(split_logs(ids, {}, 0.34, s)[1]))
+        result = fit_extracted(datas, {}, 0.34, seed, no_data=no_data)
+        assert (result.real_log_count, result.sim_log_count, result.skipped_log_count) == (9, 1, 3)
+        assert "u1" in result.holdout_log_ids
+        assert not {"e1", "w1", "s1"} & set(result.holdout_log_ids)
+        assert result.holdout_log_count == len(result.holdout_log_ids)
 
     def test_fit_log_ids_hold_only_contributing_logs(self):
         quiet = {**_battery(4, R_4S_MOHM, 5), "current_a": np.full(FAKE_SAMPLES, 4.0)}

@@ -62,7 +62,7 @@ import numpy as np
 # names are re-exported so `from log_validation.battery_fit import ...` works.
 from .battery_extract import (  # noqa: F401
     BATTERY_TOPIC, MAX_CELL_COUNT, MIN_PEAK_CURRENT_A, MIN_VOLTAGE_RANGE_V, NPZ_SUFFIX,
-    STATUS_OK, STATUS_SIM, STATUS_UNUSABLE, STATUS_WORKER_DIED, STATUSES,
+    STATUS_LOAD_ERROR, STATUS_OK, STATUS_SIM, STATUS_UNUSABLE, STATUS_WORKER_DIED, STATUSES,
     LogBatteryData, _load_named, _read_statuses, extract_dir, extract_log,
     load_battery_topics, load_extracted, save_extracted,
 )
@@ -191,9 +191,9 @@ class OcvCurve:
 class BatteryFitResult:
     """Aggregate output of the battery fitting pipeline.
 
-    Counts are over the selected logs: ``real_log_count`` is every selected
-    log not detected as simulation, including those without usable battery
-    data, which ``skipped_log_count`` counts.  ``fit_log_ids`` are the
+    Counts are over the selected logs: ``real_log_count`` is every log that
+    loaded and is not simulation (as before); ``skipped_log_count`` is every
+    non-simulation log without usable data, load errors included.  ``fit_log_ids`` are the
     fit-side logs that gave at least one resistance or OCV observation;
     ``holdout_log_ids`` are the real logs of the holdout side; ``per_log_r``
     has one row per fit-side log with resistance observations.
@@ -560,7 +560,7 @@ def fit_extracted(
     """Fit R and OCV on the fit side of the split; score the holdout side.
 
     ``datas`` are the usable real logs.  ``no_data`` maps every other selected
-    log to its extract status ("sim", "unusable" or "worker_died"): those logs
+    log to its extract status ("sim", "unusable", "load_error", "worker_died"): those logs
     keep their place in the split, as every .ulg file had in the one-pass
     analysis, so a split without a manifest equals that analysis's split; they
     give no observation and no score.  ``vehicle_of`` (empty without a
@@ -583,11 +583,11 @@ def fit_extracted(
         raise ValueError("No holdout logs could be evaluated; check holdout fraction.")
     maes = np.array(holdout_maes)
     median_mae = float(np.median(maes))
-    n_sim = sum(1 for s in statuses.values() if s == STATUS_SIM)
-    holdout_real = [i for i in holdout_ids if statuses[i] != STATUS_SIM]
+    real = (STATUS_OK, STATUS_UNUSABLE)  # loaded and not simulation, as before
+    holdout_real = [i for i in holdout_ids if statuses[i] in real]
     return BatteryFitResult(
-        real_log_count=len(statuses) - n_sim,
-        sim_log_count=n_sim,
+        real_log_count=sum(1 for s in statuses.values() if s in real),
+        sim_log_count=sum(1 for s in statuses.values() if s == STATUS_SIM),
         skipped_log_count=sum(1 for s in statuses.values() if s not in (STATUS_OK, STATUS_SIM)),
         r_fits=r_fits,
         overall_r_median_mohm_per_cell=overall,

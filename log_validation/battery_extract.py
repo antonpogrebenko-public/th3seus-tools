@@ -40,11 +40,14 @@ MIN_PEAK_CURRENT_A: float = 2.0
 # Status of each selected log after the extract step.  An "ok" log is saved as
 # <log_id>.npz; any other status is saved as an empty <log_id>.<status> file,
 # so the fit step still places that log in the split (see fit_extracted).
+# "unusable" logs loaded but lack usable battery data; a "load_error" or
+# "worker_died" log was never read, so the fit does not count it as real.
 STATUS_OK = "ok"
 STATUS_SIM = "sim"
 STATUS_UNUSABLE = "unusable"
+STATUS_LOAD_ERROR = "load_error"
 STATUS_WORKER_DIED = "worker_died"
-STATUSES = (STATUS_OK, STATUS_SIM, STATUS_UNUSABLE, STATUS_WORKER_DIED)
+STATUSES = (STATUS_OK, STATUS_SIM, STATUS_UNUSABLE, STATUS_LOAD_ERROR, STATUS_WORKER_DIED)
 NPZ_SUFFIX = ".npz"
 _SUFFIX_OF_STATUS = {STATUS_OK: NPZ_SUFFIX, **{s: f".{s}" for s in STATUSES[1:]}}
 _STATUS_OF_SUFFIX = {suffix: status for status, suffix in _SUFFIX_OF_STATUS.items()}
@@ -74,7 +77,6 @@ class LogBatteryData:
     discharged_mah: np.ndarray | None
 
 
-
 # ---------------------------------------------------------------------------
 # Extract step: one log -> LogBatteryData -> <log_id>.npz
 # ---------------------------------------------------------------------------
@@ -88,15 +90,15 @@ def load_battery_topics(path: Path) -> ULog:
 def extract_log(
     path: Path, loader: Callable[[Path], Any] = load_battery_topics
 ) -> tuple[str, LogBatteryData | None]:
-    """Read one log: ("ok", data), ("sim", None) or ("unusable", None).
+    """Read one log: ("ok", data), or ("sim" | "unusable" | "load_error", None).
 
-    Unusable: the log fails to load, has no battery_status, or its pack fails
-    the checks of the one-pass analysis (cell count, voltage range, current).
+    Load error: the loader raised.  Unusable: no battery_status, or the pack
+    fails the checks of the one-pass analysis (cell count, voltage range, current).
     """
     try:
         ulog = loader(path)
     except Exception:
-        return STATUS_UNUSABLE, None
+        return STATUS_LOAD_ERROR, None
     if _is_simulation_log(ulog):
         return STATUS_SIM, None
     data = _battery_data(Path(path).stem, ulog)
