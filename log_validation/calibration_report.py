@@ -109,8 +109,9 @@ def write_calibration_dir(
 ) -> None:
     """Write report.md, ranges.csv, log-ids/{noise,battery,response}.txt and the normalized inputs.
 
-    Raises ValueError for an `out_dir` that exists and is not empty or an input of the wrong shape and PrivateDataError when any
-    output would hold a private string; then nothing is written to `out_dir`."""
+    Raises ValueError for an input of the wrong shape or an `out_dir` that is not empty.
+    Raises PrivateDataError when any output would hold a private string; then nothing
+    is written to `out_dir`."""
     out = Path(out_dir)
     if out.exists() and (not out.is_dir() or any(out.iterdir())):
         raise ValueError("the output directory exists and is not empty; use a new or empty one")

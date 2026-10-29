@@ -166,7 +166,6 @@ def test_range_row_is_frozen():
 
 
 # ---- Task 12: noise before and after, the report, the directory ----
-# ---- Task 12: noise before and after, the report, the directory ----
 
 
 
@@ -347,3 +346,12 @@ def test_non_empty_out_dir_is_refused(tmp_path, capsys):
     assert [p.name for p in out.iterdir()] == ["stale.txt"]
     (out / "stale.txt").unlink()
     assert main(args) == 0  # an existing empty directory is fine
+
+
+def test_a_forbid_string_shorter_than_3_characters_is_refused(tmp_path, capsys):
+    paths = write_inputs(tmp_path / "in")
+    code = main(["--noise", str(paths["noise"]), "--battery", str(paths["battery"]),
+                 "--response", str(paths["response"]), "--airframes", str(paths["airframes"]),
+                 "--run-info", str(paths["run_info"]), "--out-dir", str(tmp_path / "o"),
+                 "--forbid", "ab"])
+    assert code == 2 and "--forbid" in capsys.readouterr().err
