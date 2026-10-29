@@ -12,23 +12,36 @@ import pytest
 
 from log_validation.response import (
     AXES,
+    FIT_DELAYS_S,
+    FIT_TAUS_S,
+    INSTRUMENT_LAGS_S,
     ResponseGates,
     analyze_response,
+    instrument_matrix,
     main,
     response_batch,
 )
-from log_validation.sysid import butterworth2_group_delay_s, first_order_group_delay_s
+from log_validation.sysid import (
+    butterworth2_group_delay_s,
+    first_order_group_delay_s,
+    fit_first_order_plant,
+)
 from log_validation.tests.response_fakes import (
     AIRFRAME,
+    DELAY_S,
     DGYRO_CUTOFF_HZ,
     GAIN,
     GYRO_CUTOFF_HZ,
+    TAU_S,
+    LoopSpec,
     QuadSpec,
     quad_datasets,
     quad_log,
+    simulate_rate_loop,
 )
 
 GATES = ResponseGates()
+CLOSED_LOOP_SEED = 21
 FAST = QuadSpec(duration_s=20.0, takeoff_s=3.0, landing_s=18.0, rate_hz=400.0)
 
 
@@ -158,7 +171,61 @@ def test_setpoint_logged_below_the_rate_loop_rate_gets_no_estimate():
     result = _analyze(FAST, datasets)
     assert result.measurements == {}
     assert result.errors == ["not logged at the rate controller's rate (vehicle_torque_setpoint "
-                             "at 50 Hz, vehicle_angular_velocity at 400 Hz; need 200 Hz)"]
+                             "at 50 Hz, vehicle_angular_velocity at 400 Hz, "
+                             "vehicle_rates_setpoint at 400 Hz; need 190 Hz)"]
+
+
+def test_rate_setpoint_logged_slightly_below_200_hz_is_accepted():
+    # PX4 publishes the rate setpoint at about 200 Hz; logged medians of 198 Hz are common.
+    result = _analyze(replace(FAST, rates_sp_hz=192.0))
+    assert "effectiveness.roll" in result.measurements, result.errors
+
+
+def test_rate_setpoint_logged_too_slowly_gets_no_fit():
+    result = _analyze(replace(FAST, rates_sp_hz=150.0))
+    assert result.measurements == {}
+    assert result.errors == ["not logged at the rate controller's rate (vehicle_torque_setpoint "
+                             "at 400 Hz, vehicle_angular_velocity at 400 Hz, "
+                             "vehicle_rates_setpoint at 150 Hz; need 190 Hz)"]
+
+
+def test_log_without_rate_setpoint():
+    result = _analyze(replace(FAST, instrument="none"))
+    assert result.measurements == {}
+    assert result.errors == ["no vehicle_rates_setpoint (the instrument of the closed-loop fit)"]
+
+
+def test_unrelated_rate_setpoint_is_a_weak_instrument():
+    result = _analyze(replace(FAST, instrument="unrelated"))
+    assert _no_estimate(result.measurements)
+    for axis in AXES:
+        assert result.measurements[f"first_stage_r2.{axis}"] < GATES.min_first_stage_r2
+        assert any(e.startswith(f"{axis}: weak instrument (first-stage R^2 ")
+                   for e in result.errors)
+
+
+def test_closed_loop_two_stage_fit_beats_least_squares():
+    run = simulate_rate_loop(LoopSpec(seconds=120.0, seed=CLOSED_LOOP_SEED))
+    t = np.arange(len(run.torque)) * run.dt_s
+    keep = t >= max(INSTRUMENT_LAGS_S)
+    z = instrument_matrix(t, run.rate_sp, t[keep])
+    u, y = run.torque[keep], run.accel[keep]
+    tsls = fit_first_order_plant(u, y, run.dt_s, FIT_DELAYS_S, FIT_TAUS_S, instruments=z)
+    ls = fit_first_order_plant(u, y, run.dt_s, FIT_DELAYS_S, FIT_TAUS_S)
+    # u to y: the plant's 30 ms plus the derivative filter and half a sample.
+    path_lag = DELAY_S + TAU_S + LoopSpec().dgyro_tau_s + run.dt_s / 2
+    assert abs(tsls.gain - GAIN) / GAIN < 0.15 and abs(tsls.lag_s - path_lag) < 0.005
+    assert abs(ls.gain - GAIN) > abs(tsls.gain - GAIN)
+
+
+@pytest.mark.parametrize("value, expected", [(1, 1.0), (0, 0.0)])
+def test_battery_scaling_flag_is_reported(value, expected):
+    result = _analyze(replace(FAST, params={"MC_BAT_SCALE_EN": value}))
+    assert result.measurements["bat_scale_en"] == expected
+
+
+def test_battery_scaling_flag_is_absent_without_the_parameter():
+    assert "bat_scale_en" not in _analyze(FAST).measurements
 
 
 def test_setpoint_not_logged_in_the_air_gets_no_estimate():
@@ -274,7 +341,8 @@ def test_cli_has_one_option_per_gate(tmp_path, capsys):
     log_dir = _touch(tmp_path, [])
     out = tmp_path / "r.json"
     code = main([str(log_dir), "-o", str(out), "--min-torque-std", "0.05", "--min-r2", "0.6",
-                 "--noise-cutoff-hz", "15", "--min-motor-cmd-std", "0.03"])
+                 "--noise-cutoff-hz", "15", "--min-motor-cmd-std", "0.03",
+                 "--min-first-stage-r2", "0.1"])
     assert code == 0 and _read(out) == []
 
 

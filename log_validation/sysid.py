@@ -3,9 +3,10 @@
 - ``uniform_resample`` / ``resample_on``: put a logged series on a uniform time grid,
   dropping repeated and backward timestamps first.
 - ``first_order_lowpass``: the causal first-order lag, exact and vectorized.
-- ``fit_first_order_plant``: regress a response on its input passed through a pure
-  delay and a first-order lag, by least squares at every point of a delay and time
-  constant grid, keeping the point with the highest R^2.
+- ``fit_first_order_plant``: fit a response to its input passed through a pure
+  delay and a first-order lag at every point of a delay and time constant grid, by
+  least squares, or by two-stage least squares when instruments are given (for
+  closed-loop data), keeping the best point.
 - ``butterworth2_group_delay_s`` / ``first_order_group_delay_s``: the low-frequency
   group delay of PX4's second-order low-pass (``LowPassFilter2p``) and of its
   first-order ``AlphaFilter``; ``response.py`` says which of them sit on the logged
@@ -30,16 +31,25 @@ _MAX_BLOCK_GROWTH = 300.0
 MIN_FIT_SAMPLES = 100
 # Tolerance when a delay is converted to a whole number of samples plus a fraction.
 _SAMPLE_EPS = 1e-9
+# Instrument directions whose variance is below this share of the largest are dropped
+# (lags of one smooth signal are nearly collinear; this keeps Z'Z invertible).
+_COLLINEAR_FLOOR = 1e-10
 
 
 @dataclass(frozen=True)
 class PlantFit:
-    """y = gain * lowpass(u, tau_s) delayed by delay_s, plus an offset; r2 in [0, 1]."""
+    """y = gain * lowpass(u, tau_s) delayed by delay_s, plus an offset; r2 in [0, 1].
+
+    Least squares: r2 is the ordinary R^2 and first_stage_r2 is 1.0. Two-stage
+    least squares: r2 is the R^2 projected on the instruments and first_stage_r2
+    the R^2 of the filtered, delayed input on the instruments.
+    """
 
     gain: float
     delay_s: float
     tau_s: float
     r2: float
+    first_stage_r2: float = 1.0
 
     @property
     def lag_s(self) -> float:
@@ -140,117 +150,179 @@ def first_order_lowpass(u: np.ndarray, dt_s: float, tau_s: float) -> np.ndarray:
 # ---------------------------------------------------------------------------
 
 
-def _lag_moments(
-    lp: np.ndarray, target: np.ndarray, warmup: int
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    """Moments of A_n = lp[warmup - n : len - n] for n = 0..warmup.
+@dataclass(frozen=True)
+class _DelayGrid:
+    """Each grid delay as whole + frac samples, and the samples every fit skips first."""
 
-    Returns (A_n . target, sum A_n, A_n . A_n, A_n . A_(n+1)); the last is
-    meaningful for n < warmup only.
+    whole: np.ndarray
+    frac: np.ndarray
+    warmup: int
+
+
+@dataclass(frozen=True)
+class _Prepared:
+    """Centred runs and the sums that do not depend on u.
+
+    Each run is (u, rows): rows[0] the response after warmup, rows[1:] one instrument
+    each, as contiguous rows (np.dot on a contiguous row is several times faster than a
+    matrix product with an (n, k) matrix, and avoids the spurious floating-point
+    warnings numpy 2 on Apple Accelerate raises for some matmul shapes).
     """
+
+    runs: list[tuple[np.ndarray, np.ndarray]]
+    count: int
+    syy: float
+    whiten: np.ndarray | None  # W with W' (Z'Z) W = I on the kept directions
+    zy_white: np.ndarray | None  # W' Z'y
+
+
+def _delay_grid(dt_s: float, delays: np.ndarray) -> _DelayGrid:
+    shifts = delays / dt_s
+    whole = np.floor(shifts + _SAMPLE_EPS).astype(int)
+    return _DelayGrid(whole, np.clip(shifts - whole, 0.0, 1.0), int(whole.max()) + 1)
+
+
+def _delayed(per_shift: np.ndarray, grid: _DelayGrid) -> np.ndarray:
+    """Per-shift sums (rows n = 0..warmup) at every grid delay, by linear interpolation:
+    x = (1 - frac) A_n + frac A_(n+1), A_n the low-passed input shifted by n samples."""
+    w1 = grid.frac.reshape((-1,) + (1,) * (per_shift.ndim - 1))
+    return (1.0 - w1) * per_shift[grid.whole] + w1 * per_shift[grid.whole + 1]
+
+
+def _shifted_sums(lp: np.ndarray, rows: np.ndarray, warmup: int
+                  ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Per shift n: (sum A_n, A_n . row for each row), A_n . A_n and A_n . A_(n+1)."""
     n = np.arange(warmup + 1)
     lo, hi = warmup - n, lp.size - n
-    cross = np.array([np.dot(lp[a:b], target) for a, b in zip(lo, hi)])
     zero = np.zeros(1)
     sums = np.concatenate((zero, np.cumsum(lp)))
     squares = np.concatenate((zero, np.cumsum(lp * lp)))
     neighbours = np.concatenate((zero, zero, np.cumsum(lp[1:] * lp[:-1])))
-    return cross, sums[hi] - sums[lo], squares[hi] - squares[lo], neighbours[hi] - neighbours[lo]
+    cross = np.array([[np.dot(lp[a:b], row) for row in rows] for a, b in zip(lo, hi)])
+    linear = np.column_stack((sums[hi] - sums[lo], cross))
+    return linear, squares[hi] - squares[lo], neighbours[hi] - neighbours[lo]
 
 
-def _delay_sums(
-    moments: tuple[np.ndarray, ...], whole: np.ndarray, frac: np.ndarray
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Sum x, sum x*y and sum x*x of x = lp delayed by whole + frac samples.
+def _run_sums(u: np.ndarray, rows: np.ndarray, dt_s: float, tau_s: float,
+              grid: _DelayGrid) -> np.ndarray:
+    """Per delay: (sum x, sum x*x, sum x*y, Z'x...) of x = u low-passed by tau_s and delayed."""
+    linear, squares, neighbours = _shifted_sums(first_order_lowpass(u, dt_s, tau_s), rows,
+                                                grid.warmup)
+    w0, w1, n = 1.0 - grid.frac, grid.frac, grid.whole
+    sxx = w0 * w0 * squares[n] + 2.0 * w0 * w1 * neighbours[n] + w1 * w1 * squares[n + 1]
+    moved = _delayed(linear, grid)
+    return np.column_stack((moved[:, 0], sxx, moved[:, 1:]))
 
-    Between samples x is interpolated linearly: x = (1 - frac) A_whole + frac A_(whole+1).
+
+def _scores(sums: np.ndarray, prepared: _Prepared
+            ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """(R^2, gain, first-stage R^2) per delay, all centred (the model has an offset).
+
+    Without instruments: least squares, R^2 the squared correlation. With them:
+    two-stage least squares, gain = x'Py / x'Px for P the projection on the
+    instruments, and R^2 = 1 - e'Pe / y'Py (the fit projected on the instruments).
     """
-    cross, sums, squares, neighbours = moments
-    w0, w1 = 1.0 - frac, frac
-    sx = w0 * sums[whole] + w1 * sums[whole + 1]
-    sxy = w0 * cross[whole] + w1 * cross[whole + 1]
-    sxx = (w0 * w0 * squares[whole] + 2.0 * w0 * w1 * neighbours[whole]
-           + w1 * w1 * squares[whole + 1])
-    return sx, sxy, sxx
+    sx, sxx, sxy = sums[:, 0], sums[:, 1], sums[:, 2]
+    var_x = sxx - sx * sx / prepared.count
+    with np.errstate(divide="ignore", invalid="ignore"):
+        if prepared.whiten is None:
+            gain = sxy / var_x
+            r2 = sxy * sxy / (var_x * prepared.syy)
+            first = np.ones_like(r2)
+        else:
+            q = sums[:, 3:] @ prepared.whiten
+            num, den = q @ prepared.zy_white, np.sum(q * q, axis=1)
+            gain = num / den
+            r2 = num * num / (den * float(np.dot(prepared.zy_white, prepared.zy_white)))
+            first = np.clip(den / var_x, 0.0, 1.0)
+    valid = (var_x > 0) & np.isfinite(r2) & np.isfinite(gain)
+    return np.where(valid, np.clip(r2, 0.0, 1.0), -np.inf), gain, first
 
 
-def _usable_runs(
-    runs: Sequence[tuple[np.ndarray, np.ndarray]], warmup: int
-) -> list[tuple[np.ndarray, np.ndarray]]:
+def _usable_runs(runs: Sequence[tuple[np.ndarray, ...]], warmup: int
+                 ) -> list[tuple[np.ndarray, np.ndarray, np.ndarray | None]]:
+    """Validated (u, y, instruments or None) runs longer than warmup."""
     usable = []
-    for u, y in runs:
-        u_arr, y_arr = np.asarray(u, dtype=float), np.asarray(y, dtype=float)
-        if u_arr.shape != y_arr.shape or u_arr.ndim != 1:
-            raise ValueError("each run needs 1-D input and response of the same length")
-        if not (np.all(np.isfinite(u_arr)) and np.all(np.isfinite(y_arr))):
+    for run in runs:
+        u, y = (np.asarray(a, dtype=float) for a in run[:2])
+        z = np.asarray(run[2], dtype=float) if len(run) > 2 and run[2] is not None else None
+        if u.ndim != 1 or y.shape != u.shape or (z is not None and (
+                z.ndim != 2 or z.shape[0] != u.size)):
+            raise ValueError("each run needs 1-D input and response, and (n, k) instruments, "
+                             "of one length")
+        if not all(np.all(np.isfinite(a)) for a in (u, y, z) if a is not None):
             raise ValueError("runs must hold finite samples only")
-        if u_arr.size > warmup:
-            usable.append((u_arr, y_arr))
-    if sum(u.size - warmup for u, _ in usable) < MIN_FIT_SAMPLES:
+        if u.size > warmup:
+            usable.append((u, y, z))
+    if len({z is None for _, _, z in usable}) > 1:
+        raise ValueError("either every run has instruments or none has")
+    if sum(u.size - warmup for u, _, _ in usable) < MIN_FIT_SAMPLES:
         raise ValueError(f"too few samples to fit (need {MIN_FIT_SAMPLES} after the longest delay)")
     return usable
 
 
-def _r2_and_gain(
-    sums: np.ndarray, count: int, sy: float, syy: float
-) -> tuple[np.ndarray, np.ndarray]:
-    """R^2 and least-squares gain (with an offset) from the stacked (sx, sxy, sxx) sums."""
-    sx, sxy, sxx = sums
-    cov = sxy - sx * sy / count
-    var_x = sxx - sx * sx / count
-    var_y = syy - sy * sy / count
-    with np.errstate(divide="ignore", invalid="ignore"):
-        gain = cov / var_x
-        r2 = cov * cov / (var_x * var_y)
-    valid = (var_x > 0) & (var_y > 0) & np.isfinite(r2)
-    return np.where(valid, np.clip(r2, 0.0, 1.0), -np.inf), gain
+def _whitening(zz: np.ndarray) -> np.ndarray:
+    """W with W' zz W = I on the directions of zz above a relative floor (drops collinear ones)."""
+    values, vectors = np.linalg.eigh(zz)
+    keep = values > _COLLINEAR_FLOOR * max(float(values.max()), 0.0)
+    if not np.any(keep):
+        raise ValueError("the instruments have no variation over the fitted samples")
+    return vectors[:, keep] / np.sqrt(values[keep])
+
+
+def _gram(rows: np.ndarray) -> np.ndarray:
+    """rows rows': every pairwise np.dot of the rows."""
+    return np.array([[float(np.dot(a, b)) for b in rows] for a in rows])
+
+
+def _prepare(usable: list[tuple[np.ndarray, np.ndarray, np.ndarray | None]], warmup: int
+             ) -> _Prepared:
+    """Centre input, response (after warmup) and instruments by their means over all runs."""
+    u_all = np.concatenate([u for u, _, _ in usable])
+    y_all = np.concatenate([y[warmup:] for _, y, _ in usable])
+    if np.ptp(u_all) == 0 or np.ptp(y_all) == 0:
+        raise ValueError("the input or the response has no variation over the fitted samples")
+    u_mean, y_mean = float(np.mean(u_all)), float(np.mean(y_all))
+    has_z = usable[0][2] is not None
+    z_mean = np.mean(np.vstack([z[warmup:] for _, _, z in usable]), axis=0) if has_z else None
+    runs = [(u - u_mean, np.ascontiguousarray(np.vstack(
+        [y[warmup:] - y_mean] + ([] if z is None else list((z[warmup:] - z_mean).T)))))
+        for u, y, z in usable]
+    gram = sum(_gram(rows) for _, rows in runs)
+    if not has_z:
+        return _Prepared(runs, y_all.size, float(gram[0, 0]), None, None)
+    whiten = _whitening(gram[1:, 1:])
+    return _Prepared(runs, y_all.size, float(gram[0, 0]), whiten, gram[1:, 0] @ whiten)
 
 
 def fit_first_order_plant_runs(
-    runs: Sequence[tuple[np.ndarray, np.ndarray]],
+    runs: Sequence[tuple[np.ndarray, ...]],
     dt_s: float,
     delays_s: Sequence[float],
     taus_s: Sequence[float],
 ) -> PlantFit:
-    """Fit one plant to several runs of (u, y) on the same dt_s grid.
+    """Fit one plant to several runs of (u, y) or (u, y, instruments) on one dt_s grid.
 
     Each run is filtered and delayed on its own, so no delay reaches across a
-    gap between runs; the least-squares sums of all runs are then added. Every
-    grid point is scored on the same response samples: those of each run after
-    its first longest-delay samples.
+    gap between runs; the sums of all runs are then added. Every grid point is
+    scored on the same response samples: those of each run after its first
+    longest-delay samples. See fit_first_order_plant for the estimators.
     """
     delays, taus = np.asarray(delays_s, dtype=float), np.asarray(taus_s, dtype=float)
     if not dt_s > 0 or delays.size == 0 or taus.size == 0 or np.any(delays < 0):
         raise ValueError("need dt_s > 0 and non-empty grids of non-negative delays")
-    shifts = delays / dt_s
-    whole = np.floor(shifts + _SAMPLE_EPS).astype(int)
-    frac = np.clip(shifts - whole, 0.0, 1.0)
-    warmup = int(whole.max()) + 1
-    usable = _usable_runs(runs, warmup)
-    all_u = np.concatenate([u for u, _ in usable])
-    targets = [y[warmup:] for _, y in usable]
-    all_y = np.concatenate(targets)
-    if np.ptp(all_u) == 0 or np.ptp(all_y) == 0:
-        raise ValueError("the input or the response has no variation over the fitted samples")
-    u_mean, y_mean = float(np.mean(all_u)), float(np.mean(all_y))
-    count = sum(t.size for t in targets)
-    sy = sum(float(np.sum(t - y_mean)) for t in targets)
-    syy = sum(float(np.dot(t - y_mean, t - y_mean)) for t in targets)
-
-    r2 = np.empty((taus.size, delays.size))
-    gain = np.empty_like(r2)
+    grid = _delay_grid(dt_s, delays)
+    prepared = _prepare(_usable_runs(runs, grid.warmup), grid.warmup)
+    scores = np.empty((3, taus.size, delays.size))
     for i, tau in enumerate(taus):
-        sums = np.zeros((3, delays.size))
-        for (u, _), target in zip(usable, targets):
-            lowpassed = first_order_lowpass(u - u_mean, dt_s, tau)
-            moments = _lag_moments(lowpassed, target - y_mean, warmup)
-            sums += np.array(_delay_sums(moments, whole, frac))
-        r2[i], gain[i] = _r2_and_gain(sums, count, sy, syy)
+        sums = sum(_run_sums(u, rows, dt_s, tau, grid) for u, rows in prepared.runs)
+        scores[:, i] = _scores(sums, prepared)
+    r2, gain, first = scores
     if not np.any(np.isfinite(r2)):
         raise ValueError("the input has no variation over the fitted samples")
     i, j = np.unravel_index(int(np.argmax(r2)), r2.shape)
     return PlantFit(gain=float(gain[i, j]), delay_s=float(delays[j]), tau_s=float(taus[i]),
-                    r2=float(r2[i, j]))
+                    r2=float(r2[i, j]), first_stage_r2=float(first[i, j]))
 
 
 def fit_first_order_plant(
@@ -259,14 +331,24 @@ def fit_first_order_plant(
     dt_s: float,
     delays_s: Sequence[float],
     taus_s: Sequence[float],
+    instruments: np.ndarray | None = None,
 ) -> PlantFit:
-    """Regress y on u delayed and low-passed, for every grid point; keep the highest R^2.
+    """Fit y = gain * x + offset, x = u low-passed by tau and delayed; keep the best grid point.
 
-    u and y are uniformly sampled every dt_s. The model is y = gain * x + offset
-    with x = first_order_lowpass(u, tau) delayed by delay (linear interpolation
-    between samples), solved by least squares at each (delay, tau).
+    u, y (and the rows of instruments) are uniformly sampled every dt_s; x is
+    first_order_lowpass(u, tau) delayed by the grid delay (linear interpolation
+    between samples).
+
+    Without instruments the gain is least squares and the point with the highest
+    R^2 is kept. With an (n, k) instrument matrix Z (signals correlated with u
+    but not with the noise in y) the gain is two-stage least squares: x is
+    projected on Z, y regressed on that projection, gain = x'Py / x'Px. The
+    point kept is the one with the highest R^2 projected on Z, 1 - e'Pe / y'Py.
+    Z is the same at every grid point, so every point is scored on the same
+    projected response. first_stage_r2 is the R^2 of x on Z at that point.
     """
-    return fit_first_order_plant_runs([(u, y)], dt_s, delays_s, taus_s)
+    run = (u, y) if instruments is None else (u, y, instruments)
+    return fit_first_order_plant_runs([run], dt_s, delays_s, taus_s)
 
 
 # ---------------------------------------------------------------------------

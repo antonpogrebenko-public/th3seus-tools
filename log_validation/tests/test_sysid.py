@@ -59,6 +59,46 @@ def test_runs_are_fitted_together_without_crossing_their_boundaries():
     assert abs(fit.gain - 40) / 40 < 0.10 and abs(fit.lag_s - 0.030) < 0.005
 
 
+def _lagged(x: np.ndarray, shifts=(0, 4, 8, 16, 32, 64)) -> np.ndarray:
+    """x at whole-sample lags, rows before the longest lag dropped."""
+    longest = max(shifts)
+    return np.column_stack([x[longest - s: len(x) - s] for s in shifts])
+
+
+def test_least_squares_reports_a_full_first_stage():
+    u, y, dt = _plant(seconds=10.0)
+    assert fit_first_order_plant(u, y, dt, DELAYS, TAUS).first_stage_r2 == 1.0
+
+
+def test_two_stage_fit_recovers_an_open_loop_plant():
+    u, y, dt = _plant()
+    fit = fit_first_order_plant(u[64:], y[64:], dt, DELAYS, TAUS, instruments=_lagged(u))
+    assert abs(fit.gain - 40) / 40 < 0.10 and abs(fit.lag_s - 0.030) < 0.005
+    assert 0.9 < fit.r2 <= 1.0 and 0.5 < fit.first_stage_r2 <= 1.0
+
+
+def test_two_stage_fit_with_runs_of_instruments():
+    u, y, dt = _plant()
+    z = _lagged(u)
+    u, y = u[64:], y[64:]
+    half = len(u) // 2
+    runs = [(u[:half], y[:half], z[:half]), (u[half:], y[half:], z[half:])]
+    fit = fit_first_order_plant_runs(runs, dt, DELAYS, TAUS)
+    assert abs(fit.gain - 40) / 40 < 0.10 and abs(fit.lag_s - 0.030) < 0.005
+
+
+def test_fit_refuses_constant_instruments():
+    u, y, dt = _plant(seconds=5.0)
+    with pytest.raises(ValueError, match="instruments"):
+        fit_first_order_plant(u, y, dt, DELAYS, TAUS, instruments=np.ones((len(u), 3)))
+
+
+def test_fit_refuses_instruments_of_another_length():
+    u, y, dt = _plant(seconds=5.0)
+    with pytest.raises(ValueError, match="length"):
+        fit_first_order_plant(u, y, dt, DELAYS, TAUS, instruments=np.ones((len(u) - 1, 3)))
+
+
 def test_plant_fit_is_frozen_and_lag_is_delay_plus_tau():
     fit = PlantFit(gain=1.0, delay_s=0.01, tau_s=0.02, r2=0.9)
     assert fit.lag_s == pytest.approx(0.03)

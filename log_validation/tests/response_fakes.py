@@ -52,6 +52,62 @@ def sum_of_sines(t_s: np.ndarray, amplitude: float, rng: np.random.Generator) ->
 
 
 @dataclass(frozen=True)
+class LoopSpec:
+    """A rate loop around the plant: P on the rate error, D on the measured derivative."""
+
+    rate_hz: float = RATE_HZ
+    seconds: float = 60.0
+    p_gain: float = 0.15
+    d_gain: float = 0.004
+    ref_amplitude: float = 1.0  # rad/s, sum of sines into the rate setpoint
+    process_noise_std: float = 30.0  # rad/s^2 on the angular acceleration, before colouring
+    process_noise_tau_s: float = 0.03  # first-order colouring of the process noise
+    gyro_noise_std: float = 0.002  # rad/s on the measured rate
+    dgyro_tau_s: float = 0.002  # first-order filter on the measured derivative
+    seed: int = 21
+
+
+@dataclass(frozen=True)
+class LoopRun:
+    """Logged signals of a closed-loop run, one value per control step."""
+
+    dt_s: float
+    rate_sp: np.ndarray  # the reference, rad/s
+    torque: np.ndarray  # the controller output u
+    accel: np.ndarray  # the measured, filtered derivative y, which the D term also uses
+    rate: np.ndarray  # the measured rate
+
+
+def simulate_rate_loop(spec: LoopSpec = LoopSpec()) -> LoopRun:
+    """The plant of simulate_plant (GAIN, DELAY_S, TAU_S) under a P + D rate loop.
+
+    From u to the logged y the lag is the plant's DELAY_S + TAU_S plus the measurement
+    path: the dgyro filter (dgyro_tau_s) and half a sample of the backward difference.
+    """
+    rng = np.random.default_rng(spec.seed)
+    dt = 1.0 / spec.rate_hz
+    n = int(spec.seconds * spec.rate_hz)
+    ref = sum_of_sines(np.arange(n) * dt, spec.ref_amplitude, rng)
+    process = reference_lowpass(rng.normal(0.0, spec.process_noise_std, n), dt,
+                                spec.process_noise_tau_s)
+    gyro_noise = rng.normal(0.0, spec.gyro_noise_std, n)
+    shift = int(round(DELAY_S / dt))
+    a_plant, a_dgyro = dt / (TAU_S + dt), dt / (spec.dgyro_tau_s + dt)
+    lagged = np.zeros(n)
+    u, y, measured = np.zeros(n), np.zeros(n), np.zeros(n)
+    omega = state = y_state = previous = 0.0
+    for k in range(n):
+        measured[k] = omega + gyro_noise[k]
+        y_state += a_dgyro * ((measured[k] - previous) / dt - y_state)
+        previous, y[k] = measured[k], y_state
+        u[k] = spec.p_gain * (ref[k] - measured[k]) - spec.d_gain * y[k]
+        state += a_plant * (u[k] - state)
+        lagged[k] = state
+        omega += (GAIN * (lagged[k - shift] if k >= shift else 0.0) + process[k]) * dt
+    return LoopRun(dt, ref, u, y, measured)
+
+
+@dataclass(frozen=True)
 class QuadSpec:
     """What a synthetic quadrotor log holds; defaults give a clean full-rate flight."""
 
@@ -69,6 +125,25 @@ class QuadSpec:
     gain: float = GAIN  # the plant: angular acceleration per unit torque
     delay_s: float = DELAY_S
     tau_s: float = TAU_S
+    # The rate setpoint, the fit's instrument: "torque" follows the torque setpoint,
+    # "unrelated" is an independent signal, "none" leaves the topic out.
+    instrument: str = "torque"
+    rates_sp_hz: float | None = None  # its logged rate; None: rate_hz
+
+
+def _rates_setpoint(t_s: np.ndarray, torque: np.ndarray, spec: QuadSpec,
+                    rng: np.random.Generator) -> dict[str, np.ndarray]:
+    t_sp = np.arange(0.0, spec.duration_s, 1.0 / (spec.rates_sp_hz or spec.rate_hz))
+    out = {"timestamp": t_sp * 1e6}
+    for k, name in enumerate(("roll", "pitch", "yaw")):
+        if spec.instrument == "unrelated":
+            # Broadband noise: lags of a sum of sines at the torque's own frequencies
+            # would span the torque and make a strong instrument.
+            source = rng.normal(0.0, 1.0, len(t_s))
+        else:
+            source = 10.0 * torque[:, k] + rng.normal(0.0, 0.01, len(t_s))
+        out[name] = np.interp(t_sp, t_s, source)
+    return out
 
 
 def _segment_topics(n_lp: int, t_lp_us: np.ndarray, spec: QuadSpec) -> dict:
@@ -118,6 +193,8 @@ def quad_datasets(spec: QuadSpec) -> dict[str, dict[str, np.ndarray]]:
     if spec.with_derivative:
         rate_topic.update({f"xyz_derivative[{k}]": accel[:, k] for k in range(3)})
     datasets["vehicle_angular_velocity"] = rate_topic
+    if spec.instrument != "none":
+        datasets["vehicle_rates_setpoint"] = _rates_setpoint(t_s, torque, spec, rng)
     n_lp = int(spec.duration_s * 50)
     datasets.update(_segment_topics(n_lp, np.arange(n_lp) * 2e4, spec))
     return datasets

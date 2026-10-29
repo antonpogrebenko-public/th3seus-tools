@@ -3,17 +3,22 @@
 Usage:
     python -m log_validation.response data/downloaded/ -o response.json
 
-For roll, pitch and yaw the pass regresses the angular acceleration on the rate
+For roll, pitch and yaw the pass fits the angular acceleration to the rate
 controller's torque setpoint passed through a pure delay and a first-order lag
 (``sysid.fit_first_order_plant_runs``; delays 0 to 40 ms and time constants 0 to
-60 ms, 1 ms steps) and reports the gain (``effectiveness.<axis>``, rad/s^2 per
-unit of normalized torque), the delay plus time constant (``lag_s.<axis>``), the
-R^2 (``fit_r2.<axis>``) and the share of in-air time used (``used_fraction.<axis>``).
-Inputs: ``vehicle_torque_setpoint.xyz[k]`` on its ``timestamp`` (applied when
-published) and ``vehicle_angular_velocity.xyz_derivative[k]`` on its
-``timestamp_sample``, both resampled at the median angular-velocity interval inside
-the in-air segments of ``flight_segments.detect_flight_segments``, each trimmed by
-2 s at both ends so takeoff and landing are left out.
+60 ms, 1 ms steps) by two-stage least squares (see "Closed loop" below) and reports
+the gain (``effectiveness.<axis>``, rad/s^2 per unit of normalized torque), the
+delay plus time constant (``lag_s.<axis>``), the R^2 projected on the instruments
+(``fit_r2.<axis>``), the instrument strength (``first_stage_r2.<axis>``) and the
+share of in-air time used (``used_fraction.<axis>``). Inputs:
+``vehicle_torque_setpoint.xyz[k]`` on its ``timestamp`` (applied when published),
+``vehicle_angular_velocity.xyz_derivative[k]`` on its ``timestamp_sample`` and
+``vehicle_rates_setpoint`` roll, pitch and yaw on their ``timestamp``, all resampled
+at the median angular-velocity interval inside the in-air segments of
+``flight_segments.detect_flight_segments``, each trimmed by 2 s at both ends so
+takeoff and landing are left out. ``bat_scale_en`` reports MC_BAT_SCALE_EN (1.0 or
+0.0, absent without the parameter): with it on, PX4 scales the published torque by
+the battery voltage, so the effectiveness is per unit of scaled torque.
 
 Filter delay (``filter_delay_s``, and ``lag_minus_filter_s.<axis>`` = lag minus it).
 Source: PX4-Autopilot ``src/modules/sensors/vehicle_angular_velocity/
@@ -37,17 +42,22 @@ filter_delay_s holds the IMU_GYRO_CUTOFF low-pass only. The measurement
 ``angular_accel_from_rate`` records the source: 1.0 for this fallback, 0.0 for
 ``xyz_derivative``.
 
-Closed loop and the plausibility gates. Source: PX4-Autopilot
-``src/lib/rate_control/rate_control.cpp`` (``RateControl::update``) and
-``src/modules/mc_rate_control/MulticopterRateControl.cpp`` at tag v1.14.0. The torque
-setpoint is P * rate error + integral - D * angular_accel + FF * rate setpoint, and
-the angular_accel passed in is ``vehicle_angular_velocity.xyz_derivative``: the very
-signal fitted here. So the setpoint holds -D * y at zero delay, and coloured
-disturbances in y bias the least-squares gain low (even negative) and the lag short.
-An instrumental-variable fit with the rate setpoint as instrument was tried and not
-adopted (it gave no more plausible estimates on real logs); instead an axis whose
-best fit has a gain <= 0 ("implausible gain") or a lag below filter_delay_s ("lag
-below filter delay"), neither of which a real plant can have, gets no estimate.
+Closed loop. In PX4 v1.14.0 ``src/lib/rate_control/rate_control.cpp``
+(``RateControl::update``) computes the torque setpoint as P * rate error + integral
+- D * angular_accel + FF * rate setpoint, and ``mc_rate_control`` passes
+``vehicle_angular_velocity.xyz_derivative`` as angular_accel: the very signal fitted
+here. So the setpoint contains -D times the measured disturbance at zero delay, and a
+plain least-squares fit is pulled toward low or negative gains and short lags. The
+fit therefore uses the axis's rate setpoint history (``INSTRUMENT_LAGS_S``, 0 to
+80 ms) as instruments: it drives the torque through the P and FF terms but comes from
+the pilot or the attitude loop, not from this instant's disturbance. At each grid
+point the delayed, low-passed torque is projected on those instruments and the
+angular acceleration regressed on the projection; the point with the highest R^2
+projected on the instruments is kept. A log without ``vehicle_rates_setpoint`` gets
+no fit. Gates per axis: excitation (torque std), instrument strength
+(``first_stage_r2``, "weak instrument"), fit quality (``fit_r2``), and two
+plausibility gates that no real plant can fail: a gain <= 0 ("implausible gain") or
+a lag below filter_delay_s ("lag below filter delay") gives no estimate.
 
 Only real quadrotors are analyzed: simulation logs (``hardware.is_simulation``) and
 logs whose MAV_TYPE (or, without it, CA_ROTOR_COUNT) is not a quadrotor get no
@@ -86,9 +96,11 @@ from .ulog_loader import US_TO_S
 AXES = ("roll", "pitch", "yaw")
 TOPIC_TORQUE = "vehicle_torque_setpoint"
 TOPIC_RATE = "vehicle_angular_velocity"
-# The topics the pass reads: the two signals and what detect_flight_segments needs.
-RESPONSE_TOPICS = (TOPIC_TORQUE, TOPIC_RATE, "vehicle_status", "vehicle_land_detected",
-                   "vehicle_local_position")
+TOPIC_RATES_SP = "vehicle_rates_setpoint"
+RATES_SP_FIELDS = ("roll", "pitch", "yaw")
+# The topics the pass reads: the signals, the instrument and what detect_flight_segments needs.
+RESPONSE_TOPICS = (TOPIC_TORQUE, TOPIC_RATE, TOPIC_RATES_SP, "vehicle_status",
+                   "vehicle_land_detected", "vehicle_local_position")
 
 # Seconds cut from both ends of each in-air segment, leaving out takeoff and landing.
 TRIM_S = 2.0
@@ -97,10 +109,15 @@ FIT_DELAYS_S = tuple(i * 1e-3 for i in range(41))
 FIT_TAUS_S = tuple(i * 1e-3 for i in range(61))
 # Finite stretches shorter than this are not used (too short to hold a 40 ms delay well).
 MIN_RUN_S = 0.25
-# Both signals must be logged at least this often: the rate loop runs at 250 Hz or more,
+# The instrument: the axis's rate setpoint at these lags (its last 80 ms of history).
+INSTRUMENT_LAGS_S = (0.0, 0.005, 0.010, 0.020, 0.040, 0.080)
+# Every signal must be logged at least this often: the rate loop runs at 250 Hz or more,
 # and a fit of a lag of tens of ms needs samples a few ms apart. PX4's default logger
 # profile (torque setpoint at 50 Hz) falls below it.
 MIN_LOGGED_RATE_HZ = 200.0
+# Accepted shortfall of a logged median rate below MIN_LOGGED_RATE_HZ: PX4 publishes the
+# rate setpoint at about 200 Hz and scheduling jitter often logs it at 198 or 199 Hz.
+LOGGED_RATE_TOLERANCE = 0.05
 # Vehicle type: MAV_TYPE 2 is MAV_TYPE_QUADROTOR; without MAV_TYPE, four rotors.
 MAV_TYPE_QUADROTOR = 2
 QUADROTOR_ROTOR_COUNT = 4
@@ -118,6 +135,7 @@ class ResponseGates:
     min_r2: float = 0.5  # fit quality
     noise_cutoff_hz: float = 20.0  # in-flight noise cut-off (Task 8)
     min_motor_cmd_std: float = 0.02  # motor command variation for motor lag (Task 8)
+    min_first_stage_r2: float = 0.05  # instrument strength: R^2 of the torque on it
 
 
 @dataclass(frozen=True)
@@ -143,11 +161,12 @@ class _Header:
 
 @dataclass(frozen=True)
 class _Signals:
-    """Both signals on the uniform grid of each used window, one (n, 3) array per window."""
+    """The signals on the uniform grid of each used window, one array per window."""
 
     dt_s: float
     torque: tuple[np.ndarray, ...]
     accel: tuple[np.ndarray, ...]
+    instruments: tuple[np.ndarray, ...]  # (n, 3, len(INSTRUMENT_LAGS_S)) per window
     accel_from_rate: bool
 
 
@@ -207,6 +226,8 @@ def _refusal(ulog: Any, header: _Header) -> str | None:
         return ERROR_NO_TORQUE
     if TOPIC_RATE not in topics:
         return f"no {TOPIC_RATE}"
+    if TOPIC_RATES_SP not in topics:
+        return f"no {TOPIC_RATES_SP} (the instrument of the closed-loop fit)"
     return None
 
 
@@ -236,10 +257,14 @@ def _filter_delay(params: dict[str, Any], has_derivative: bool) -> tuple[float |
     return delay, None
 
 
-def _vector(data: dict, field: str, stamp: str) -> tuple[np.ndarray, np.ndarray]:
-    """(t_s, (n, 3) values) of field[0..2] on the stamp field, repeated/backward stamps dropped."""
+def _xyz(field: str) -> tuple[str, ...]:
+    return tuple(f"{field}[{k}]" for k in range(3))
+
+
+def _vector(data: dict, fields: tuple[str, ...], stamp: str) -> tuple[np.ndarray, np.ndarray]:
+    """(t_s, (n, 3) values) of three fields on the stamp field, repeated/backward stamps dropped."""
     t_s = np.asarray(data[stamp], dtype=float) * US_TO_S
-    values = np.column_stack([np.asarray(data[f"{field}[{k}]"], dtype=float) for k in range(3)])
+    values = np.column_stack([np.asarray(data[f], dtype=float) for f in fields])
     return increasing_samples(t_s, values)
 
 
@@ -255,53 +280,72 @@ def _on_grid(t_s: np.ndarray, values: np.ndarray, grid: np.ndarray) -> np.ndarra
     return np.column_stack([resample_on(t_s, values[:, k], grid) for k in range(3)])
 
 
-def _logging_error(dt_torque_s: float, dt_rate_s: float) -> str | None:
-    """Why the two signals cannot be fitted as logged, or None."""
-    for topic, dt in ((TOPIC_TORQUE, dt_torque_s), (TOPIC_RATE, dt_rate_s)):
+def instrument_matrix(
+    t_s: np.ndarray, x: np.ndarray, grid_s: np.ndarray,
+    lags_s: tuple[float, ...] = INSTRUMENT_LAGS_S,
+) -> np.ndarray:
+    """(len(grid_s), len(lags_s)): x interpolated at grid_s - lag for each lag (its history).
+
+    NaN where grid_s - lag falls outside the span of x.
+    """
+    grid = np.asarray(grid_s, dtype=float)
+    return np.column_stack([resample_on(t_s, x, grid - lag) for lag in lags_s])
+
+
+def _logging_error(intervals: dict[str, float]) -> str | None:
+    """Why the signals cannot be fitted as logged (median intervals by topic), or None."""
+    for topic, dt in intervals.items():
         if not np.isfinite(dt):
             return f"no {topic} samples in the used in-air time"
-    if max(dt_torque_s, dt_rate_s) * MIN_LOGGED_RATE_HZ > 1.0:
-        return (f"not logged at the rate controller's rate ({TOPIC_TORQUE} at "
-                f"{1 / dt_torque_s:.0f} Hz, {TOPIC_RATE} at {1 / dt_rate_s:.0f} Hz; "
-                f"need {MIN_LOGGED_RATE_HZ:.0f} Hz)")
+    floor_hz = MIN_LOGGED_RATE_HZ * (1.0 - LOGGED_RATE_TOLERANCE)
+    if max(intervals.values()) * floor_hz > 1.0:
+        rates = ", ".join(f"{topic} at {1 / dt:.0f} Hz" for topic, dt in intervals.items())
+        return f"not logged at the rate controller's rate ({rates}; need {floor_hz:.0f} Hz)"
     return None
 
 
 def _resampled(ulog: Any, windows: list[tuple[float, float]]) -> _Signals | str:
-    """Both signals on each window's grid, or an error when they are logged too sparsely."""
+    """The signals on each window's grid, or an error when they are logged too sparsely."""
     rate_data = ulog.get_dataset(TOPIC_RATE).data
     stamp = "timestamp_sample" if "timestamp_sample" in rate_data else "timestamp"
     from_rate = "xyz_derivative[0]" not in rate_data
-    t_y, y = _vector(rate_data, "xyz" if from_rate else "xyz_derivative", stamp)
-    t_u, u = _vector(ulog.get_dataset(TOPIC_TORQUE).data, "xyz", "timestamp")
-    dt, dt_u = _median_interval(t_y, windows), _median_interval(t_u, windows)
-    error = _logging_error(dt_u, dt)
+    t_y, y = _vector(rate_data, _xyz("xyz" if from_rate else "xyz_derivative"), stamp)
+    t_u, u = _vector(ulog.get_dataset(TOPIC_TORQUE).data, _xyz("xyz"), "timestamp")
+    t_z, z = _vector(ulog.get_dataset(TOPIC_RATES_SP).data, RATES_SP_FIELDS, "timestamp")
+    intervals = {topic: _median_interval(t, windows)
+                 for topic, t in ((TOPIC_TORQUE, t_u), (TOPIC_RATE, t_y), (TOPIC_RATES_SP, t_z))}
+    error = _logging_error(intervals)
     if error:
         return error
+    dt = intervals[TOPIC_RATE]
     grids = [start + np.arange(int((end - start) / dt) + 1) * dt for start, end in windows]
-    torque = tuple(_on_grid(t_u, u, g) for g in grids)
     accel = tuple(_on_grid(t_y, y, g) for g in grids)
     if from_rate:
         accel = tuple(np.gradient(a, dt, axis=0) if len(a) > 1 else a * np.nan for a in accel)
-    return _Signals(dt, torque, accel, from_rate)
+    instruments = tuple(np.stack([instrument_matrix(t_z, z[:, k], g) for k in range(3)], axis=1)
+                        for g in grids)
+    return _Signals(dt, tuple(_on_grid(t_u, u, g) for g in grids), accel, instruments, from_rate)
 
 
 # ---------------------------------------------------------------------------
 # Per-axis measurement
 # ---------------------------------------------------------------------------
 
+_Run = tuple[np.ndarray, np.ndarray, np.ndarray]
 
-def _finite_runs(u: np.ndarray, y: np.ndarray, min_len: int) -> list[tuple[np.ndarray, np.ndarray]]:
-    """The stretches of at least min_len samples where both u and y are finite."""
-    ok = np.isfinite(u) & np.isfinite(y)
+
+def _finite_runs(u: np.ndarray, y: np.ndarray, z: np.ndarray, min_len: int) -> list[_Run]:
+    """The stretches of at least min_len samples where u, y and every instrument are finite."""
+    ok = np.isfinite(u) & np.isfinite(y) & np.all(np.isfinite(z), axis=1)
     edges = np.flatnonzero(np.diff(np.concatenate(([0], ok.astype(np.int8), [0]))))
-    return [(u[a:b], y[a:b]) for a, b in zip(edges[::2], edges[1::2]) if b - a >= min_len]
+    return [(u[a:b], y[a:b], z[a:b]) for a, b in zip(edges[::2], edges[1::2])
+            if b - a >= min_len]
 
 
-def _axis_runs(signals: _Signals, k: int) -> list[tuple[np.ndarray, np.ndarray]]:
+def _axis_runs(signals: _Signals, k: int) -> list[_Run]:
     min_len = max(2, int(MIN_RUN_S / signals.dt_s))
-    return [run for u, y in zip(signals.torque, signals.accel)
-            for run in _finite_runs(u[:, k], y[:, k], min_len)]
+    return [run for u, y, z in zip(signals.torque, signals.accel, signals.instruments)
+            for run in _finite_runs(u[:, k], y[:, k], z[:, k, :], min_len)]
 
 
 def _implausibility(axis: str, fit: PlantFit, filter_delay_s: float) -> str | None:
@@ -314,16 +358,26 @@ def _implausibility(axis: str, fit: PlantFit, filter_delay_s: float) -> str | No
     return None
 
 
+def _fit_gate(axis: str, fit: PlantFit, gates: ResponseGates) -> str | None:
+    """Why a fit is too weak to report, or None."""
+    if not fit.first_stage_r2 >= gates.min_first_stage_r2:
+        return (f"{axis}: weak instrument (first-stage R^2 {fit.first_stage_r2:.3f} "
+                f"< {gates.min_first_stage_r2})")
+    if not fit.r2 >= gates.min_r2:
+        return f"{axis}: low fit quality (R^2 {fit.r2:.3f} < {gates.min_r2})"
+    return None
+
+
 def _axis_response(
-    axis: str, runs: list[tuple[np.ndarray, np.ndarray]], signals: _Signals,
+    axis: str, runs: list[_Run], signals: _Signals,
     in_air_s: float, filter_delay_s: float, gates: ResponseGates,
 ) -> tuple[dict[str, float], list[str]]:
     """Measurements and errors of one axis; a gated axis has no effectiveness or lag."""
-    used_s = sum(len(u) for u, _ in runs) * signals.dt_s
+    used_s = sum(len(run[0]) for run in runs) * signals.dt_s
     measurements = {f"used_fraction.{axis}": used_s / in_air_s if in_air_s > 0 else 0.0}
     if not runs:
-        return measurements, [f"{axis}: no in-air samples with both signals finite"]
-    torque_std = float(np.std(np.concatenate([u for u, _ in runs])))
+        return measurements, [f"{axis}: no in-air samples with all signals finite"]
+    torque_std = float(np.std(np.concatenate([run[0] for run in runs])))
     if not torque_std >= gates.min_torque_std:
         return measurements, [f"{axis}: low excitation (torque setpoint std {torque_std:.4f} "
                               f"< {gates.min_torque_std})"]
@@ -332,15 +386,22 @@ def _axis_response(
     except ValueError as e:
         return measurements, [f"{axis}: fit failed ({e})"]
     measurements[f"fit_r2.{axis}"] = fit.r2
-    if not fit.r2 >= gates.min_r2:
-        return measurements, [f"{axis}: low fit quality (R^2 {fit.r2:.3f} < {gates.min_r2})"]
-    implausible = _implausibility(axis, fit, filter_delay_s)
-    if implausible:
-        return measurements, [implausible]
+    measurements[f"first_stage_r2.{axis}"] = fit.first_stage_r2
+    refusal = _fit_gate(axis, fit, gates) or _implausibility(axis, fit, filter_delay_s)
+    if refusal:
+        return measurements, [refusal]
     measurements[f"effectiveness.{axis}"] = fit.gain
     measurements[f"lag_s.{axis}"] = fit.lag_s
     measurements[f"lag_minus_filter_s.{axis}"] = fit.lag_s - filter_delay_s
     return measurements, []
+
+
+def _battery_scaling(params: dict[str, Any]) -> dict[str, float]:
+    """bat_scale_en: 1.0 when MC_BAT_SCALE_EN scales the published torque, 0.0 when not."""
+    value = params.get("MC_BAT_SCALE_EN")
+    if value is None:
+        return {}
+    return {"bat_scale_en": 0.0 if float(value) == 0 else 1.0}
 
 
 def _effectiveness_and_lag(
@@ -386,7 +447,8 @@ def analyze_response(
         refusal = _refusal(ulog, header)
         if refusal:
             return result({}, [refusal])
-        return result(*_effectiveness_and_lag(ulog, header.params, gates))
+        measurements, errors = _effectiveness_and_lag(ulog, header.params, gates)
+        return result({**_battery_scaling(header.params), **measurements}, errors)
     except Exception as e:
         return result({}, [f"analysis failed: {type(e).__name__}: {e}"])
 
@@ -471,6 +533,9 @@ def _build_parser() -> argparse.ArgumentParser:
     gates.add_argument("--min-motor-cmd-std", type=float, default=defaults.min_motor_cmd_std,
                        help="motor lag gate: motor command std "
                             f"(default {defaults.min_motor_cmd_std})")
+    gates.add_argument("--min-first-stage-r2", type=float, default=defaults.min_first_stage_r2,
+                       help="instrument strength gate: first-stage R^2 per axis "
+                            f"(default {defaults.min_first_stage_r2})")
     return parser
 
 
@@ -480,7 +545,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Error: {args.log_dir} is not a directory", file=sys.stderr)
         return 2
     gates = ResponseGates(args.min_torque_std, args.min_r2, args.noise_cutoff_hz,
-                          args.min_motor_cmd_std)
+                          args.min_motor_cmd_std, args.min_first_stage_r2)
     try:
         response_batch(args.log_dir, args.output, args.manifest, args.max_per_vehicle,
                        args.jobs, gates)
