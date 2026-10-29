@@ -20,7 +20,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from log_validation import battery_fit
+from log_validation import battery_extract
 from log_validation.battery_fit import (
     DEFAULT_HOLDOUT_FRAC,
     DEFAULT_SPLIT_SEED,
@@ -491,7 +491,7 @@ class TestExtract:
             calls.append(message_name_filter_list)
             return load_by_stem(Path(path))
 
-        monkeypatch.setattr(battery_fit, "ULog", fake_ulog)
+        monkeypatch.setattr(battery_extract, "ULog", fake_ulog)
         status, _ = extract_log(Path("a01.ulg"))
         assert status == "ok" and calls == [["battery_status"]]
 
@@ -638,7 +638,7 @@ class TestFitObsDir:
 class TestCli:
     def test_extract_then_fit_matches_log_dir(self, tmp_path, monkeypatch):
         monkeypatch.setattr(
-            battery_fit, "ULog", lambda path, message_name_filter_list=None: load_by_stem(Path(path))
+            battery_extract, "ULog", lambda path, message_name_filter_list=None: load_by_stem(Path(path))
         )
         log_dir = _log_dir(tmp_path, CORPUS)
         obs, out = tmp_path / "obs", tmp_path / "out"
