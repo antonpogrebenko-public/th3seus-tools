@@ -18,7 +18,10 @@ Comparison rules:
   taken first and the percentiles are taken over vehicles, so a vehicle with
   many logs counts once. A log without `vehicle_id` is its own vehicle.
 * `lag` is the per-log mean of `lag_minus_filter_s.roll` and `.pitch` (the one
-  present if only one is), compared with TH3SEUS's `tau_motor_s`.
+  present if only one is), compared with TH3SEUS's `tau_motor_s`. It is the
+  body-rate lag minus the filter delay, so it also holds the allocator, output
+  and ESC protocol latency: an upper bound on motor lag. Only a prediction above
+  it is evidence against the motor-lag formula.
 * Effectiveness from a log with `bat_scale_en` == 1 is left out: PX4 then
   publishes torque scaled by battery voltage, which is not comparable.
 * TH3SEUS's effectiveness is in motor-command space (THR_MDL_FAC = 0), so each
@@ -56,6 +59,14 @@ FORMULA_OF = {
     "effectiveness": "inertia and arm-length formulas",
 }
 
+# What each compared real value is. The real lag also holds the allocator, output
+# and ESC protocol latency, so it bounds the motor lag from above.
+QUANTITY_LABELS = {
+    HOVER: "hover motor command",
+    LAG: "body-rate lag minus filter delay (upper bound on motor lag)",
+    **{f"{EFFECTIVENESS}.{a}": f"control effectiveness, {a}, motor-command space" for a in AXES},
+}
+
 PERCENTILES = (25.0, 50.0, 75.0)
 BUILD_FIELDS = tuple(f.name for f in dataclasses.fields(Build))
 REQUIRED_BUILD_FIELDS = tuple(
@@ -82,6 +93,7 @@ class QuantityRow:
     real_p75: float
     n_vehicles: int
     ratio: float  # predicted / real median
+    label: str  # what the real value is (QUANTITY_LABELS)
 
 
 @dataclass(frozen=True)
@@ -270,7 +282,8 @@ def _rows(predicted: Mapping[str, float], vehicle_values: Mapping[tuple, Mapping
             continue
         p25, p50, p75 = (float(x) for x in np.percentile(medians, PERCENTILES))
         ratio = value / p50 if p50 != 0.0 else math.nan
-        rows.append(QuantityRow(quantity, value, p50, p25, p75, len(medians), ratio))
+        rows.append(QuantityRow(quantity, value, p50, p25, p75, len(medians), ratio,
+                                QUANTITY_LABELS[quantity]))
     return tuple(rows)
 
 
@@ -283,7 +296,8 @@ def recommendations(comparisons: Sequence[KitComparison]) -> list[Recommendation
     it and in every such kit the prediction lies outside [p25, p75] on the same
     side, for every quantity of the formula. Kits that were not compared, or
     that have no data for the formula, are not evidence. The hover command is
-    never recommended."""
+    never recommended. The motor lag is recommended only when the prediction is
+    above the real p75: the real lag is an upper bound on motor lag."""
     return [_recommend(formula, comparisons) for formula in FORMULA_OF]
 
 
@@ -320,12 +334,21 @@ def _recommend(formula: str, comparisons: Sequence[KitComparison]) -> Recommenda
         if consistent:
             note += f"; the prediction is off the same way in all {len(names)} kits"
         return Recommendation(formula, label, False, names, note + tail)
+    if consistent and formula == LAG and with_data[0][1] < 0:
+        return Recommendation(formula, label, False, names, _lag_below_note(len(names)) + tail)
     if consistent:
         direction = "above" if with_data[0][1] > 0 else "below"
         note = (f"review the formula: the prediction is {direction} the real p25 to p75 "
                 f"in all {len(names)} compared kits")
         return Recommendation(formula, label, True, names, note + tail)
     return Recommendation(formula, label, False, names, _no_change_note(len(names)) + tail)
+
+
+def _lag_below_note(n_kits: int) -> str:
+    """Only a prediction above the real lag is evidence: the real lag bounds motor lag from above."""
+    return (f"no change recommended: the prediction is below the real p25 in all {n_kits} "
+            "compared kits, but the real value is an upper bound on motor lag (it also holds "
+            "allocator, output and ESC protocol latency), so a lower prediction is not evidence")
 
 
 def _without_data_note(without: Sequence[str]) -> str:

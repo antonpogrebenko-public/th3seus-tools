@@ -99,6 +99,23 @@ def test_consistent_lag_error_is_recommended():
     assert recs["lag"].formula == FORMULA_OF["lag"]
 
 
+LAG_LABEL = "body-rate lag minus filter delay (upper bound on motor lag)"
+
+
+def test_lag_below_in_all_kits_is_not_recommended():
+    kits, response = _three_kits_response(**{"lag_minus_filter_s.roll": 0.200})
+    comparisons = compare_kits(kits, response)
+    assert all(row(c, "lag").real_p25 > PRED.tau_motor_s for c in comparisons)
+    rec = {r.quantity: r for r in recommendations(comparisons)}["lag"]
+    assert not rec.recommended and rec.kits == ("kit_0", "kit_1", "kit_2")
+    assert "upper bound" in rec.note
+
+
+def test_lag_row_is_labelled_as_an_upper_bound():
+    r = row(compare_kits([kit()], vehicles(5, **{"lag_minus_filter_s.roll": 0.01}))[0], "lag")
+    assert r.label == LAG_LABEL
+
+
 def test_hover_is_never_recommended():
     kits, response = _three_kits_response(**{"hover.command": 0.1})
     recs = {r.quantity: r for r in recommendations(compare_kits(kits, response))}

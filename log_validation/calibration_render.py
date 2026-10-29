@@ -104,8 +104,8 @@ def _range_cells(r: RangeRow, points: Sequence[str]) -> list[str]:
 def _response(ranges: Sequence[RangeRow]) -> list[str]:
     rows = [r for r in ranges if r.class_kind == ALL and r.quantity.startswith(RESPONSE_QUANTITIES)]
     lines = ["Overall distributions over vehicle medians (each vehicle counts once). "
-             "Effectiveness is in motor-command space; lag is the response lag without the "
-             "log's filter delay.", ""]
+             "Effectiveness is in motor-command space; lag is the body-rate lag minus the "
+             "log's filter delay, an upper bound on motor lag.", ""]
     if not rows:
         return lines + ["No response quantity has enough vehicles.", ""]
     return lines + _table(["Quantity", "Logs", "Vehicles", "p5", "p25", "p50", "p75", "p95"],
@@ -119,9 +119,10 @@ def _airframes(airframes: Mapping[str, Any]) -> list[str]:
         lines += [f"### {c.get('kit')} (airframe {c.get('airframe_id')}, "
                   f"{c.get('n_vehicles')} vehicles)", ""]
         if c.get("rows"):
-            lines += _table(["Quantity", "Predicted", "Real median", "Real p25", "Real p75",
-                             "Vehicles", "Ratio"],
-                            [[r["quantity"], _num(r["predicted"]), _num(r["real_median"]),
+            lines += _table(["Quantity", "Real value", "Predicted", "Real median", "Real p25",
+                             "Real p75", "Vehicles", "Ratio"],
+                            [[r["quantity"], str(r.get("label") or r["quantity"]),
+                              _num(r["predicted"]), _num(r["real_median"]),
                               _num(r["real_p25"]), _num(r["real_p75"]), str(r["n_vehicles"]),
                               _num(r["ratio"], ".3g")] for r in c["rows"]])
         if c.get("note"):

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import math
+from dataclasses import asdict
 from pathlib import Path
 
 import pytest
@@ -37,6 +38,7 @@ from log_validation.tests.calibration_inputs import (
 )
 from log_validation.tests.test_batch_analyze import load_by_stem as noise_loader
 from log_validation.tests.test_response import load_by_stem as response_loader
+from log_validation.th3seus_model import REFERENCE_BUILDS
 
 COMMAND_ARGS = ("noise", "battery", "response", "airframes", "run_info")
 EMPTY_BATTERY: dict = {"per_log_r": [], "fit_log_ids": [], "holdout_scored_log_ids": []}
@@ -201,6 +203,17 @@ def test_report_sections_in_order():
     assert "Current (TH3SEUS estimator)" in text and "kit-a" in text
     assert "Step check: median error" in text and "ratio of" in text
     assert "roll: low excitation | 2" in text
+
+
+def test_report_labels_the_airframe_lag_as_an_upper_bound():
+    kit = reference_airframes.Kit("kit-l", 4001, REFERENCE_BUILDS["impulse_apex_5"], {}, ())
+    logs = [resp(f"l{i}", f"v{i}", 4001, **{"lag_minus_filter_s.roll": 0.01}) for i in range(5)]
+    comparisons = reference_airframes.compare_kits([kit], logs)
+    airframes = {"min_vehicles": 5, "comparisons": [asdict(c) for c in comparisons],
+                 "recommendations": [asdict(r) for r in reference_airframes.recommendations(
+                     comparisons)]}
+    text = render_report([], EMPTY_BATTERY, logs, airframes, [], run_info())
+    assert "| lag | body-rate lag minus filter delay (upper bound on motor lag) |" in text
 
 
 def test_directory_has_every_listed_file(tmp_path):
