@@ -65,6 +65,16 @@ def _build_log() -> FakeULog:
         "z": 9.81 + rng.normal(0, a_sigma, n),
     }
 
+    # sensor_combined at 200 Hz: same noise, each sample integrated over 5000 us.
+    combined = {
+        "timestamp": _ts_us(n, rate),
+        "gyro_integral_dt": np.full(n, 5000.0),
+        "accelerometer_integral_dt": np.full(n, 5000.0),
+    }
+    for i in range(3):
+        combined[f"gyro_rad[{i}]"] = gyro["xyz"[i]]
+        combined[f"accelerometer_m_s2[{i}]"] = accel["xyz"[i]]
+
     # Baro at 50 Hz: 0.2 m noise on a constant altitude.
     bn = int(60 * 50)
     baro = {
@@ -98,6 +108,7 @@ def _build_log() -> FakeULog:
         {
             "sensor_gyro": gyro,
             "sensor_accel": accel,
+            "sensor_combined": combined,
             "vehicle_air_data": baro,
             "sensor_mag": mag,
             "vehicle_gps_position": gps,

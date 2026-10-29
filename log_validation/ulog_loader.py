@@ -82,3 +82,20 @@ def xyz(ulog: ULog, topic: str, instance: int = 0) -> tuple[np.ndarray, np.ndarr
         ]
     )
     return t_s, arr
+
+
+def vec3(
+    ulog: ULog, topic: str, field: str, instance: int = 0
+) -> tuple[np.ndarray, np.ndarray]:
+    """Return (t_s, Nx3 array) for an array field exposed as `field[0]` to `field[2]`."""
+    ds = _dataset(ulog, topic, instance)
+    names = [f"{field}[{i}]" for i in range(3)]
+    for name in names:
+        if name not in ds.data:
+            raise KeyError(
+                f"topic '{topic}' missing field '{name}'. "
+                f"Available fields: {sorted(ds.data.keys())}"
+            )
+    t_s = np.asarray(ds.data["timestamp"], dtype=float) * US_TO_S
+    arr = np.column_stack([np.asarray(ds.data[n], float) for n in names])
+    return t_s, arr
