@@ -484,3 +484,11 @@ class TestFitExtracted:
     def test_repeated_log_id_is_refused(self):
         with pytest.raises(ValueError, match="more than once"):
             fit_extracted([make_data("a1"), make_data("a1")], {})
+
+    @pytest.mark.parametrize("status", ["ok", "no_manifest_row", "capped"])
+    def test_only_the_named_no_data_statuses_are_accepted(self, status):
+        from log_validation.battery_extract import NO_DATA_STATUSES
+
+        assert NO_DATA_STATUSES == {"sim", "unusable", "load_error", "worker_died"}
+        with pytest.raises(ValueError, match="unknown extract status"):
+            fit_extracted([make_data(f"a{k}") for k in range(6)], {}, no_data={"x": status})

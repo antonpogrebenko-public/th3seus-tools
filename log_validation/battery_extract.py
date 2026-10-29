@@ -52,6 +52,8 @@ STATUS_UNUSABLE = "unusable"
 STATUS_LOAD_ERROR = "load_error"
 STATUS_WORKER_DIED = "worker_died"
 STATUSES = (STATUS_OK, STATUS_SIM, STATUS_UNUSABLE, STATUS_LOAD_ERROR, STATUS_WORKER_DIED)
+# The statuses a selected log without extracted data can have (fit_extracted's no_data).
+NO_DATA_STATUSES = frozenset({STATUS_SIM, STATUS_UNUSABLE, STATUS_LOAD_ERROR, STATUS_WORKER_DIED})
 # Not a selected log: an empty <log_id>.no_manifest_row marks a log of log_dir
 # that the manifest leaves out, so the fit can count it (and never fit it).
 STATUS_NO_MANIFEST_ROW = "no_manifest_row"

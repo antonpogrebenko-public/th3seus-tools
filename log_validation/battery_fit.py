@@ -60,10 +60,10 @@ import numpy as np
 # The extract step, the result types and the outputs live in their own modules;
 # their public names are re-exported so `from log_validation.battery_fit import ...` works.
 from .battery_extract import (  # noqa: F401
-    BATTERY_TOPIC, MAX_CELL_COUNT, MIN_PEAK_CURRENT_A, MIN_VOLTAGE_RANGE_V, NPZ_SUFFIX,
-    STATUS_LOAD_ERROR, STATUS_OK, STATUS_SIM, STATUS_UNUSABLE, STATUS_WORKER_DIED, STATUSES,
-    LogBatteryData, extract_dir, extract_log, load_battery_topics, load_extracted,
-    STATUS_NO_MANIFEST_ROW, load_named, read_obs_dirs, read_statuses, save_extracted,
+    BATTERY_TOPIC, MAX_CELL_COUNT, MIN_PEAK_CURRENT_A, MIN_VOLTAGE_RANGE_V, NO_DATA_STATUSES,
+    NPZ_SUFFIX, STATUS_LOAD_ERROR, STATUS_NO_MANIFEST_ROW, STATUS_OK, STATUS_SIM,
+    STATUS_UNUSABLE, STATUS_WORKER_DIED, STATUSES, LogBatteryData, extract_dir, extract_log,
+    load_battery_topics, load_extracted, load_named, read_obs_dirs, read_statuses, save_extracted,
 )
 from .battery_model import (  # noqa: F401
     MIN_R_OBSERVATIONS_PER_CLASS, R_PLAUSIBLE_FLOOR_MOHM_PER_CELL, BatteryFitResult, OcvCurve,
@@ -458,7 +458,7 @@ def _statuses_of(datas: Sequence[LogBatteryData], no_data: Mapping[str, str]) ->
     repeated = sorted(i for i, n in Counter(ids).items() if n > 1)
     if repeated:
         raise ValueError(f"log ID given more than once: {', '.join(repeated[:5])}")
-    unknown = sorted(set(no_data.values()) - set(STATUSES[1:]))
+    unknown = sorted(set(no_data.values()) - NO_DATA_STATUSES)
     if unknown:
         raise ValueError(f"unknown extract status: {', '.join(unknown)}")
     return {**{d.log_id: STATUS_OK for d in datas}, **no_data}
