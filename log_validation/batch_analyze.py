@@ -7,20 +7,28 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import json
 import sys
+from collections.abc import Callable
+from concurrent.futures import ProcessPoolExecutor
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
-import numpy as np
 from pyulog import ULog
 
 from . import report
-from .hardware import HardwareInfo, extract_hardware_info, is_simulation
+from .hardware import extract_hardware_info, is_simulation
+from .manifest import (
+    DEFAULT_MAX_PER_VEHICLE,
+    ManifestError,
+    add_selection_args,
+    select_logs,
+)
+from .outputs import PrivateDataError, forbidden_strings, write_json
 from .report import (
     TOPIC_ACCEL,
     TOPIC_AIR_DATA,
+    TOPIC_COMBINED,
     TOPIC_GPS,
     TOPIC_GYRO,
     TOPIC_MAG,
@@ -32,13 +40,14 @@ from .report import (
 REQUIRED_TOPICS = (
     TOPIC_ACCEL,
     TOPIC_GYRO,
+    TOPIC_COMBINED,
     TOPIC_MAG,
     TOPIC_AIR_DATA,
     TOPIC_GPS,
 )
 
 
-@dataclass
+@dataclass(frozen=True)
 class LogResult:
     """Analysis result for a single log file."""
 
@@ -46,33 +55,53 @@ class LogResult:
     hardware: dict[str, Any]
     measurements: dict[str, float | None]
     errors: list[str]
+    vehicle_id: str | None = None
+    airframe_id: int | None = None
 
 
-def analyze_log(path: Path) -> LogResult | None:
+def load_filtered(path: Path) -> ULog:
+    """Parse only the topics the analysis reads.
+
+    `ULog(path)` decodes all 59 topics in a log to reach the few in `report.py`;
+    measured at 5.51 s against 1.04 s filtered on a 4.2 MB log, a 5.3x
+    difference. `msg_info_dict` and `initial_parameters`, which
+    `extract_hardware_info` needs, come from the log header and are unaffected
+    by the filter.
+    """
+    return ULog(str(path), message_name_filter_list=list(REQUIRED_TOPICS))
+
+
+def _airframe_id(params: dict[str, Any]) -> int | None:
+    """SYS_AUTOSTART as an int, or None when absent or 0."""
+    try:
+        value = int(params.get("SYS_AUTOSTART", 0) or 0)
+    except (TypeError, ValueError):
+        return None
+    return value or None
+
+
+def analyze_log(
+    path: Path,
+    vehicle_id: str | None = None,
+    loader: Callable[[Path], Any] = load_filtered,
+) -> LogResult:
     """Analyze a single log file, return structured result."""
     log_id = path.stem
     errors: list[str] = []
     measurements: dict[str, float | None] = {}
 
     try:
-        # Parse only the topics the analysis reads.
-        #
-        # `ULog(path)` decodes all 59 topics in a log to reach the five in
-        # `report.py` — measured at 5.51 s against 1.04 s filtered on a 4.2 MB
-        # log, a 5.3x difference. The corpus is 1,000 logs and 8.5 GB, so a full
-        # pass was about 92 minutes where 17 will do, and peak parse memory
-        # falls with it.
-        #
-        # `msg_info_dict` and `initial_parameters`, which `extract_hardware_info`
-        # needs, come from the log header and are unaffected by the filter.
-        ulog = ULog(str(path), message_name_filter_list=list(REQUIRED_TOPICS))
+        ulog = loader(path)
     except Exception as e:
         return LogResult(
             log_id=log_id,
             hardware={},
             measurements={},
             errors=[f"load failed: {e}"],
+            vehicle_id=vehicle_id,
         )
+
+    airframe_id = _airframe_id(ulog.initial_parameters)
 
     # Extract hardware info
     hw = None
@@ -92,6 +121,8 @@ def analyze_log(path: Path) -> LogResult | None:
             hardware=hw_dict,
             measurements={},
             errors=["simulation log skipped (SITL/HIL)"],
+            vehicle_id=vehicle_id,
+            airframe_id=airframe_id,
         )
 
     # Run noise analysis
@@ -111,49 +142,54 @@ def analyze_log(path: Path) -> LogResult | None:
         hardware=hw_dict,
         measurements=measurements,
         errors=errors,
+        vehicle_id=vehicle_id,
+        airframe_id=airframe_id,
     )
 
 
 def batch_analyze(
-    log_dir: Path, output_path: Path | None = None, limit: int | None = None
+    log_dir: Path,
+    output_path: Path | None = None,
+    limit: int | None = None,
+    manifest_path: Path | None = None,
+    max_per_vehicle: int = DEFAULT_MAX_PER_VEHICLE,
+    jobs: int = 1,
+    loader: Callable[[Path], Any] = load_filtered,
 ) -> list[LogResult]:
-    """Analyze all logs in directory."""
-    paths = sorted(log_dir.glob("*.ulg"))
+    """Analyze the selected logs of a directory; results are sorted by log ID."""
+    selection = select_logs(log_dir, manifest_path, max_per_vehicle)
+    paths = list(selection.paths)
     if limit:
         paths = paths[:limit]
+    vehicles = [selection.vehicle_of.get(p.stem) for p in paths]
 
-    results: list[LogResult] = []
-    total = len(paths)
-
-    for i, path in enumerate(paths, 1):
-        print(f"\r[{i}/{total}] {path.name[:40]:<40}", end="", flush=True)
-        result = analyze_log(path)
-        if result:
-            results.append(result)
+    if jobs > 1:
+        with ProcessPoolExecutor(max_workers=jobs) as pool:
+            futures = [
+                pool.submit(analyze_log, p, v, loader) for p, v in zip(paths, vehicles)
+            ]
+            results = []
+            for i, future in enumerate(futures, 1):
+                results.append(future.result())
+                _progress(i, len(paths), paths[i - 1])
+    else:
+        results = []
+        for i, (path, vehicle) in enumerate(zip(paths, vehicles), 1):
+            _progress(i, len(paths), path)
+            results.append(analyze_log(path, vehicle, loader))
 
     print()  # newline after progress
+    results.sort(key=lambda r: r.log_id)
 
     if output_path:
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(output_path, "w") as f:
-            json.dump(
-                [asdict(r) for r in results],
-                f,
-                indent=2,
-                default=_json_default,
-            )
+        write_json(output_path, [asdict(r) for r in results], forbidden_strings(log_dir))
         print(f"Wrote {len(results)} results to {output_path}")
 
     return results
 
 
-def _json_default(obj: Any) -> Any:
-    """JSON serializer for numpy types."""
-    if isinstance(obj, (np.integer, np.floating)):
-        return float(obj)
-    if isinstance(obj, np.ndarray):
-        return obj.tolist()
-    raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
+def _progress(done: int, total: int, path: Path) -> None:
+    print(f"\r[{done}/{total}] {path.name[:40]:<40}", end="", flush=True)
 
 
 def main() -> None:
@@ -161,13 +197,25 @@ def main() -> None:
     parser.add_argument("log_dir", type=Path, help="Directory containing .ulg files")
     parser.add_argument("-o", "--output", type=Path, help="Output JSON file")
     parser.add_argument("-n", "--limit", type=int, help="Limit number of logs")
+    add_selection_args(parser)
     args = parser.parse_args()
 
     if not args.log_dir.is_dir():
         print(f"Error: {args.log_dir} is not a directory", file=sys.stderr)
         sys.exit(1)
 
-    batch_analyze(args.log_dir, args.output, args.limit)
+    try:
+        batch_analyze(
+            args.log_dir,
+            args.output,
+            args.limit,
+            manifest_path=args.manifest,
+            max_per_vehicle=args.max_per_vehicle,
+            jobs=args.jobs,
+        )
+    except (ManifestError, PrivateDataError) as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":
