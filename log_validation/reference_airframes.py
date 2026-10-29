@@ -190,36 +190,36 @@ def _finite(value: Any) -> bool:
             and math.isfinite(value))
 
 
-def _number(measurements: Mapping[str, Any], key: str) -> float | None:
+def finite_number(measurements: Mapping[str, Any], key: str) -> float | None:
     value = measurements.get(key)
     return float(value) if _finite(value) else None
 
 
 def _log_lag(measurements: Mapping[str, Any]) -> float | None:
-    values = [v for v in (_number(measurements, f"lag_minus_filter_s.{a}")
+    values = [v for v in (finite_number(measurements, f"lag_minus_filter_s.{a}")
                           for a in ("roll", "pitch")) if v is not None]
     return sum(values) / len(values) if values else None
 
 
-def _log_effectiveness(measurements: Mapping[str, Any], axis: str) -> float | None:
+def log_effectiveness(measurements: Mapping[str, Any], axis: str) -> float | None:
     if measurements.get("bat_scale_en") == 1:
         return None
-    raw = _number(measurements, f"effectiveness.{axis}")
+    raw = finite_number(measurements, f"effectiveness.{axis}")
     if raw is None or raw <= 0.0:
         return None
-    converted = to_command_space(raw, _number(measurements, "hover.thr_mdl_fac"),
-                                 _number(measurements, HOVER))
+    converted = to_command_space(raw, finite_number(measurements, "hover.thr_mdl_fac"),
+                                 finite_number(measurements, HOVER))
     return converted if converted is not None and converted > 0.0 else None
 
 
 def _log_values(measurements: Mapping[str, Any]) -> dict[str, float]:
-    values = {HOVER: _number(measurements, HOVER), LAG: _log_lag(measurements)}
+    values = {HOVER: finite_number(measurements, HOVER), LAG: _log_lag(measurements)}
     for axis in AXES:
-        values[f"{EFFECTIVENESS}.{axis}"] = _log_effectiveness(measurements, axis)
+        values[f"{EFFECTIVENESS}.{axis}"] = log_effectiveness(measurements, axis)
     return {q: v for q, v in values.items() if v is not None}
 
 
-def _vehicle_key(log: Mapping[str, Any]) -> tuple[str, Any]:
+def vehicle_key(log: Mapping[str, Any]) -> tuple[str, Any]:
     vehicle_id = log.get("vehicle_id")
     return ("log", log.get("log_id")) if vehicle_id is None else ("vehicle", vehicle_id)
 
@@ -246,7 +246,7 @@ def _compare_kit(kit: Kit, response: Sequence[dict], min_vehicles: int) -> KitCo
     logs = [log for log in response if log.get("airframe_id") == kit.airframe_id]
     vehicle_values: dict[tuple, dict[str, list[float]]] = defaultdict(lambda: defaultdict(list))
     for log in logs:
-        per_vehicle = vehicle_values[_vehicle_key(log)]
+        per_vehicle = vehicle_values[vehicle_key(log)]
         for quantity, value in _log_values(log.get("measurements") or {}).items():
             per_vehicle[quantity].append(value)
     n_vehicles = len(vehicle_values)
