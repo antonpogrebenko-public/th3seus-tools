@@ -22,8 +22,10 @@ Comparison rules:
   body-rate lag minus the filter delay, so it also holds the allocator, output
   and ESC protocol latency: an upper bound on motor lag. Only a prediction above
   it is evidence against the motor-lag formula.
-* Effectiveness from a log with `bat_scale_en` == 1 is left out: PX4 then
-  publishes torque scaled by battery voltage, which is not comparable.
+* Effectiveness from a log with `bat_scale_en` == 1 is kept: PX4 v1.14.0
+  `MulticopterRateControl.cpp` scales the thrust and torque setpoints by the
+  battery before it publishes them, so the published torque is the allocator
+  input in either case.
 * TH3SEUS's effectiveness is in motor-command space (THR_MDL_FAC = 0), so each
   measured value is first converted with `to_command_space`.
 * A quantity gets a row only when at least `min_vehicles` vehicles contributed.
@@ -221,8 +223,10 @@ def _log_lag(measurements: Mapping[str, Any]) -> float | None:
 
 
 def log_effectiveness(measurements: Mapping[str, Any], axis: str) -> float | None:
-    if measurements.get("bat_scale_en") == 1:
-        return None
+    """The log's effectiveness in motor-command space, or None.
+
+    `bat_scale_en` does not matter: the published torque setpoint is already
+    battery-scaled when MC_BAT_SCALE_EN is on, so it is the allocator input."""
     raw = finite_number(measurements, f"effectiveness.{axis}")
     if raw is None or raw <= 0.0:
         return None

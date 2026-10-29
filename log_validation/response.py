@@ -22,8 +22,10 @@ at the median angular-velocity interval inside the in-air segments of
 takeoff and landing are left out. A logging gap longer than ``MAX_GAP_INTERVALS``
 median intervals of its topic is left empty rather than interpolated across.
 ``bat_scale_en`` reports MC_BAT_SCALE_EN (1.0 or
-0.0, absent without the parameter): with it on, PX4 scales the published torque by
-the battery voltage, so the effectiveness is per unit of scaled torque.
+0.0, absent without the parameter): with it on, PX4 v1.14.0
+``MulticopterRateControl.cpp`` scales the thrust and torque setpoints by the battery
+before publishing them, so the published torque is the allocator input either way
+and the effectiveness is comparable across logs.
 
 Filter delay (``filter_delay_s``, and ``lag_minus_filter_s.<axis>`` = lag minus it).
 Source: PX4-Autopilot ``src/modules/sensors/vehicle_angular_velocity/

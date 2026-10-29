@@ -171,11 +171,10 @@ def test_effectiveness_left_out_without_conversion_inputs():
 
 # ---- Ruling 26 ----
 
-def test_bat_scale_en_one_excludes_effectiveness():
+def test_bat_scale_en_one_keeps_effectiveness():
     base = {"effectiveness.roll": 50.0, "hover.thr_mdl_fac": 0.0, "hover.command": 0.4}
-    response = vehicles(5, bat_scale_en=1.0, **base)
-    result = compare_kits([kit()], response)[0]
-    assert not any(r.quantity.startswith("effectiveness") for r in result.rows)
+    result = compare_kits([kit()], vehicles(5, bat_scale_en=1.0, **base))[0]
+    assert row(result, "effectiveness.roll").real_median == pytest.approx(50.0)
 
 
 def test_bat_scale_en_zero_or_absent_keeps_effectiveness():

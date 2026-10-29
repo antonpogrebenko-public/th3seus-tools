@@ -19,9 +19,10 @@ Ranges rules:
 * The lag quantity is `lag_minus_filter_s.<axis>`, not `lag_s.<axis>`: the
   filter delay depends on each log's PX4 parameters, and a simulator running
   PX4's own filters would count it twice.
-* Effectiveness uses the same values as the reference-airframe comparison: logs
-  with `bat_scale_en` == 1 are left out and the rest are converted to
-  motor-command space (`reference_airframes.log_effectiveness`).
+* Effectiveness uses the same values as the reference-airframe comparison,
+  converted to motor-command space (`reference_airframes.log_effectiveness`).
+  Logs with `bat_scale_en` == 1 are kept: PX4 scales the torque setpoint before
+  publishing it, so the published torque is the allocator input.
 * Classes: the battery cell count and the airframe ID. A response entry's cell
   count is `measurements["cell_count"]` and its airframe ID is top level; a
   battery row carries its own cell count (and an airframe ID if it has one); a

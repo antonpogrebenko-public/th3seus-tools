@@ -114,14 +114,12 @@ def test_effectiveness_exclusions():
     logs.append(resp("scaled", "vs", **base, bat_scale_en=1.0))
     logs.append(resp("nofac", "vn", **{"effectiveness.roll": 10.0, "hover.command": 0.4}))
     rows = ranges_table([], EMPTY_BATTERY, logs)
-    assert find(rows, "effectiveness.roll").n_logs == 5
-    lists = log_id_lists([], EMPTY_BATTERY, logs)
-    assert "scaled" in lists["response"]  # contributes hover.command
-    only = [resp("s", "v", **{"effectiveness.roll": 10.0, "hover.thr_mdl_fac": 0.0,
-                              "hover.command": 0.4, "bat_scale_en": 1.0})]
-    only = [{**only[0], "measurements": {k: v for k, v in only[0]["measurements"].items()
-                                         if k != "hover.command"}}]
-    assert log_id_lists([], EMPTY_BATTERY, only)["response"] == []
+    assert find(rows, "effectiveness.roll").n_logs == 6  # battery-scaled kept, no THR_MDL_FAC not
+    scaled_only = [resp("s", "v", **{"effectiveness.roll": 10.0, "hover.thr_mdl_fac": 0.0,
+                                     "bat_scale_en": 1.0})]
+    assert log_id_lists([], EMPTY_BATTERY, scaled_only)["response"] == ["s"]
+    no_fac_only = [resp("n", "v", **{"effectiveness.roll": 10.0})]
+    assert log_id_lists([], EMPTY_BATTERY, no_fac_only)["response"] == []
 
 
 def test_response_list_only_ranges_table_quantities():
