@@ -14,6 +14,7 @@ from log_validation.reference_airframes import (
     Kit,
     compare_kits,
     load_kits,
+    log_effectiveness,
     main,
     recommendations,
     to_command_space,
@@ -462,9 +463,19 @@ def test_to_command_space_refuses_non_positive_hover():
 
 
 def test_effectiveness_dropped_for_zero_hover_command():
-    m = {"effectiveness.roll": 50.0, "hover.thr_mdl_fac": 0.0, "hover.command": 0.0}
+    m = {"effectiveness.roll": 50.0, "hover.thr_mdl_fac": 0.3, "hover.command": 0.0}
     result = compare_kits([kit()], vehicles(5, **m))[0]
     assert not any(r.quantity.startswith("effectiveness") for r in result.rows)
+
+
+def test_f_zero_keeps_effectiveness_without_hover_command():
+    assert log_effectiveness({"effectiveness.roll": 200, "hover.thr_mdl_fac": 0.0}, "roll") == 200
+    assert to_command_space(10.0, 0.0, None) == 10.0
+    assert to_command_space(10.0, 0.0, 0.0) == 10.0
+
+
+def test_missing_thr_mdl_fac_still_drops_effectiveness():
+    assert log_effectiveness({"effectiveness.roll": 200, "hover.command": 0.4}, "roll") is None
 
 
 def test_non_positive_effectiveness_is_dropped():

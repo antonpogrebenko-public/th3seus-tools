@@ -190,9 +190,15 @@ def to_command_space(effectiveness: float, thr_mdl_fac: float | None,
 
     PX4 applies the thrust-model inverse after allocation, so a log flown with
     f = THR_MDL_FAC > 0 shows the effectiveness divided by dT/du at hover. The
-    value is multiplied by (1 - f) + 2 f u_hover. None when f or u_hover is
-    missing, not finite, or the hover command is not positive."""
-    if not is_finite_number(thr_mdl_fac) or not is_finite_number(hover_command) or hover_command <= 0.0:
+    value is multiplied by (1 - f) + 2 f u_hover. With f = 0 the factor is 1,
+    so the value is returned unchanged whatever u_hover is. None when f is
+    missing or not finite, or, for f != 0, when u_hover is missing, not finite
+    or not positive."""
+    if not is_finite_number(thr_mdl_fac):
+        return None
+    if thr_mdl_fac == 0.0:
+        return effectiveness
+    if not is_finite_number(hover_command) or hover_command <= 0.0:
         return None
     return effectiveness * ((1.0 - thr_mdl_fac) + 2.0 * thr_mdl_fac * hover_command)
 
