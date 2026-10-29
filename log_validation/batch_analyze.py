@@ -35,7 +35,7 @@ from .report import (
 )
 
 # The only topics any of the measurements below read. Kept next to the parse so
-# adding a measurement that needs a sixth topic fails loudly here rather than
+# adding a measurement that needs another topic fails loudly here rather than
 # silently returning nothing.
 REQUIRED_TOPICS = (
     TOPIC_ACCEL,
