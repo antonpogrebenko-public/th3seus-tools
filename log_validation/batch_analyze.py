@@ -9,7 +9,6 @@ from __future__ import annotations
 import argparse
 import sys
 from collections.abc import Callable
-from concurrent.futures import ProcessPoolExecutor
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
@@ -24,6 +23,7 @@ from .manifest import (
     add_selection_args,
     select_logs,
 )
+from .parallel import run_per_log
 from .outputs import PrivateDataError, forbidden_strings, write_json
 from .report import (
     TOPIC_ACCEL,
@@ -101,7 +101,11 @@ def analyze_log(
             vehicle_id=vehicle_id,
         )
 
-    airframe_id = _airframe_id(ulog.initial_parameters)
+    try:
+        airframe_id = _airframe_id(ulog.initial_parameters)
+    except Exception as e:
+        airframe_id = None
+        errors.append(f"parameters unavailable: {e}")
 
     # Extract hardware info
     hw = None
@@ -163,20 +167,10 @@ def batch_analyze(
         paths = paths[:limit]
     vehicles = [selection.vehicle_of.get(p.stem) for p in paths]
 
-    if jobs > 1:
-        with ProcessPoolExecutor(max_workers=jobs) as pool:
-            futures = [
-                pool.submit(analyze_log, p, v, loader) for p, v in zip(paths, vehicles)
-            ]
-            results = []
-            for i, future in enumerate(futures, 1):
-                results.append(future.result())
-                _progress(i, len(paths), paths[i - 1])
-    else:
-        results = []
-        for i, (path, vehicle) in enumerate(zip(paths, vehicles), 1):
-            _progress(i, len(paths), path)
-            results.append(analyze_log(path, vehicle, loader))
+    tasks = [(p, v, loader) for p, v in zip(paths, vehicles)]
+    results = run_per_log(_analyze_task, tasks, jobs, _died_result)
+    for i, path in enumerate(paths, 1):
+        _progress(i, len(paths), path)
 
     print()  # newline after progress
     results.sort(key=lambda r: r.log_id)
@@ -186,6 +180,22 @@ def batch_analyze(
         print(f"Wrote {len(results)} results to {output_path}")
 
     return results
+
+
+def _analyze_task(task: tuple[Path, str | None, Callable[[Path], Any]]) -> LogResult:
+    path, vehicle_id, loader = task
+    return analyze_log(path, vehicle_id, loader)
+
+
+def _died_result(task: tuple[Path, str | None, Callable[[Path], Any]]) -> LogResult:
+    path, vehicle_id, _ = task
+    return LogResult(
+        log_id=path.stem,
+        hardware={},
+        measurements={},
+        errors=["worker process died"],
+        vehicle_id=vehicle_id,
+    )
 
 
 def _progress(done: int, total: int, path: Path) -> None:

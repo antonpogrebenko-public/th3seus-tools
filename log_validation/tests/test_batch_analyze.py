@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 from log_validation.batch_analyze import batch_analyze
@@ -24,10 +25,18 @@ def _fake(board: str = "PX4_FMU_V5", autostart: float = AIRFRAME) -> FakeULog:
     )
 
 
+class _NoParams:
+    """A parse result without the header attributes."""
+
+
 def load_by_stem(path: Path):
     """Top-level so a spawned worker can import it."""
     if path.stem == "bad":
         raise OSError("corrupt log")
+    if path.stem == "die":
+        os._exit(1)
+    if path.stem == "noparams":
+        return _NoParams()
     if path.stem.startswith("sitl"):
         return _fake(board="PX4_SITL")
     return _fake()
@@ -54,6 +63,8 @@ def test_entry_has_the_seeding_fields(tmp_path):
     assert {"log_id", "measurements", "errors", "vehicle_id", "airframe_id"} <= set(entry)
     assert "gyro.gyro_noise_density" in entry["measurements"]
     assert entry["airframe_id"] == AIRFRAME
+    assert entry["measurements"]["gyro.integration_interval_s"] > 0
+    assert entry["measurements"]["accel.integration_interval_s"] > 0
     assert entry["vehicle_id"] is None
 
 
@@ -100,3 +111,22 @@ def test_jobs_do_not_change_the_output(tmp_path):
     batch_analyze(log_dir, two, jobs=2, loader=load_by_stem)
     assert one.read_bytes() == two.read_bytes()
     assert [e["log_id"] for e in _read(one)] == ["a1", "b2", "bad", "c3"]
+
+
+def test_log_without_header_attributes_does_not_stop_the_run(tmp_path):
+    log_dir = _touch(tmp_path, ["a1", "noparams"])
+    out = tmp_path / "r.json"
+    batch_analyze(log_dir, out, jobs=2, loader=load_by_stem)
+    by_id = {e["log_id"]: e for e in _read(out)}
+    assert by_id["noparams"]["airframe_id"] is None and by_id["noparams"]["errors"]
+    assert by_id["a1"]["measurements"]
+
+
+def test_worker_death_is_recorded_and_others_survive(tmp_path):
+    log_dir = _touch(tmp_path, ["a1", "die", "c3"])
+    out = tmp_path / "r.json"
+    batch_analyze(log_dir, out, jobs=2, loader=load_by_stem)
+    by_id = {e["log_id"]: e for e in _read(out)}
+    assert by_id["die"]["errors"] == ["worker process died"]
+    assert by_id["die"]["measurements"] == {} and by_id["die"]["hardware"] == {}
+    assert by_id["a1"]["measurements"] and by_id["c3"]["measurements"]
