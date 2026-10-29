@@ -151,7 +151,10 @@ except the Run date line of `report.md`.
 Deployment note: re-seeding the TH3SEUS profiles from this run lowers the simulated
 IMU noise for every TH3SEUS user, because the old estimator overstated the per-sample
 noise. The report's before and after table gives the measured factor in its current
-and new columns, per MCU family; check them before deploying.
+and new columns, per MCU family; check them before deploying. Re-seeding also changes
+the gyro bias sigma and the baro, mag and GPS parameters measured in the still window,
+because the still window and the Allan fit now use `sensor_combined` (when the log has
+it) rather than `sensor_gyro`; compare those profile values with the deployed ones too.
 
 ## Tests
 
