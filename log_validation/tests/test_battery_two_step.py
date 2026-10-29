@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import json
+import pickle
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -10,6 +13,7 @@ import pytest
 from log_validation import battery_extract
 from log_validation.battery_fit import (
     analyze_logs,
+    fit_extracted,
     extract_dir,
     fit_obs_dir,
     main,
@@ -23,6 +27,8 @@ from log_validation.tests.battery_fakes import (
     make_log_dir,
     make_manifest,
 )
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 class TestFitObsDir:
@@ -91,3 +97,19 @@ class TestCli:
         code = main(["--obs-dir", "obs", "--out-json", "out/fit.json", "--out-md", "out/fit.md"])
         assert code in (0, 1)  # 2 would be an error such as a refused output
         assert "n_total_observations" in (tmp_path / "out" / "fit.json").read_text()
+
+
+def test_outputs_do_not_import_the_fit(tmp_path):
+    result = fit_extracted([make_data(f"a{k}") for k in range(6)], {}, 0.2, 0)
+    pickled = tmp_path / "result.pkl"
+    pickled.write_bytes(pickle.dumps(result))
+    script = (
+        "import pickle, sys\n"
+        "from log_validation import battery_output\n"
+        f"r = pickle.loads(open({str(pickled)!r}, 'rb').read())\n"
+        f"battery_output.write_markdown_summary(r, {str(tmp_path / 'r.md')!r})\n"
+        "print('log_validation.battery_fit' in sys.modules)\n"
+    )
+    done = subprocess.run([sys.executable, "-c", script], cwd=REPO_ROOT,
+                          capture_output=True, text=True, check=True)
+    assert done.stdout.strip() == "False"

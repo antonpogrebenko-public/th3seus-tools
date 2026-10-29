@@ -4,12 +4,13 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING
 
+from .battery_model import (
+    MIN_R_OBSERVATIONS_PER_CLASS,
+    R_PLAUSIBLE_FLOOR_MOHM_PER_CELL,
+    BatteryFitResult,
+)
 from .outputs import write_text
-
-if TYPE_CHECKING:
-    from .battery_fit import BatteryFitResult
 
 
 def result_to_dict(r: BatteryFitResult) -> dict:
@@ -83,9 +84,6 @@ def write_markdown_summary(
     r: BatteryFitResult, path: str | Path, forbidden: Sequence[str] = ()
 ) -> None:
     """Write a short Markdown summary of the fit results."""
-    # Imported here: battery_fit imports this module at load time.
-    from .battery_fit import MIN_R_OBSERVATIONS_PER_CLASS, R_PLAUSIBLE_FLOOR_MOHM_PER_CELL
-
     lines = [
         "# Battery Model Fit — 2026-06-23",
         "",

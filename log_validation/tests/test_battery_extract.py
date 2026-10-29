@@ -109,3 +109,11 @@ class TestExtract:
         (out / "a01.unusable").touch()
         extract_dir(make_log_dir(tmp_path, ["a01"]), out, loader=load_by_stem)
         assert file_names(out) == ["a01.npz"]
+
+    def test_folder_readers_are_public(self, tmp_path):
+        from log_validation.battery_extract import load_named, read_statuses
+
+        out = tmp_path / "obs"
+        extract_dir(make_log_dir(tmp_path, ["a01", "sim01"]), out, loader=load_by_stem)
+        assert read_statuses(out) == {"a01": "ok", "sim01": "sim"}
+        assert load_named(out, "a01").log_id == "a01"

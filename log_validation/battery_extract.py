@@ -253,7 +253,7 @@ def _record_status(out_dir: Path, log_id: str, status: str) -> None:
         (out_dir / f"{log_id}{_SUFFIX_OF_STATUS[status]}").touch()
 
 
-def _read_statuses(obs_dir: Path) -> dict[str, str]:
+def read_statuses(obs_dir: Path) -> dict[str, str]:
     """{log_id: status} from the files extract_dir left; other files are ignored."""
     found = sorted(
         (p.stem, _STATUS_OF_SUFFIX[p.suffix])
@@ -266,7 +266,7 @@ def _read_statuses(obs_dir: Path) -> dict[str, str]:
     return dict(found)
 
 
-def _load_named(obs_dir: Path, log_id: str) -> LogBatteryData:
+def load_named(obs_dir: Path, log_id: str) -> LogBatteryData:
     data = load_extracted(obs_dir / f"{log_id}{NPZ_SUFFIX}")
     if data.log_id != log_id:
         raise ValueError(f"{log_id}{NPZ_SUFFIX} holds log {data.log_id}")
