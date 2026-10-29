@@ -45,7 +45,11 @@ def _clean(obj: Any) -> Any:
 
 def _check(text: str, forbidden: Sequence[str]) -> None:
     for s in forbidden:
-        if s and s in text:
+        if not s:
+            continue
+        # Also match the JSON-escaped forms (backslashes, \\uXXXX) of the string.
+        variants = {s, json.dumps(s)[1:-1], json.dumps(s, ensure_ascii=False)[1:-1]}
+        if any(v in text for v in variants):
             raise PrivateDataError("output contains private data; refusing to write it")
 
 
@@ -53,11 +57,12 @@ def write_text(path: Path, text: str, forbidden: Sequence[str]) -> None:
     _check(text, forbidden)
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(text)
+    path.write_text(text, encoding="utf-8")
 
 
 def write_json(path: Path, obj: Any, forbidden: Sequence[str]) -> None:
-    text = json.dumps(_clean(obj), indent=1, sort_keys=True, allow_nan=False) + "\n"
+    text = json.dumps(_clean(obj), indent=1, sort_keys=True, allow_nan=False,
+                      ensure_ascii=False) + "\n"
     write_text(path, text, forbidden)
 
 
@@ -65,7 +70,7 @@ def merge_per_log(paths: Sequence[Path]) -> list[dict]:
     """Merge JSON lists of per-log records, sorted by log_id; a repeated log_id is an error."""
     merged: dict[str, dict] = {}
     for p in paths:
-        records = json.loads(Path(p).read_text())
+        records = json.loads(Path(p).read_text(encoding="utf-8"))
         if not isinstance(records, list):
             raise ValueError(f"{Path(p).name}: expected a JSON list of per-log records")
         for rec in records:

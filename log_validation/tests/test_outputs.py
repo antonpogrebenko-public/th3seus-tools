@@ -78,3 +78,22 @@ def test_merge_command(tmp_path):
     out = tmp_path / "out" / "merged.json"
     assert outputs.main(["merge", "-o", str(out), str(p1), str(p2)]) == 0
     assert json.loads(out.read_text()) == [{"log_id": "a"}, {"log_id": "b"}]
+
+
+def test_write_json_refuses_non_ascii_forbidden(tmp_path):
+    target = tmp_path / "o.json"
+    with pytest.raises(PrivateDataError):
+        write_json(target, {"p": "/home/jos\u00e9/logs/x.ulg"}, ["/home/jos\u00e9"])
+    assert not target.exists()
+
+
+def test_write_json_refuses_backslash_forbidden(tmp_path):
+    target = tmp_path / "o.json"
+    with pytest.raises(PrivateDataError):
+        write_json(target, {"p": "C:\\Users\\bob\\x.ulg"}, ["C:\\Users\\bob"])
+    assert not target.exists()
+
+
+def test_write_json_is_utf8(tmp_path):
+    write_json(tmp_path / "o.json", {"k": "caf\u00e9"}, [])
+    assert "caf\u00e9".encode("utf-8") in (tmp_path / "o.json").read_bytes()
