@@ -381,7 +381,7 @@ def test_battery_scaling_and_params_failures_are_contained(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# Motor lag gates (Ruling 24) and minors
+# Motor lag gates and other small cases
 # ---------------------------------------------------------------------------
 
 

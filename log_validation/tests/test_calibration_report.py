@@ -200,8 +200,7 @@ def test_range_row_is_frozen():
         row.n_logs = 2  # type: ignore[misc]
 
 
-# ---- Task 12: noise before and after, the report, the directory ----
-
+# ---- noise before and after, the report, the directory ----
 
 
 def _write(tmp_path, out_name="out", date="2026-10-29", extra=()):

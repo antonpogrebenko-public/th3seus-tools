@@ -167,7 +167,7 @@ ERROR_WORKER_DIED = "worker process died"
 
 @dataclass(frozen=True)
 class ResponseGates:
-    """Per-axis acceptance gates (provisional; Task 13 sets them from the sample run)."""
+    """Per-axis acceptance gates (provisional, to be set from a run on real logs)."""
 
     min_torque_std: float = 0.02  # excitation: torque setpoint std over the used time
     # Fit quality: the share of the angular acceleration the fitted model explains. Pure
@@ -177,7 +177,7 @@ class ResponseGates:
     noise_cutoff_hz: float = 20.0  # in-flight noise: the cut-off below which the signal is not noise
     min_motor_cmd_std: float = 0.02  # motor lag: the least std of the motor command in a window
     min_first_stage_r2: float = 0.05  # instrument strength: R^2 of the torque on it
-    # Motor lag fit quality per ESC. Provisional; Task 13 sets it. Much higher than min_r2:
+    # Motor lag fit quality per ESC, provisional like the others. Much higher than min_r2:
     # real ESC fits with R^2 0.14 to 0.4 gave lags anywhere from 16 to 170 ms.
     min_motor_r2: float = 0.5
 

@@ -63,7 +63,7 @@ def row(comparison, quantity):
     return next(r for r in comparison.rows if r.quantity == quantity)
 
 
-# ---- the brief's six tests ----
+# ---- sources, vehicle counts, recommendations and weighting ----
 
 def test_unsourced_value_is_not_compared(tmp_path):
     item = kit_item()
@@ -135,7 +135,7 @@ def test_vehicle_weighting():
     assert r.predicted == pytest.approx(PRED.hover_command)
 
 
-# ---- Ruling 27 ----
+# ---- conversion to motor-command space ----
 
 def test_to_command_space_f_zero_is_identity():
     assert to_command_space(100.0, 0.0, 0.4) == pytest.approx(100.0)
@@ -169,7 +169,7 @@ def test_effectiveness_left_out_without_conversion_inputs():
     assert not any(r.quantity.startswith("effectiveness") for r in result.rows)
 
 
-# ---- Ruling 26 ----
+# ---- battery scaling ----
 
 def test_bat_scale_en_one_keeps_effectiveness():
     base = {"effectiveness.roll": 50.0, "hover.thr_mdl_fac": 0.0, "hover.command": 0.4}
@@ -190,7 +190,7 @@ def test_bat_scale_en_does_not_exclude_other_quantities():
     assert {r.quantity for r in result.rows} == {"hover.command", "lag"}
 
 
-# ---- Ruling 4 ----
+# ---- lag from roll and pitch ----
 
 def test_lag_is_mean_of_roll_and_pitch():
     m = {"lag_minus_filter_s.roll": 0.01, "lag_minus_filter_s.pitch": 0.03}
@@ -376,7 +376,7 @@ def test_cli_bad_kits_exits_2(tmp_path, capsys):
     assert code == 2 and "Error:" in capsys.readouterr().err
 
 
-# ---- fix round 1 ----
+# ---- notes, shared airframes, p25 and p75 edges, conversion limits ----
 
 def _lag_by_vehicle(airframe_id: int, lags: list[float]) -> list[dict]:
     return [entry(f"{airframe_id}-{i}", f"v{airframe_id}-{i}", airframe_id,

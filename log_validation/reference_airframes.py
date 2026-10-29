@@ -7,7 +7,7 @@ TH3SEUS's predicted hover motor command, motor lag and control effectiveness
 that airframe, and recommends reviewing a TH3SEUS formula only when the evidence
 is consistent across kits.
 
-Known limitations, inherited from the Task 9 mirror (`th3seus_model`): the
+Known limitations, inherited from the TH3SEUS model mirror (`th3seus_model`): the
 predictions are static (nominal pack voltage, no voltage sag or thermal
 effects) and assume a symmetric quad X.
 
