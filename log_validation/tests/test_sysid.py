@@ -292,3 +292,18 @@ def test_inflight_noise_does_not_change_its_input():
 def test_inflight_noise_refuses_unusable_input(x, dt, cutoff):
     with pytest.raises(ValueError):
         inflight_noise_std(x, dt, cutoff)
+
+
+def test_inflight_noise_std_docstring_describes_the_filter():
+    doc = " ".join(inflight_noise_std.__doc__.split())
+    assert "moving-average window of 1 / cutoff_hz seconds" in doc
+    assert "first null at cutoff_hz" in doc and "-3 dB near 0.44 cutoff_hz" in doc
+
+
+def test_inflight_noise_keeps_a_sine_at_the_cutoff_and_removes_a_slow_one():
+    dt, cutoff = 1e-3, 20.0  # a window of 50 samples
+    t = np.arange(20000) * dt
+    at_cutoff = inflight_noise_std(np.sin(2 * np.pi * cutoff * t), dt, cutoff)
+    slow = inflight_noise_std(np.sin(2 * np.pi * 0.05 * cutoff * t), dt, cutoff)
+    assert at_cutoff == pytest.approx(math.sqrt(0.5) * math.sqrt(50 / 49), rel=1e-3)
+    assert slow < 0.01

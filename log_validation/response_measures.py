@@ -14,7 +14,8 @@ values are finite (``_finite_only`` drops and reports any that are not).
   command and an error; the thrust is still reported.
 - In-flight gyro noise (``inflight_noise_measurements``):
   ``inflight_gyro_noise.<axis>`` is ``sysid.inflight_noise_std`` of
-  ``vehicle_angular_velocity.xyz[k]`` in the HOVER segments at the cut-off given, and
+  ``vehicle_angular_velocity.xyz[k]`` in the HOVER segments, with the moving-average
+  window that ``noise_cutoff_hz`` sets (see that function), and
   ``inflight_gyro_rate_hz`` the logged rate of that topic there. A log without a hover
   segment gets one error for the whole hover group (``hover_group``).
 - Motor lag (``motor_lag_measurements``): per ESC, ``esc_status.esc[i].esc_rpm`` (minus

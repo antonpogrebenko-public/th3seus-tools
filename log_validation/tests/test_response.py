@@ -450,3 +450,11 @@ def test_cli_refuses_a_bad_manifest(tmp_path, capsys):
     manifest.write_text("log_id\n1\n")
     code = main([str(log_dir), "-o", str(tmp_path / "r.json"), "--manifest", str(manifest)])
     assert code == 2 and capsys.readouterr().err.startswith("Error: ")
+
+
+def test_noise_cutoff_help_describes_the_moving_average(capsys):
+    with pytest.raises(SystemExit):
+        main(["--help"])
+    text = " ".join(capsys.readouterr().out.split())
+    assert "moving-average window of 1/f seconds" in text
+    assert "first null at f" in text and "-3 dB near 0.44 f" in text

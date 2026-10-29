@@ -174,7 +174,9 @@ class ResponseGates:
     # noise gives about k / N (6 instruments over N samples; under 0.001 on the test
     # fakes), real fits 0.1 and up; 0.05 sits between them with a wide margin.
     min_r2: float = 0.05
-    noise_cutoff_hz: float = 20.0  # in-flight noise: the cut-off below which the signal is not noise
+    # In-flight noise: f sets a moving-average window of 1/f seconds (first null at f,
+    # -3 dB near 0.44 f); the noise is the std of the signal minus that average.
+    noise_cutoff_hz: float = 20.0
     min_motor_cmd_std: float = 0.02  # motor lag: the least std of the motor command in a window
     min_first_stage_r2: float = 0.05  # instrument strength: R^2 of the torque on it
     # Motor lag fit quality per ESC, provisional like the others. Much higher than min_r2:
@@ -628,7 +630,10 @@ def _build_parser() -> argparse.ArgumentParser:
     gates.add_argument("--min-r2", type=float, default=defaults.min_r2,
                        help=f"fit quality gate: R^2 per axis (default {defaults.min_r2})")
     gates.add_argument("--noise-cutoff-hz", type=float, default=defaults.noise_cutoff_hz,
-                       help=f"in-flight noise cut-off in Hz (default {defaults.noise_cutoff_hz})")
+                       help="in-flight noise: f in Hz sets a moving-average window of 1/f "
+                            "seconds (first null at f, -3 dB near 0.44 f), and the noise is the "
+                            "std of the angular velocity minus that average "
+                            f"(default {defaults.noise_cutoff_hz})")
     gates.add_argument("--min-motor-cmd-std", type=float, default=defaults.min_motor_cmd_std,
                        help="motor lag gate: motor command std "
                             f"(default {defaults.min_motor_cmd_std})")

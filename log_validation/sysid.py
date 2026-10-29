@@ -446,6 +446,12 @@ def hover_command(thrust: float, thr_mdl_fac: float) -> float:
 def inflight_noise_std(x: np.ndarray, dt_s: float, cutoff_hz: float) -> float:
     """Std of x minus its centred moving average over round(1 / (cutoff_hz * dt_s)) samples.
 
+    `cutoff_hz` is not a filter corner: it sets a moving-average window of
+    1 / cutoff_hz seconds. That moving average has its first null at cutoff_hz
+    and is -3 dB near 0.44 cutoff_hz, so the residual holds all of a signal at
+    cutoff_hz, half its power near 0.76 cutoff_hz, and little of what lies well
+    below.
+
     Only samples with a full window around them count (no edge bias). The std is
     corrected by sqrt(N / (N - 1)) for the window length N: white noise of std s
     leaves a residual of variance s**2 (1 - 1/N). ValueError when the cutoff or
