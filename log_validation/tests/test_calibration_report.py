@@ -76,7 +76,14 @@ def test_class_with_fewer_than_5_vehicles_is_omitted():
     rows = ranges_table([], EMPTY_BATTERY, five)
     assert find(rows, "hover.command", "airframe", "4019").n_vehicles == 5
     assert find(rows, "hover.command") is not None
-    assert find(ranges_table([], EMPTY_BATTERY, four), "hover.command") is None
+    assert find(ranges_table([], EMPTY_BATTERY, four), "hover.command").n_vehicles == 4
+
+
+def test_overall_row_vehicle_weighting():
+    logs = [resp(f"a{i}", "v1", **{"hover.command": 0.30}) for i in range(3)]
+    logs.append(resp("b0", "v2", **{"hover.command": 0.50}))
+    row = find(ranges_table([], EMPTY_BATTERY, logs), "hover.command")
+    assert row.n_vehicles == 2 and row.n_logs == 4 and row.p50 == pytest.approx(0.40)
 
 
 def test_noise_list_has_contributing_logs_only():

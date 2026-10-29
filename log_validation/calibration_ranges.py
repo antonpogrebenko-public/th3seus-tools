@@ -13,8 +13,9 @@ Ranges rules:
 * A log without a vehicle ID is its own vehicle, keyed so that it cannot collide
   with a real vehicle ID.
 * Non-finite values never enter a percentile.
-* A class, and the "all" row of a quantity, is omitted when fewer than
-  `min_vehicles` vehicles contributed.
+* A class is omitted when fewer than `min_vehicles` vehicles contributed. The
+  "all" row of a quantity is written whenever at least one vehicle contributed,
+  with its vehicle count, so a reader can judge it.
 * The lag quantity is `lag_minus_filter_s.<axis>`, not `lag_s.<axis>`: the
   filter delay depends on each log's PX4 parameters, and a simulator running
   PX4's own filters would count it twice.
@@ -206,7 +207,7 @@ def _quantity_rows(quantity: str, samples: Sequence[_Sample], min_vehicles: int)
     for (kind, value), group in groups.items():
         n_logs, n_vehicles, p = vehicle_percentiles(
             [(s.log_id, _vehicle_id(s), s.value) for s in group])
-        if n_vehicles >= min_vehicles:
+        if n_vehicles >= (1 if kind == ALL else min_vehicles):
             rows.append(RangeRow(quantity, kind, value, n_logs, n_vehicles,
                                  p[5], p[25], p[50], p[75], p[95]))
     return rows

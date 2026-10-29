@@ -107,7 +107,7 @@ def _response(ranges: Sequence[RangeRow]) -> list[str]:
              "Effectiveness is in motor-command space; lag is the body-rate lag minus the "
              "log's filter delay, an upper bound on motor lag.", ""]
     if not rows:
-        return lines + ["No response quantity has enough vehicles.", ""]
+        return lines + ["No response quantity has a value.", ""]
     return lines + _table(["Quantity", "Logs", "Vehicles", "p5", "p25", "p50", "p75", "p95"],
                           [_range_cells(r, ("p5", "p25", "p50", "p75", "p95")) for r in rows])
 

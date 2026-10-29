@@ -118,7 +118,8 @@ The calibration directory holds:
   ranges, the gaps TH3SEUS does not model, and the counts of logs analyzed, skipped
   and failed per pass with their reasons.
 - `ranges.csv`: the p5, p25, p50, p75 and p95 of every quantity, overall and per
-  battery cell count and airframe ID, with the numbers of logs and vehicles.
+  battery cell count and airframe ID, with the numbers of logs and vehicles. A class
+  needs at least 5 vehicles; the overall row is given whenever one vehicle has a value.
 - `log-ids/noise.txt`, `log-ids/battery.txt`, `log-ids/response.txt`: the Flight
   Review log IDs behind each pass's numbers, one per line, sorted.
 - `noise-results.json`, `noise-profiles.json`, `battery-fit.json`,
