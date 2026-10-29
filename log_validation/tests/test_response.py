@@ -60,7 +60,7 @@ def test_known_plant_in_a_log():
         assert abs(m[f"effectiveness.{axis}"] - GAIN) / GAIN < 0.10
         assert abs(m[f"lag_s.{axis}"] - 0.030) < 0.005
         assert m[f"lag_minus_filter_s.{axis}"] == pytest.approx(m[f"lag_s.{axis}"] - filter_delay)
-        assert 0.5 < m[f"fit_r2.{axis}"] <= 1.0
+        assert 0.5 < m[f"fit_r2.{axis}"] <= m[f"reduced_form_r2.{axis}"] <= 1.0
     assert result.errors == []
 
 
@@ -69,6 +69,20 @@ def test_used_fraction_is_the_trimmed_share_of_in_air_time():
     # 30 s in air, 2 s trimmed at each end: 26 / 30.
     for axis in AXES:
         assert m[f"used_fraction.{axis}"] == pytest.approx(26 / 30, abs=0.01)
+
+
+def test_used_fraction_counts_only_the_samples_the_fit_scores():
+    # One missing roll sample every 0.5 s cuts 11 s into 22 runs; the fit skips the
+    # first 17 samples (42.5 ms) of each run, which used_fraction must not count.
+    datasets = quad_datasets(FAST)
+    rate = dict(datasets["vehicle_angular_velocity"])
+    accel = rate["xyz_derivative[0]"].copy()
+    accel[::200] = np.nan
+    rate["xyz_derivative[0]"] = accel
+    datasets["vehicle_angular_velocity"] = rate
+    m = _analyze(FAST, datasets).measurements
+    assert m["used_fraction.roll"] == pytest.approx((11 - 22 * 0.045) / 15, abs=0.01)
+    assert m["used_fraction.pitch"] == pytest.approx((11 - 0.0425) / 15, abs=0.005)
 
 
 def test_low_excitation_axis():
@@ -81,8 +95,9 @@ def test_low_excitation_axis():
     assert "effectiveness.pitch" in m and "effectiveness.yaw" in m
 
 
-def test_low_fit_quality_axis_gets_no_estimate():
-    result = _analyze(QuadSpec(noise_only=True))
+@pytest.mark.parametrize("seed", range(1, 13))
+def test_low_fit_quality_axis_gets_no_estimate(seed):
+    result = _analyze(QuadSpec(noise_only=True, seed=seed))
     assert not any(k.startswith("effectiveness.") for k in result.measurements)
     for axis in AXES:
         assert any(axis in e and "fit quality" in e for e in result.errors)
@@ -153,7 +168,8 @@ def test_missing_cutoff_parameter_gives_no_lag():
 def test_repeated_and_backward_timestamps():
     datasets = quad_datasets(FAST)
     for topic, stamp in (("vehicle_torque_setpoint", "timestamp"),
-                         ("vehicle_angular_velocity", "timestamp_sample")):
+                         ("vehicle_angular_velocity", "timestamp_sample"),
+                         ("vehicle_rates_setpoint", "timestamp")):
         t = datasets[topic][stamp].copy()
         t[1000] = t[999]  # repeated
         t[2000] = t[1990]  # backward
@@ -169,7 +185,7 @@ def test_setpoint_logged_below_the_rate_loop_rate_gets_no_estimate():
     torque = datasets["vehicle_torque_setpoint"]
     datasets["vehicle_torque_setpoint"] = {k: v[::8] for k, v in torque.items()}  # 50 Hz
     result = _analyze(FAST, datasets)
-    assert result.measurements == {}
+    assert _only_log_level(result.measurements)
     assert result.errors == ["not logged at the rate controller's rate (vehicle_torque_setpoint "
                              "at 50 Hz, vehicle_angular_velocity at 400 Hz, "
                              "vehicle_rates_setpoint at 400 Hz; need 190 Hz)"]
@@ -183,16 +199,26 @@ def test_rate_setpoint_logged_slightly_below_200_hz_is_accepted():
 
 def test_rate_setpoint_logged_too_slowly_gets_no_fit():
     result = _analyze(replace(FAST, rates_sp_hz=150.0))
-    assert result.measurements == {}
+    assert _only_log_level(result.measurements)
     assert result.errors == ["not logged at the rate controller's rate (vehicle_torque_setpoint "
                              "at 400 Hz, vehicle_angular_velocity at 400 Hz, "
                              "vehicle_rates_setpoint at 150 Hz; need 190 Hz)"]
 
 
+def _only_log_level(measurements: dict) -> bool:
+    """No per-axis value, but the log-level ones a blocked fit still reports."""
+    return (not any("." in k for k in measurements)
+            and {"filter_delay_s", "angular_accel_from_rate"} <= set(measurements))
+
+
 def test_log_without_rate_setpoint():
-    result = _analyze(replace(FAST, instrument="none"))
-    assert result.measurements == {}
+    # Only the effectiveness fit needs the rate setpoint; the rest is still reported,
+    # in the same shape as a rate setpoint logged too slowly.
+    result = _analyze(replace(FAST, instrument="none", params={"MC_BAT_SCALE_EN": 1}))
+    assert _only_log_level(result.measurements) and result.measurements["bat_scale_en"] == 1.0
     assert result.errors == ["no vehicle_rates_setpoint (the instrument of the closed-loop fit)"]
+    slow = _analyze(replace(FAST, rates_sp_hz=150.0, params={"MC_BAT_SCALE_EN": 1}))
+    assert set(slow.measurements) == set(result.measurements)
 
 
 def test_unrelated_rate_setpoint_is_a_weak_instrument():
@@ -234,11 +260,28 @@ def test_setpoint_not_logged_in_the_air_gets_no_estimate():
     before_takeoff = torque["timestamp"] < 2e6
     datasets["vehicle_torque_setpoint"] = {k: v[before_takeoff] for k, v in torque.items()}
     result = _analyze(FAST, datasets)
-    assert result.measurements == {}
+    assert _only_log_level(result.measurements)
     assert result.errors == ["no vehicle_torque_setpoint samples in the used in-air time"]
 
 
-def test_in_air_time_without_data_is_not_used():
+@pytest.mark.parametrize("topic, stamp", [
+    ("vehicle_torque_setpoint", "timestamp"),
+    ("vehicle_angular_velocity", "timestamp_sample"),
+    ("vehicle_rates_setpoint", "timestamp"),
+])
+def test_in_air_time_without_samples_is_not_used(topic, stamp):
+    # A logging gap: 3 s of one topic's samples are missing, not set to NaN.
+    datasets = quad_datasets(FAST)
+    data = datasets[topic]
+    keep = ~((data[stamp] >= 6e6) & (data[stamp] < 9e6))
+    datasets[topic] = {k: v[keep] for k, v in data.items()}
+    m = _analyze(FAST, datasets).measurements
+    # 15 s in air, 11 s after trimming, 3 s of it without data.
+    for axis in AXES:
+        assert m[f"used_fraction.{axis}"] == pytest.approx(8 / 15, abs=0.015)
+
+
+def test_non_finite_samples_are_not_used():
     datasets = quad_datasets(FAST)
     rate = dict(datasets["vehicle_angular_velocity"])
     accel = rate["xyz_derivative[0]"].copy()
@@ -246,9 +289,49 @@ def test_in_air_time_without_data_is_not_used():
     rate["xyz_derivative[0]"] = accel
     datasets["vehicle_angular_velocity"] = rate
     m = _analyze(FAST, datasets).measurements
-    # 15 s in air, 11 s after trimming, 3 s of it without roll data.
     assert m["used_fraction.roll"] == pytest.approx(8 / 15, abs=0.01)
     assert m["used_fraction.pitch"] == pytest.approx(11 / 15, abs=0.01)
+
+
+def test_partial_derivative_fields_fall_back_to_the_rate_derivative():
+    datasets = quad_datasets(FAST)
+    rate = {k: v for k, v in datasets["vehicle_angular_velocity"].items()
+            if k not in ("xyz_derivative[1]", "xyz_derivative[2]")}
+    datasets["vehicle_angular_velocity"] = rate
+    result = _analyze(FAST, datasets)
+    assert result.measurements["angular_accel_from_rate"] == 1.0
+    assert "effectiveness.roll" in result.measurements, result.errors
+
+
+def test_analysis_failure_reports_the_type_only(capsys):
+    real = quad_log(FAST)
+
+    class Broken:
+        initial_parameters = real.initial_parameters
+        msg_info_dict = real.msg_info_dict
+        data_list = real.data_list
+
+        def get_dataset(self, name, multi_instance=0):
+            if name == "vehicle_angular_velocity":
+                raise ValueError("cannot read /home/someone/flight.ulg")
+            return real.get_dataset(name, multi_instance)
+
+    result = analyze_response(Broken(), "log9", None, GATES)
+    assert result.errors == ["analysis failed: ValueError"]
+    err = capsys.readouterr().err
+    assert "log9" in err and "/home/someone/flight.ulg" in err
+
+
+def test_a_failing_header_read_is_one_error_entry(monkeypatch):
+    import log_validation.response as response
+
+    def broken(_ulog):
+        raise RuntimeError("header")
+
+    monkeypatch.setattr(response, "_read_header", broken)
+    result = analyze_response(quad_log(FAST), "log9", "veh9", GATES)
+    assert result.errors == ["analysis failed: RuntimeError"] and result.measurements == {}
+    assert result.log_id == "log9" and result.vehicle_id == "veh9"
 
 
 def test_analysis_does_not_change_the_log():

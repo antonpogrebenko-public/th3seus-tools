@@ -14,6 +14,7 @@ from log_validation.sysid import (
     first_order_lowpass,
     fit_first_order_plant,
     fit_first_order_plant_runs,
+    resample_on,
     uniform_resample,
 )
 from log_validation.tests.response_fakes import reference_lowpass, simulate_plant, sum_of_sines
@@ -67,7 +68,8 @@ def _lagged(x: np.ndarray, shifts=(0, 4, 8, 16, 32, 64)) -> np.ndarray:
 
 def test_least_squares_reports_a_full_first_stage():
     u, y, dt = _plant(seconds=10.0)
-    assert fit_first_order_plant(u, y, dt, DELAYS, TAUS).first_stage_r2 == 1.0
+    fit = fit_first_order_plant(u, y, dt, DELAYS, TAUS)
+    assert fit.first_stage_r2 == 1.0 and fit.reduced_form_r2 == 1.0
 
 
 def test_two_stage_fit_recovers_an_open_loop_plant():
@@ -87,10 +89,64 @@ def test_two_stage_fit_with_runs_of_instruments():
     assert abs(fit.gain - 40) / 40 < 0.10 and abs(fit.lag_s - 0.030) < 0.005
 
 
+def test_fit_r2_is_the_share_of_y_the_two_stage_model_explains():
+    u, y, dt = _plant(seconds=20.0)
+    fit = fit_first_order_plant(u[64:], y[64:], dt, DELAYS, TAUS, instruments=_lagged(u))
+    ls = fit_first_order_plant(u[64:], y[64:], dt, DELAYS, TAUS)
+    assert fit.r2 <= fit.reduced_form_r2 <= 1.0
+    assert fit.r2 == pytest.approx(ls.r2, abs=0.02)  # open loop: about the LS share
+
+
+def test_fit_r2_of_a_response_unrelated_to_the_instruments_is_small():
+    u, _, dt = _plant(seconds=20.0)
+    noise = np.random.default_rng(4).normal(0.0, 4.0, len(u))
+    fit = fit_first_order_plant(u[64:], noise[64:], dt, DELAYS, TAUS, instruments=_lagged(u))
+    assert fit.r2 < 0.01 and fit.reduced_form_r2 < 0.01
+
+
+def test_reduced_form_r2_is_the_same_at_every_grid_point():
+    # The fit keeps the highest fit_r2; that is the highest R^2 projected on the
+    # instruments only because y'Py / y'y does not depend on the grid point. Every
+    # grid below ends at 40 ms, so all score the same response samples.
+    u, y, dt = _plant(seconds=10.0)
+    z = _lagged(u)
+    full = fit_first_order_plant(u[64:], y[64:], dt, DELAYS, TAUS, instruments=z)
+    for d, tau in ((0.0, 0.0), (0.010, 0.020), (0.003, 0.051)):
+        one = fit_first_order_plant(u[64:], y[64:], dt, [d, 0.040], [tau], instruments=z)
+        assert one.reduced_form_r2 == pytest.approx(full.reduced_form_r2, abs=1e-12)
+        assert one.r2 <= full.r2 + 1e-12
+
+
 def test_fit_refuses_constant_instruments():
     u, y, dt = _plant(seconds=5.0)
     with pytest.raises(ValueError, match="instruments"):
-        fit_first_order_plant(u, y, dt, DELAYS, TAUS, instruments=np.ones((len(u), 3)))
+        fit_first_order_plant(u, y, dt, DELAYS, TAUS, instruments=np.full((len(u), 6), 0.1))
+
+
+def test_fit_refuses_instruments_with_a_single_direction():
+    # Two-stage fitting here is over-identified: one direction is not enough.
+    u, y, dt = _plant(seconds=5.0)
+    z = np.column_stack([u, 2.0 * u, u + 1.0])
+    with pytest.raises(ValueError, match="2 independent"):
+        fit_first_order_plant(u, y, dt, DELAYS, TAUS, instruments=z)
+
+
+def test_instruments_without_signal_have_their_own_error():
+    # Instruments orthogonal to the input at the only grid point (no delay, no lag).
+    u, y, dt = _plant(seconds=5.0)
+    scored = u[1:] - u.mean()  # the input a one-point grid (no delay, no lag) scores
+    basis = [np.ones(scored.size) / np.sqrt(scored.size)]
+    centred = scored - np.dot(scored, basis[0]) * basis[0]
+    basis.append(centred / np.sqrt(np.dot(centred, centred)))
+    columns = []
+    for column in np.random.default_rng(2).normal(size=(3, scored.size)):
+        for b in basis:
+            column = column - np.dot(column, b) * b
+        columns.append(np.concatenate(([0.0], column)))
+    z = np.column_stack(columns)
+    with pytest.raises(ValueError, match="no signal") as caught:
+        fit_first_order_plant(u, y, dt, [0.0], [0.0], instruments=z)
+    assert "variation" not in str(caught.value)
 
 
 def test_fit_refuses_instruments_of_another_length():
@@ -144,6 +200,16 @@ def test_uniform_resample_drops_repeated_and_backward_stamps():
     grid, values = uniform_resample(t, x, 0.0005)
     np.testing.assert_allclose(grid, [0.0, 0.0005, 0.001, 0.0015, 0.002, 0.0025, 0.003])
     np.testing.assert_allclose(values, [0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0])
+
+
+def test_resample_on_does_not_bridge_long_gaps():
+    t = np.array([0.0, 0.001, 0.002, 0.003, 0.010, 0.011])
+    x = np.arange(6.0)
+    grid = np.array([0.0015, 0.0025, 0.005, 0.009, 0.0105])
+    out = resample_on(t, x, grid, max_gap_s=0.003)
+    np.testing.assert_allclose(out[[0, 1, 4]], [1.5, 2.5, 4.5])
+    assert np.isnan(out[2]) and np.isnan(out[3])
+    assert np.all(np.isfinite(resample_on(t, x, grid)))  # no limit: bridged as before
 
 
 def test_uniform_resample_of_nothing_is_empty():

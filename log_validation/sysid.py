@@ -31,18 +31,23 @@ _MAX_BLOCK_GROWTH = 300.0
 MIN_FIT_SAMPLES = 100
 # Tolerance when a delay is converted to a whole number of samples plus a fraction.
 _SAMPLE_EPS = 1e-9
-# Instrument directions whose variance is below this share of the largest are dropped
-# (lags of one smooth signal are nearly collinear; this keeps Z'Z invertible).
+# Instrument directions whose variance is below this share of the instruments'
+# uncentred energy are dropped: lags of one smooth signal are nearly collinear, and
+# a constant instrument centres to rounding noise.
 _COLLINEAR_FLOOR = 1e-10
+# A grid point where the instruments explain less than this share of the filtered
+# input (first-stage R^2) is invalid: the gain there is a ratio of rounding errors.
+_NO_SIGNAL_FLOOR = 1e-9
 
 
 @dataclass(frozen=True)
 class PlantFit:
     """y = gain * lowpass(u, tau_s) delayed by delay_s, plus an offset; r2 in [0, 1].
 
-    Least squares: r2 is the ordinary R^2 and first_stage_r2 is 1.0. Two-stage
-    least squares: r2 is the R^2 projected on the instruments and first_stage_r2
-    the R^2 of the filtered, delayed input on the instruments.
+    r2 is the share of y the fitted model explains. Least squares: the ordinary
+    R^2, and first_stage_r2 and reduced_form_r2 are 1.0. Two-stage least squares:
+    (x'Py)^2 / (x'Px y'y); first_stage_r2 is the R^2 of the filtered, delayed input
+    on the instruments and reduced_form_r2 that of y, y'Py / y'y.
     """
 
     gain: float
@@ -50,6 +55,7 @@ class PlantFit:
     tau_s: float
     r2: float
     first_stage_r2: float = 1.0
+    reduced_form_r2: float = 1.0
 
     @property
     def lag_s(self) -> float:
@@ -78,13 +84,23 @@ def increasing_samples(t_s: np.ndarray, x: np.ndarray) -> tuple[np.ndarray, np.n
     return t[keep], values[keep]
 
 
-def resample_on(t_s: np.ndarray, x: np.ndarray, grid_s: np.ndarray) -> np.ndarray:
-    """x linearly interpolated at grid_s from its increasing samples; NaN outside their span."""
+def resample_on(t_s: np.ndarray, x: np.ndarray, grid_s: np.ndarray,
+                max_gap_s: float | None = None) -> np.ndarray:
+    """x linearly interpolated at grid_s from its increasing samples; NaN outside their span.
+
+    With max_gap_s, a grid point whose two neighbouring samples are further apart than
+    max_gap_s is NaN too: a logging gap is left empty, not bridged by a straight line.
+    """
     t, values = increasing_samples(t_s, x)
     grid = np.asarray(grid_s, dtype=float)
     if t.size == 0:
         return np.full(grid.size, np.nan)
-    return np.interp(grid, t, values, left=np.nan, right=np.nan)
+    out = np.interp(grid, t, values, left=np.nan, right=np.nan)
+    if max_gap_s is None or t.size < 2:
+        return out
+    right = np.clip(np.searchsorted(t, grid, side="right"), 1, t.size - 1)
+    on_sample = t[right - 1] == grid
+    return np.where((t[right] - t[right - 1] > max_gap_s) & ~on_sample, np.nan, out)
 
 
 def uniform_resample(
@@ -159,6 +175,11 @@ class _DelayGrid:
     warmup: int
 
 
+def fit_warmup_samples(dt_s: float, delays_s: Sequence[float]) -> int:
+    """The first samples of every run that the fit does not score: the longest delay, plus one."""
+    return int(np.floor(max(delays_s) / dt_s + _SAMPLE_EPS)) + 1
+
+
 @dataclass(frozen=True)
 class _Prepared:
     """Centred runs and the sums that do not depend on u.
@@ -175,11 +196,19 @@ class _Prepared:
     whiten: np.ndarray | None  # W with W' (Z'Z) W = I on the kept directions
     zy_white: np.ndarray | None  # W' Z'y
 
+    @property
+    def reduced_form_r2(self) -> float:
+        """y'Py / y'y: the share of y the instruments explain (1.0 without instruments)."""
+        if self.zy_white is None:
+            return 1.0
+        return float(np.dot(self.zy_white, self.zy_white)) / self.syy
+
 
 def _delay_grid(dt_s: float, delays: np.ndarray) -> _DelayGrid:
     shifts = delays / dt_s
     whole = np.floor(shifts + _SAMPLE_EPS).astype(int)
-    return _DelayGrid(whole, np.clip(shifts - whole, 0.0, 1.0), int(whole.max()) + 1)
+    return _DelayGrid(whole, np.clip(shifts - whole, 0.0, 1.0),
+                      fit_warmup_samples(dt_s, delays))
 
 
 def _delayed(per_shift: np.ndarray, grid: _DelayGrid) -> np.ndarray:
@@ -220,22 +249,23 @@ def _scores(sums: np.ndarray, prepared: _Prepared
 
     Without instruments: least squares, R^2 the squared correlation. With them:
     two-stage least squares, gain = x'Py / x'Px for P the projection on the
-    instruments, and R^2 = 1 - e'Pe / y'Py (the fit projected on the instruments).
+    instruments, and R^2 = (x'Py)^2 / (x'Px y'y): the share of y the fitted model
+    explains. That is the R^2 projected on the instruments, 1 - e'Pe / y'Py, times
+    y'Py / y'y, which is the same at every grid point, so both pick the same point.
+    A point where the instruments explain almost none of x is invalid.
     """
     sx, sxx, sxy = sums[:, 0], sums[:, 1], sums[:, 2]
     var_x = sxx - sx * sx / prepared.count
     with np.errstate(divide="ignore", invalid="ignore"):
         if prepared.whiten is None:
-            gain = sxy / var_x
-            r2 = sxy * sxy / (var_x * prepared.syy)
-            first = np.ones_like(r2)
+            num, den, first = sxy, var_x, np.ones_like(var_x)
         else:
             q = sums[:, 3:] @ prepared.whiten
             num, den = q @ prepared.zy_white, np.sum(q * q, axis=1)
-            gain = num / den
-            r2 = num * num / (den * float(np.dot(prepared.zy_white, prepared.zy_white)))
             first = np.clip(den / var_x, 0.0, 1.0)
-    valid = (var_x > 0) & np.isfinite(r2) & np.isfinite(gain)
+        gain = num / den
+        r2 = num * num / (den * prepared.syy)
+    valid = (var_x > 0) & (first > _NO_SIGNAL_FLOOR) & np.isfinite(r2) & np.isfinite(gain)
     return np.where(valid, np.clip(r2, 0.0, 1.0), -np.inf), gain, first
 
 
@@ -261,12 +291,18 @@ def _usable_runs(runs: Sequence[tuple[np.ndarray, ...]], warmup: int
     return usable
 
 
-def _whitening(zz: np.ndarray) -> np.ndarray:
-    """W with W' zz W = I on the directions of zz above a relative floor (drops collinear ones)."""
+def _whitening(zz: np.ndarray, energy: float) -> np.ndarray:
+    """W with W' zz W = I on the directions of the centred Gram zz that matter.
+
+    A direction is kept when its variance is above _COLLINEAR_FLOOR times the
+    instruments' uncentred energy, so a constant instrument (centred to rounding
+    noise) keeps none. At least 2 directions must remain: the fit is over-identified.
+    """
     values, vectors = np.linalg.eigh(zz)
-    keep = values > _COLLINEAR_FLOOR * max(float(values.max()), 0.0)
-    if not np.any(keep):
-        raise ValueError("the instruments have no variation over the fitted samples")
+    keep = values > _COLLINEAR_FLOOR * energy
+    if np.count_nonzero(keep) < 2:
+        raise ValueError("the instruments have fewer than 2 independent directions over "
+                         "the fitted samples")
     return vectors[:, keep] / np.sqrt(values[keep])
 
 
@@ -291,7 +327,8 @@ def _prepare(usable: list[tuple[np.ndarray, np.ndarray, np.ndarray | None]], war
     gram = sum(_gram(rows) for _, rows in runs)
     if not has_z:
         return _Prepared(runs, y_all.size, float(gram[0, 0]), None, None)
-    whiten = _whitening(gram[1:, 1:])
+    energy = sum(float(np.sum(z[warmup:] ** 2)) for _, _, z in usable)
+    whiten = _whitening(gram[1:, 1:], energy)
     return _Prepared(runs, y_all.size, float(gram[0, 0]), whiten, gram[1:, 0] @ whiten)
 
 
@@ -319,10 +356,13 @@ def fit_first_order_plant_runs(
         scores[:, i] = _scores(sums, prepared)
     r2, gain, first = scores
     if not np.any(np.isfinite(r2)):
-        raise ValueError("the input has no variation over the fitted samples")
+        raise ValueError("the input has no variation over the fitted samples"
+                         if prepared.whiten is None else
+                         "the instruments carry no signal for this axis")
     i, j = np.unravel_index(int(np.argmax(r2)), r2.shape)
     return PlantFit(gain=float(gain[i, j]), delay_s=float(delays[j]), tau_s=float(taus[i]),
-                    r2=float(r2[i, j]), first_stage_r2=float(first[i, j]))
+                    r2=float(r2[i, j]), first_stage_r2=float(first[i, j]),
+                    reduced_form_r2=prepared.reduced_form_r2)
 
 
 def fit_first_order_plant(
