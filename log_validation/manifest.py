@@ -25,6 +25,7 @@ class Selection:
     manifest_rows_without_log: int = 0
     logs_without_manifest_row: int = 0
     capped_out: int = 0
+    unlisted_ids: tuple[str, ...] = ()  # the logs counted in logs_without_manifest_row
 
 
 def read_manifest(path: Path) -> dict[str, str]:
@@ -66,12 +67,14 @@ def select_logs(
     listed = [p for p in found if p.stem in vehicle_of]
     kept_ids = set(cap_per_vehicle([p.stem for p in listed], vehicle_of, max_per_vehicle))
     kept = [p for p in listed if p.stem in kept_ids]
+    unlisted = tuple(p.stem for p in found if p.stem not in vehicle_of)
     return Selection(
         paths=tuple(kept),
         vehicle_of={p.stem: vehicle_of[p.stem] for p in kept},
         manifest_rows_without_log=rows_without_log,
-        logs_without_manifest_row=len(found) - len(listed),
+        logs_without_manifest_row=len(unlisted),
         capped_out=len(listed) - len(kept),
+        unlisted_ids=unlisted,
     )
 
 

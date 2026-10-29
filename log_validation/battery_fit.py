@@ -41,7 +41,7 @@ Usage::
 
     # the same in two steps (each batch extracted into one folder, then fit)
     python -m log_validation.battery_fit --log-dir BATCH --extract-to OBS --manifest M.csv
-    python -m log_validation.battery_fit --obs-dir OBS --manifest M.csv --out-json ... --out-md ...
+    python -m log_validation.battery_fit --obs-dir OBS [OBS2 ...] --manifest M.csv --out-json ... --out-md ...
 """
 
 from __future__ import annotations
@@ -51,7 +51,7 @@ import sys
 import tempfile
 from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Optional
 
@@ -63,7 +63,7 @@ from .battery_extract import (  # noqa: F401
     BATTERY_TOPIC, MAX_CELL_COUNT, MIN_PEAK_CURRENT_A, MIN_VOLTAGE_RANGE_V, NPZ_SUFFIX,
     STATUS_LOAD_ERROR, STATUS_OK, STATUS_SIM, STATUS_UNUSABLE, STATUS_WORKER_DIED, STATUSES,
     LogBatteryData, extract_dir, extract_log, load_battery_topics, load_extracted,
-    load_named, read_statuses, save_extracted,
+    STATUS_NO_MANIFEST_ROW, load_named, read_obs_dirs, read_statuses, save_extracted,
 )
 from .battery_model import (  # noqa: F401
     MIN_R_OBSERVATIONS_PER_CLASS, R_PLAUSIBLE_FLOOR_MOHM_PER_CELL, BatteryFitResult, OcvCurve,
@@ -537,28 +537,32 @@ def _select_extracted(
 
 
 def fit_obs_dir(
-    obs_dir: Path,
+    obs_dirs: Path | Sequence[Path],
     manifest_path: Path | None = None,
     max_per_vehicle: int = DEFAULT_MAX_PER_VEHICLE,
     holdout_frac: float = DEFAULT_HOLDOUT_FRAC,
     seed: int = DEFAULT_SPLIT_SEED,
 ) -> BatteryFitResult:
-    """fit_extracted over the files that extract_dir left in obs_dir.
+    """fit_extracted over the files that extract_dir left in one or more folders.
 
-    obs_dir may merge several extract_dir runs (batches) as long as no log ID
-    appears twice.  With a manifest, logs without a row are left out and
-    counted, and at most max_per_vehicle logs of each vehicle (the smallest log
-    IDs) are kept, so the result equals a one-pass run over the same logs.
+    The folders (batches) merge as long as no log ID appears twice.  Logs
+    without a manifest row are left out and counted once each: those marked
+    <log_id>.no_manifest_row at extraction, plus extracted logs missing from
+    this manifest.  At most max_per_vehicle logs of each vehicle (the smallest
+    log IDs) are kept, so the result equals a one-pass run over the same logs.
     """
-    statuses = read_statuses(Path(obs_dir))
+    dirs = [Path(obs_dirs)] if isinstance(obs_dirs, (str, Path)) else [Path(d) for d in obs_dirs]
+    found = read_obs_dirs(dirs)
+    marked = [i for i, (s, _) in found.items() if s == STATUS_NO_MANIFEST_ROW]
+    statuses = {i: s for i, (s, _) in found.items() if s != STATUS_NO_MANIFEST_ROW}
     if not statuses:
-        raise FileNotFoundError(f"No extracted battery files in {str(obs_dir)!r}")
+        raise FileNotFoundError(f"No extracted battery files in {', '.join(map(str, dirs))}")
     kept, vehicle_of, without_row = _select_extracted(list(statuses), manifest_path, max_per_vehicle)
-    datas = [load_named(Path(obs_dir), i) for i in kept if statuses[i] == STATUS_OK]
+    datas = [load_named(found[i][1], i) for i in kept if statuses[i] == STATUS_OK]
     no_data = {i: statuses[i] for i in kept if statuses[i] != STATUS_OK}
     return fit_extracted(
         datas, vehicle_of, holdout_frac, seed,
-        no_data=no_data, logs_without_manifest_row=without_row,
+        no_data=no_data, logs_without_manifest_row=without_row + len(marked),
     )
 
 
@@ -584,11 +588,8 @@ def analyze_logs(
     """
     _check_holdout_frac(holdout_frac)
     with tempfile.TemporaryDirectory() as tmp:
-        counts = extract_dir(Path(log_dir), Path(tmp), manifest_path, max_per_vehicle, jobs, loader)
-        result = fit_obs_dir(Path(tmp), manifest_path, max_per_vehicle, holdout_frac, seed)
-    # The temporary folder holds only the selected logs; logs of log_dir
-    # without a manifest row were counted by the selection.
-    return replace(result, logs_without_manifest_row=counts["logs_without_manifest_row"])
+        extract_dir(Path(log_dir), Path(tmp), manifest_path, max_per_vehicle, jobs, loader)
+        return fit_obs_dir(Path(tmp), manifest_path, max_per_vehicle, holdout_frac, seed)
 
 
 # ---------------------------------------------------------------------------
@@ -613,8 +614,8 @@ def _build_parser() -> argparse.ArgumentParser:
              "real log) and exit without fitting",
     )
     source.add_argument(
-        "--obs-dir", type=Path, default=None, metavar="DIR",
-        help="fit from the files of one or more --extract-to runs instead of --log-dir",
+        "--obs-dir", type=Path, nargs="+", default=None, metavar="DIR",
+        help="fit from the folders of one or more --extract-to runs instead of --log-dir",
     )
     add_selection_args(parser)
     parser.add_argument(
@@ -657,8 +658,9 @@ def _run_extract(args: argparse.Namespace) -> int:
 
 
 def _run_fit(args: argparse.Namespace) -> int:
-    source = args.obs_dir if args.obs_dir is not None else args.log_dir
-    print(f"Fitting from {str(source)!r} (seed={args.seed})...", file=sys.stderr, flush=True)
+    sources = args.obs_dir if args.obs_dir is not None else [args.log_dir]
+    print(f"Fitting from {', '.join(map(str, sources))} (seed={args.seed})...",
+          file=sys.stderr, flush=True)
     if args.obs_dir is not None:
         result = fit_obs_dir(
             args.obs_dir, args.manifest, args.max_per_vehicle, args.holdout_frac, args.seed
@@ -683,7 +685,7 @@ def _run_fit(args: argparse.Namespace) -> int:
         file=sys.stderr,
     )
 
-    forbidden = forbidden_strings(source)
+    forbidden = forbidden_strings(*sources)
     write_json(Path(args.out_json), result_to_dict(result), forbidden)
     print(f"JSON results written to {args.out_json}", file=sys.stderr)
     write_markdown_summary(result, args.out_md, forbidden)

@@ -29,6 +29,8 @@ from log_validation.tests.battery_fakes import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+# Six vehicles over the corpus; a09 has no manifest row.
+ROWS_WITHOUT_A09 = {i: f"v{k % 6}" for k, i in enumerate(CORPUS) if i != "a09"}
 
 
 class TestFitObsDir:
@@ -61,6 +63,40 @@ class TestFitObsDir:
         (obs / "a01.sim").touch()
         with pytest.raises(ValueError, match="a01"):
             fit_obs_dir(obs)
+
+    def test_extraction_with_a_manifest_keeps_the_count_of_logs_without_a_row(self, tmp_path):
+        manifest = make_manifest(tmp_path, ROWS_WITHOUT_A09)
+        log_dir = make_log_dir(tmp_path, CORPUS)
+        one_shot = analyze_logs(log_dir, manifest_path=manifest, loader=load_by_stem)
+        obs = tmp_path / "obs"
+        extract_dir(log_dir, obs, manifest, loader=load_by_stem)
+        assert (obs / "a09.no_manifest_row").exists()
+        two_step = fit_obs_dir(obs, manifest)
+        assert result_to_dict(two_step) == result_to_dict(one_shot)
+        assert two_step.logs_without_manifest_row == 1
+        without_manifest = fit_obs_dir(obs)  # the marker still counts, and only once
+        assert without_manifest.logs_without_manifest_row == 1
+        assert "a09" not in without_manifest.fit_log_ids + without_manifest.holdout_log_ids
+
+    def test_two_extraction_folders_merge(self, tmp_path, monkeypatch):
+        manifest = make_manifest(tmp_path, ROWS_WITHOUT_A09)
+        one_shot = analyze_logs(make_log_dir(tmp_path, CORPUS), manifest_path=manifest,
+                                loader=load_by_stem)
+        obs = [tmp_path / "obs0", tmp_path / "obs1"]
+        for k, stems in enumerate((CORPUS[0::2], CORPUS[1::2])):
+            batch = tmp_path / f"batch{k}"
+            batch.mkdir()
+            for s in stems:
+                (batch / f"{s}.ulg").write_bytes(b"")
+            extract_dir(batch, obs[k], manifest, loader=load_by_stem)
+        assert result_to_dict(fit_obs_dir(obs, manifest)) == result_to_dict(one_shot)
+        out = tmp_path / "out.json"
+        monkeypatch.setattr(battery_extract, "ULog", lambda p, message_name_filter_list=None: 0)
+        args = ["--obs-dir", str(obs[0]), str(obs[1]), "--manifest", str(manifest)]
+        assert main([*args, "--out-json", str(out), "--out-md", str(tmp_path / "o.md")]) in (0, 1)
+        assert json.loads(out.read_text())["logs_without_manifest_row"] == 1
+        with pytest.raises(ValueError, match="more than one"):
+            fit_obs_dir([obs[0], obs[0]], manifest)
 
 
 # ---------------------------------------------------------------------------

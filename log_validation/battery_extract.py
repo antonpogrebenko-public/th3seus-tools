@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import os
 from collections import Counter
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -48,8 +48,14 @@ STATUS_UNUSABLE = "unusable"
 STATUS_LOAD_ERROR = "load_error"
 STATUS_WORKER_DIED = "worker_died"
 STATUSES = (STATUS_OK, STATUS_SIM, STATUS_UNUSABLE, STATUS_LOAD_ERROR, STATUS_WORKER_DIED)
+# Not a selected log: an empty <log_id>.no_manifest_row marks a log of log_dir
+# that the manifest leaves out, so the fit can count it (and never fit it).
+STATUS_NO_MANIFEST_ROW = "no_manifest_row"
 NPZ_SUFFIX = ".npz"
-_SUFFIX_OF_STATUS = {STATUS_OK: NPZ_SUFFIX, **{s: f".{s}" for s in STATUSES[1:]}}
+_SUFFIX_OF_STATUS = {
+    STATUS_OK: NPZ_SUFFIX,
+    **{s: f".{s}" for s in (*STATUSES, STATUS_NO_MANIFEST_ROW) if s != STATUS_OK},
+}
 _STATUS_OF_SUFFIX = {suffix: status for status, suffix in _SUFFIX_OF_STATUS.items()}
 _REQUIRED_KEYS = ("log_id", "cell_count", "t_s", "v", "i")
 _OPTIONAL_KEYS = ("remaining", "discharged_mah")
@@ -212,8 +218,9 @@ def extract_dir(
     usable, else an empty <log_id>.<status>.  With jobs > 1 the logs run in
     worker processes (parallel.run_per_log); a log whose worker dies gets the
     status "worker_died" and the other logs are still extracted; loader must
-    then be a top-level function so it pickles.  The counts also hold the
-    selection's logs_without_manifest_row and capped_out.
+    then be a top-level function so it pickles.  A log the manifest leaves out
+    gets an empty <log_id>.no_manifest_row marker, so the fit counts it.  The
+    counts also hold the selection's logs_without_manifest_row and capped_out.
     """
     selection = select_logs(Path(log_dir), manifest_path, max_per_vehicle)
     if not selection.paths:
@@ -224,6 +231,8 @@ def extract_dir(
     statuses = run_per_log(_extract_task, tasks, jobs, _extract_died)
     for path, status in zip(selection.paths, statuses):
         _record_status(out, path.stem, status)
+    for log_id in selection.unlisted_ids:
+        _record_status(out, log_id, STATUS_NO_MANIFEST_ROW)
     return {
         **{s: statuses.count(s) for s in STATUSES},
         "logs_without_manifest_row": selection.logs_without_manifest_row,
@@ -264,6 +273,18 @@ def read_statuses(obs_dir: Path) -> dict[str, str]:
     if repeated:
         raise ValueError(f"log ID with more than one extracted file: {', '.join(repeated[:5])}")
     return dict(found)
+
+
+def read_obs_dirs(obs_dirs: Sequence[Path]) -> dict[str, tuple[str, Path]]:
+    """{log_id: (status, folder)} over one or more extract_dir folders.
+
+    A log ID found in more than one file, in one folder or across folders, is refused.
+    """
+    found = [(i, s, Path(d)) for d in obs_dirs for i, s in read_statuses(Path(d)).items()]
+    repeated = sorted(i for i, n in Counter(i for i, _, _ in found).items() if n > 1)
+    if repeated:
+        raise ValueError(f"log ID with more than one extracted file: {', '.join(repeated[:5])}")
+    return {i: (s, d) for i, s, d in found}
 
 
 def load_named(obs_dir: Path, log_id: str) -> LogBatteryData:
