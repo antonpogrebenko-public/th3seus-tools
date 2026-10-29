@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import sys
 import zipfile
 import zlib
 from collections import Counter
@@ -103,12 +104,15 @@ def extract_log(
 ) -> tuple[str, LogBatteryData | None]:
     """Read one log: ("ok", data), or ("sim" | "unusable" | "load_error", None).
 
-    Load error: the loader raised.  Unusable: no battery_status, or the pack
-    fails the checks of the one-pass analysis (cell count, voltage range, current).
+    Load error: the loader raised; "<log_id>: <exception type>" goes to stderr
+    (not the message, which often holds the file path).  Unusable: no
+    battery_status, or the pack fails the checks of the one-pass analysis
+    (cell count, voltage range, current).
     """
     try:
         ulog = loader(path)
-    except Exception:
+    except Exception as e:
+        print(f"{Path(path).stem}: {type(e).__name__}", file=sys.stderr)
         return STATUS_LOAD_ERROR, None
     if _is_simulation_log(ulog):
         return STATUS_SIM, None

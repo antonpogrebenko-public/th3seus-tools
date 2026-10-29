@@ -127,3 +127,12 @@ class TestExtract:
                           "truncated": whole[: len(whole) // 2]}[damage])
         with pytest.raises(ValueError, match="a01.npz"):
             load_extracted(path)
+
+    def test_load_error_is_reported_without_its_message(self, capsys):
+        def refuse(path):
+            raise OSError(f"cannot open {path}")
+
+        status, data = extract_log(Path("/private/place/bad01.ulg"), loader=refuse)
+        err = capsys.readouterr().err
+        assert (status, data) == ("load_error", None)
+        assert err == "bad01: OSError\n"  # the message, which holds the path, is not printed
