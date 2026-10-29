@@ -20,6 +20,7 @@ from typing import Any
 import numpy as np
 
 from . import reference as ref
+from .outputs import PrivateDataError, forbidden_strings, write_json
 
 
 @dataclass(frozen=True)
@@ -215,16 +216,16 @@ def print_summary(groups: list[ProfileGroup]) -> None:
         print()
 
 
-def main() -> None:
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Aggregate batch analysis results")
     parser.add_argument("input", type=Path, help="Input JSON from batch_analyze")
     parser.add_argument("-o", "--output", type=Path, help="Output aggregated JSON")
     parser.add_argument("--summary", action="store_true", help="Print summary to stdout")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     if not args.input.exists():
         print(f"Error: {args.input} not found", file=sys.stderr)
-        sys.exit(1)
+        return 1
 
     with open(args.input) as f:
         results = json.load(f)
@@ -235,10 +236,14 @@ def main() -> None:
         print_summary(groups)
 
     if args.output:
-        with open(args.output, "w") as f:
-            json.dump(to_json(groups), f, indent=2)
+        try:
+            write_json(args.output, to_json(groups), forbidden_strings(args.input))
+        except PrivateDataError as e:
+            print(f"Error: {e}", file=sys.stderr)
+            return 1
         print(f"Wrote {len(groups)} groups to {args.output}")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

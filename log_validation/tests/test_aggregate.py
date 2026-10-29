@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import dataclasses
+import json
+from pathlib import Path
 
 import numpy as np
 import pytest
 
+from log_validation.aggregate import main as aggregate_main
 from log_validation.aggregate import (
     ProfileGroup,
     SensorStats,
@@ -148,3 +151,22 @@ def test_param_below_min_logs_omitted_but_group_kept():
     assert group.sample_count == 3
     assert GYRO in group.sensors
     assert "accel.accel_noise_density" not in group.sensors
+
+
+def test_cli_refuses_a_private_string(tmp_path, capsys):
+    board = str(Path.home() / "private-board")
+    source = tmp_path / "results.json"
+    source.write_text(json.dumps([_entry(1e-3 * (1 + i / 10), board=board) for i in range(5)]))
+    out = tmp_path / "aggregated.json"
+    assert aggregate_main([str(source), "-o", str(out)]) == 1
+    assert "private data" in capsys.readouterr().err
+    assert not out.exists()
+
+
+def test_cli_writes_through_the_guarded_writer(tmp_path):
+    source = tmp_path / "results.json"
+    source.write_text(json.dumps([_entry(1e-3 * (1 + i / 10)) for i in range(5)]))
+    out = tmp_path / "aggregated.json"
+    assert aggregate_main([str(source), "-o", str(out)]) == 0
+    text = out.read_text()
+    assert text.endswith("\n") and json.loads(text)[0]["sensors"]
