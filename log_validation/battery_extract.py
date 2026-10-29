@@ -8,9 +8,10 @@ in the split.  Simulation logs are detected via ``hardware.is_simulation()``.
 
 from __future__ import annotations
 
+import hashlib
 import os
 from collections import Counter
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -52,6 +53,8 @@ STATUSES = (STATUS_OK, STATUS_SIM, STATUS_UNUSABLE, STATUS_LOAD_ERROR, STATUS_WO
 # that the manifest leaves out, so the fit can count it (and never fit it).
 STATUS_NO_MANIFEST_ROW = "no_manifest_row"
 NPZ_SUFFIX = ".npz"
+# A finished extract_dir run writes extract-<digest>.done listing its log IDs.
+DONE_SUFFIX = ".done"
 _SUFFIX_OF_STATUS = {
     STATUS_OK: NPZ_SUFFIX,
     **{s: f".{s}" for s in (*STATUSES, STATUS_NO_MANIFEST_ROW) if s != STATUS_OK},
@@ -219,20 +222,25 @@ def extract_dir(
     worker processes (parallel.run_per_log); a log whose worker dies gets the
     status "worker_died" and the other logs are still extracted; loader must
     then be a top-level function so it pickles.  A log the manifest leaves out
-    gets an empty <log_id>.no_manifest_row marker, so the fit counts it.  The
-    counts also hold the selection's logs_without_manifest_row and capped_out.
+    gets an empty <log_id>.no_manifest_row marker, so the fit counts it.  Only
+    a run that finishes writes extract-<digest>.done listing its logs; the fit
+    refuses logs no done file lists.  The counts also hold the selection's
+    logs_without_manifest_row and capped_out.
     """
     selection = select_logs(Path(log_dir), manifest_path, max_per_vehicle)
     if not selection.paths:
         raise FileNotFoundError(f"No .ulg files selected in {str(log_dir)!r}")
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
+    done = _done_file(out, [p.stem for p in selection.paths] + list(selection.unlisted_ids))
+    done.unlink(missing_ok=True)  # a rerun that stops midway must not look finished
     tasks = [(p, out, loader) for p in selection.paths]
     statuses = run_per_log(_extract_task, tasks, jobs, _extract_died)
     for path, status in zip(selection.paths, statuses):
         _record_status(out, path.stem, status)
     for log_id in selection.unlisted_ids:
         _record_status(out, log_id, STATUS_NO_MANIFEST_ROW)
+    _write_done(done, [p.stem for p in selection.paths] + list(selection.unlisted_ids))
     return {
         **{s: statuses.count(s) for s in STATUSES},
         "logs_without_manifest_row": selection.logs_without_manifest_row,
@@ -275,12 +283,51 @@ def read_statuses(obs_dir: Path) -> dict[str, str]:
     return dict(found)
 
 
-def read_obs_dirs(obs_dirs: Sequence[Path]) -> dict[str, tuple[str, Path]]:
-    """{log_id: (status, folder)} over one or more extract_dir folders.
+def _done_file(out_dir: Path, log_ids: Sequence[str]) -> Path:
+    """The file a finished extract_dir run leaves, named after the logs it covers."""
+    digest = hashlib.sha256("\n".join(sorted(log_ids)).encode("utf-8")).hexdigest()[:16]
+    return out_dir / f"extract-{digest}{DONE_SUFFIX}"
 
-    A log ID found in more than one file, in one folder or across folders, is refused.
+
+def _write_done(done: Path, log_ids: Sequence[str]) -> None:
+    partial = done.with_name(done.name + ".part")
+    partial.write_text("".join(f"{i}\n" for i in sorted(log_ids)), encoding="utf-8")
+    os.replace(partial, done)
+
+
+def _check_finished(obs_dir: Path, log_ids: Collection[str]) -> None:
+    """Refuse a folder whose log files no finished extract_dir run lists, or the reverse.
+
+    Each run lists its logs in its own done file, so batches merged into one
+    folder are checked run by run: an interrupted batch is caught even when
+    another batch in the folder finished.
     """
-    found = [(i, s, Path(d)) for d in obs_dirs for i, s in read_statuses(Path(d)).items()]
+    listed = {
+        line for f in Path(obs_dir).glob(f"*{DONE_SUFFIX}")
+        for line in f.read_text(encoding="utf-8").split()
+    }
+    unfinished = sorted(set(log_ids) - listed)
+    if unfinished:
+        raise ValueError(
+            f"{obs_dir}: {len(unfinished)} extracted log(s) belong to an interrupted extract "
+            f"run, e.g. {unfinished[0]}; run --extract-to again for that batch"
+        )
+    missing = sorted(listed - set(log_ids))
+    if missing:
+        raise ValueError(f"{obs_dir}: {len(missing)} log(s) of a finished extract run have "
+                         f"no file, e.g. {missing[0]}; the folder is incomplete")
+
+
+def read_obs_dirs(obs_dirs: Sequence[Path]) -> dict[str, tuple[str, Path]]:
+    """{log_id: (status, folder)} over one or more finished extract_dir folders.
+
+    A log ID found in more than one file, in one folder or across folders, is
+    refused, and so is a folder holding logs of an interrupted run.
+    """
+    per_dir = [(Path(d), read_statuses(Path(d))) for d in obs_dirs]
+    for folder, statuses in per_dir:
+        _check_finished(folder, statuses)
+    found = [(i, s, d) for d, statuses in per_dir for i, s in statuses.items()]
     repeated = sorted(i for i, n in Counter(i for i, _, _ in found).items() if n > 1)
     if repeated:
         raise ValueError(f"log ID with more than one extracted file: {', '.join(repeated[:5])}")

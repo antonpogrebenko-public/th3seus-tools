@@ -89,4 +89,5 @@ def make_manifest(tmp_path: Path, rows: dict[str, str]) -> Path:
 
 
 def file_names(directory: Path) -> list[str]:
-    return sorted(p.name for p in directory.iterdir())
+    """The per-log files of an extract folder (the run's .done file left out)."""
+    return sorted(p.name for p in directory.iterdir() if p.suffix != ".done")

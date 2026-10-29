@@ -84,6 +84,7 @@ class TestExtract:
         counts = extract_dir(make_log_dir(tmp_path, ["a01", "sim01", "bad01", "flat01"]), out,
                              loader=load_by_stem)
         assert file_names(out) == ["a01.npz", "bad01.load_error", "flat01.unusable", "sim01.sim"]
+        assert len(list(out.glob("*.done"))) == 1
         assert (counts["ok"], counts["sim"], counts["unusable"], counts["load_error"]) == (1, 1, 1, 1)
 
     def test_jobs_do_not_change_the_extraction(self, tmp_path):

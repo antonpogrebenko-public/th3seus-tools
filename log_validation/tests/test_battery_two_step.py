@@ -163,3 +163,56 @@ def test_negative_cap_is_refused_on_both_paths(tmp_path, path):
             analyze_logs(log_dir, manifest_path=manifest, max_per_vehicle=-1, loader=load_by_stem)
         else:
             fit_obs_dir(obs, manifest, max_per_vehicle=-1)
+
+
+def _stop_at_stop01(path: Path):
+    """A loader that interrupts the run at the log 'stop01', as Ctrl-C or a kill would."""
+    if path.stem == "stop01":
+        raise KeyboardInterrupt
+    return load_by_stem(path)
+
+
+class TestInterruptedExtraction:
+    def test_interrupted_extraction_is_refused(self, tmp_path):
+        obs = tmp_path / "obs"
+        with pytest.raises(KeyboardInterrupt):
+            extract_dir(make_log_dir(tmp_path, CORPUS + ["stop01"]), obs, loader=_stop_at_stop01)
+        assert (obs / "a00.npz").exists()  # finished logs are on disk
+        with pytest.raises(ValueError, match="interrupted"):
+            fit_obs_dir(obs)
+
+    def test_interrupted_rerun_into_a_finished_folder_is_refused(self, tmp_path):
+        log_dir = make_log_dir(tmp_path, CORPUS + ["stop01"])
+        obs = tmp_path / "obs"
+        extract_dir(log_dir, obs, loader=load_by_stem)  # stop01 loads as a 4S log here
+        with pytest.raises(KeyboardInterrupt):
+            extract_dir(log_dir, obs, loader=_stop_at_stop01)
+        with pytest.raises(ValueError, match="interrupted"):
+            fit_obs_dir(obs)
+
+    def test_interrupted_batch_merged_into_one_folder_is_refused(self, tmp_path):
+        obs = tmp_path / "obs"
+        for k, stems in enumerate((CORPUS, ["aa99", "stop01", "zz01"])):
+            batch = tmp_path / f"batch{k}"
+            batch.mkdir()
+            for s in stems:
+                (batch / f"{s}.ulg").write_bytes(b"")
+            if k == 0:
+                extract_dir(batch, obs, loader=load_by_stem)
+            else:
+                with pytest.raises(KeyboardInterrupt):
+                    extract_dir(batch, obs, loader=_stop_at_stop01)
+        assert (obs / "aa99.npz").exists()  # finished before the stop, in the merged folder
+        with pytest.raises(ValueError, match="interrupted"):
+            fit_obs_dir(obs)
+
+    def test_finished_batches_merged_into_one_folder_fit(self, tmp_path):
+        obs = tmp_path / "obs"
+        for k, stems in enumerate((CORPUS[0::2], CORPUS[1::2])):
+            batch = tmp_path / f"batch{k}"
+            batch.mkdir()
+            for s in stems:
+                (batch / f"{s}.ulg").write_bytes(b"")
+            extract_dir(batch, obs, loader=load_by_stem)
+        one_shot = analyze_logs(make_log_dir(tmp_path, CORPUS), loader=load_by_stem)
+        assert result_to_dict(fit_obs_dir(obs)) == result_to_dict(one_shot)
