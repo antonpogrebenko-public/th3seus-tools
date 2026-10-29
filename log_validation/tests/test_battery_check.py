@@ -145,7 +145,7 @@ def test_emitted_rust_keeps_its_format(pattern):
     assert any(re.match(pattern, line) for line in lines), pattern
 
 
-LONG_DASHES = ("—", "–")  # em dash, en dash
+LONG_DASHES = (chr(0x2014), chr(0x2013))  # em dash, en dash
 
 
 def _markdown(tmp_path, result) -> str:
