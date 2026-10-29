@@ -130,3 +130,17 @@ def test_worker_death_is_recorded_and_others_survive(tmp_path):
     assert by_id["die"]["errors"] == ["worker process died"]
     assert by_id["die"]["measurements"] == {} and by_id["die"]["hardware"] == {}
     assert by_id["a1"]["measurements"] and by_id["c3"]["measurements"]
+
+
+def test_analysis_failure_entry_has_the_exception_type_only(tmp_path, monkeypatch, capsys):
+    import log_validation.report as report
+
+    def broken(_ulog):
+        raise RuntimeError("secret detail at /some/private/path")
+
+    monkeypatch.setattr(report, "analyze", broken)
+    log_dir = _touch(tmp_path, ["a1"])
+    results = batch_analyze(log_dir, None, loader=load_by_stem)
+    assert results[0].errors == ["analysis failed: RuntimeError"]
+    err = capsys.readouterr().err
+    assert "a1" in err and "RuntimeError" in err and "secret detail" in err

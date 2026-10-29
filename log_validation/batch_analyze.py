@@ -139,7 +139,8 @@ def analyze_log(
             elif row.note:
                 errors.append(f"{key}: {row.note}")
     except Exception as e:
-        errors.append(f"analysis failed: {e}")
+        print(f"{log_id}: analysis failed: {type(e).__name__}: {e}", file=sys.stderr)
+        errors.append(f"analysis failed: {type(e).__name__}")
 
     return LogResult(
         log_id=log_id,
