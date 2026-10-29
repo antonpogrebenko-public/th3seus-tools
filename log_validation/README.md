@@ -91,6 +91,11 @@ python -m log_validation.response LOGS --manifest manifest.csv -o response.json
 python -m log_validation.reference_airframes response.json -o airframes.json
 ```
 
+`battery_fit` exits with status 1 when the held-out median voltage error misses the
+0.1 V per cell target, even though it has written `battery.json` and `battery.md`; a
+script that stops on any non-zero status must accept 1 there and go on (status 2 is
+an error).
+
 Write a `run-info.json` with `date`, `tool_commit`, `parameters` (caps, gates,
 cut-offs, seeds, N) and `commands`, and optionally `inputs`, the input counts, for
 example `{"manifest_rows": N, "rows_without_log": N, "logs_without_row": N,
@@ -125,6 +130,9 @@ python -m log_validation.battery_fit --log-dir CHUNK2 --extract-to obs2
 python -m log_validation.battery_fit --obs-dir obs1 obs2 --manifest manifest.csv \
     --out-json battery.json --out-md battery.md
 ```
+
+A successful extract run exits with status 0. The fit exits with status 1 when the
+0.1 V per cell target is missed, after writing both files, as in the one-pass run above.
 
 The calibration directory holds:
 
