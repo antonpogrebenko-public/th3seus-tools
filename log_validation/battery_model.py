@@ -72,6 +72,22 @@ class OcvCurve:
 
 
 @dataclass(frozen=True)
+class StepCheck:
+    """Held-out check of R on current steps alone; it never reads PX4's ``remaining``.
+
+    Errors are |measured - predicted| voltage change per cell over every step
+    of the scored holdout logs, pooled.  Both percentiles are None without
+    steps.  ``n_vehicles`` counts the vehicles of logs that gave a step (a log
+    without a vehicle counts as its own).
+    """
+
+    n_steps: int
+    n_vehicles: int
+    median_err_v_per_cell: float | None
+    p75_err_v_per_cell: float | None
+
+
+@dataclass(frozen=True)
 class BatteryFitResult:
     """Aggregate output of the battery fitting pipeline.
 
@@ -101,3 +117,5 @@ class BatteryFitResult:
     fit_log_ids: list[str]
     holdout_log_ids: list[str]
     logs_without_manifest_row: int
+    step_check: StepCheck
+    holdout_scored_log_ids: tuple[str, ...]  # sorted; scored by the MAE or the step check

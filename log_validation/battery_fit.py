@@ -67,7 +67,7 @@ from .battery_extract import (  # noqa: F401
 )
 from .battery_model import (  # noqa: F401
     MIN_R_OBSERVATIONS_PER_CLASS, R_PLAUSIBLE_FLOOR_MOHM_PER_CELL, BatteryFitResult, OcvCurve,
-    PerCellRFit,
+    PerCellRFit, StepCheck,
 )
 from .battery_output import emit_rust_constants, result_to_dict, write_markdown_summary
 from .manifest import (
@@ -453,6 +453,40 @@ def _holdout_mae(data: LogBatteryData, ocv: OcvCurve, r_mohm_per_cell: float) ->
     return float(np.median(np.abs(v_pred - data.v) / data.cell_count))
 
 
+def _step_errors(data: LogBatteryData, r_mohm_per_cell: float) -> np.ndarray:
+    """Per-cell voltage-change errors over the steps of one log (adjacent sample pairs)."""
+    dt, d_i, d_v = np.diff(data.t_s), np.diff(data.i), np.diff(data.v)
+    with np.errstate(invalid="ignore"):
+        is_step = (dt < MAX_STEP_DT_S) & (np.abs(d_i) > MIN_STEP_dI_A)
+    is_step &= np.isfinite(dt) & np.isfinite(d_i) & np.isfinite(d_v)
+    d_v_pred = -d_i[is_step] * data.cell_count * r_mohm_per_cell / 1000.0
+    return np.abs(d_v[is_step] - d_v_pred) / data.cell_count
+
+
+def step_check(
+    datas: Sequence[LogBatteryData],
+    r_mohm_for_cells: Callable[[int], float],
+    vehicle_of: Mapping[str, str],
+) -> StepCheck:
+    """Score R on the current steps of ``datas`` without using 'remaining'.
+
+    A step is an adjacent sample pair with dt < MAX_STEP_DT_S and
+    |dI| > MIN_STEP_dI_A; there is no voltage filter, which would bias the
+    check.  Pure: the inputs are not changed.
+    """
+    errs_by_log = [(d.log_id, _step_errors(d, r_mohm_for_cells(d.cell_count))) for d in datas]
+    stepped = [(i, e) for i, e in errs_by_log if len(e)]
+    if not stepped:
+        return StepCheck(0, 0, None, None)
+    pooled = np.concatenate([e for _, e in stepped])
+    return StepCheck(
+        n_steps=len(pooled),
+        n_vehicles=len({_vehicle_key(i, vehicle_of) for i, _ in stepped}),
+        median_err_v_per_cell=float(np.median(pooled)),
+        p75_err_v_per_cell=float(np.percentile(pooled, 75)),
+    )
+
+
 def _statuses_of(datas: Sequence[LogBatteryData], no_data: Mapping[str, str]) -> dict[str, str]:
     ids = [d.log_id for d in datas] + list(no_data)
     repeated = sorted(i for i, n in Counter(ids).items() if n > 1)
@@ -499,6 +533,13 @@ def fit_extracted(
         raise ValueError("No holdout logs could be evaluated; check holdout fraction.")
     maes = np.array(holdout_maes)
     median_mae = float(np.median(maes))
+    def deployed(cells: int) -> float:
+        return _deployed_r(cells, r_fits, overall)
+
+    scored_by_steps = {d.log_id for d in scored if step_check([d], deployed, {}).n_steps}
+    scored_by_mae = {
+        d.log_id for d in scored if _holdout_mae(d, ocv_curve, deployed(d.cell_count)) is not None
+    }
     real = (STATUS_OK, STATUS_UNUSABLE)  # loaded and not simulation, as before
     holdout_real = [i for i in holdout_ids if statuses[i] in real]
     return BatteryFitResult(
@@ -520,6 +561,8 @@ def fit_extracted(
         fit_log_ids=[o.log_id for o in observations if o.r_obs or o.ocv_obs],
         holdout_log_ids=holdout_real,
         logs_without_manifest_row=logs_without_manifest_row,
+        step_check=step_check(scored, deployed, vehicle_of),
+        holdout_scored_log_ids=tuple(sorted(scored_by_steps | scored_by_mae)),
     )
 
 

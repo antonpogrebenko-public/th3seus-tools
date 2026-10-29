@@ -52,6 +52,13 @@ def result_to_dict(r: BatteryFitResult) -> dict:
         "per_log_r": [dict(row) for row in r.per_log_r],
         "fit_log_ids": list(r.fit_log_ids),
         "holdout_log_ids": list(r.holdout_log_ids),
+        "holdout_scored_log_ids": list(r.holdout_scored_log_ids),
+        "step_check": {
+            "n_steps": r.step_check.n_steps,
+            "n_vehicles": r.step_check.n_vehicles,
+            "median_err_v_per_cell": r.step_check.median_err_v_per_cell,
+            "p75_err_v_per_cell": r.step_check.p75_err_v_per_cell,
+        },
     }
 
 
@@ -77,13 +84,21 @@ def _per_log_lines(r: BatteryFitResult) -> list[str]:
         "",
         f"Holdout, real logs ({len(r.holdout_log_ids)}): " + ", ".join(r.holdout_log_ids),
         "",
+        f"Holdout, scored by the MAE or the step check ({len(r.holdout_scored_log_ids)}): "
+        + ", ".join(r.holdout_scored_log_ids),
+        "",
     ]
+
+
+def _fmt(value: float | None) -> str:
+    return "n/a" if value is None else f"{value:.4f}"
 
 
 def write_markdown_summary(
     r: BatteryFitResult, path: str | Path, forbidden: Sequence[str] = ()
 ) -> None:
     """Write a short Markdown summary of the fit results."""
+    sc = r.step_check
     lines = [
         "# Battery Model Fit — 2026-06-23",
         "",
@@ -157,6 +172,9 @@ def write_markdown_summary(
         f"| Median MAE (V/cell) | **{r.holdout_median_mae_v_per_cell:.4f}** |",
         f"| Mean MAE (V/cell) | {r.holdout_mean_mae_v_per_cell:.4f} |",
         f"| p75 MAE (V/cell) | {r.holdout_p75_mae_v_per_cell:.4f} |",
+        f"| Step check: steps (vehicles) | {sc.n_steps} ({sc.n_vehicles}) |",
+        f"| Step check: median error (V/cell) | {_fmt(sc.median_err_v_per_cell)} |",
+        f"| Step check: p75 error (V/cell) | {_fmt(sc.p75_err_v_per_cell)} |",
         f"| Target < 0.1 V/cell | {'PASS' if r.validation_target_met else 'FAIL'} |",
         "",
         "## Method Notes",
