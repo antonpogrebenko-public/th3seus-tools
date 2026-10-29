@@ -357,3 +357,107 @@ def test_cli_bad_kits_exits_2(tmp_path, capsys):
     bad.write_text("{", encoding="utf-8")
     code = main([str(response_path), "--kits", str(bad), "-o", str(tmp_path / "o.json")])
     assert code == 2 and "Error:" in capsys.readouterr().err
+
+
+# ---- fix round 1 ----
+
+def _lag_by_vehicle(airframe_id: int, lags: list[float]) -> list[dict]:
+    return [entry(f"{airframe_id}-{i}", f"v{airframe_id}-{i}", airframe_id,
+                  **{"lag_minus_filter_s.roll": lag}) for i, lag in enumerate(lags)]
+
+
+def test_note_names_compared_kit_without_data():
+    kits = [kit("kit_0", 4001), kit("kit_1", 4002)]
+    response = vehicles(6, 4001, **{"lag_minus_filter_s.roll": 0.010}) + vehicles(
+        6, 4002, **{"hover.command": 0.3})
+    recs = {r.quantity: r for r in recommendations(compare_kits(kits, response))}
+    assert not recs["lag"].recommended
+    assert "no change recommended" in recs["lag"].note and "kit_1" in recs["lag"].note
+    assert "kit_0" in recs["hover.command"].note and "kit_1" not in recs["hover.command"].note
+    assert "kit_1" in recs["effectiveness"].note and "kit_0" in recs["effectiveness"].note
+    assert "1 compared kit has data" in recs["lag"].note
+
+
+def test_consistent_note_names_kit_without_data():
+    kits = [kit(f"kit_{i}", 4001 + i) for i in range(3)]
+    response = (vehicles(6, 4001, **{"lag_minus_filter_s.roll": 0.010})
+                + vehicles(6, 4002, **{"lag_minus_filter_s.roll": 0.010})
+                + vehicles(6, 4003, **{"hover.command": 0.3}))
+    recs = {r.quantity: r for r in recommendations(compare_kits(kits, response))}
+    assert recs["lag"].recommended and "kit_2" in recs["lag"].note
+
+
+def test_load_kits_refuses_shared_airframe_id(tmp_path):
+    items = [kit_item(name="kit_a"), kit_item(name="kit_b")]
+    with pytest.raises(ValueError, match=r"kit_a.*kit_b.*airframe_id"):
+        load_kits(kits_json(tmp_path, items))
+
+
+def test_load_kits_refuses_shared_name(tmp_path):
+    items = [kit_item(), kit_item(airframe_id=4002)]
+    with pytest.raises(ValueError, match=r"kit_a.*kit_a.*name"):
+        load_kits(kits_json(tmp_path, items))
+
+
+def _three_kit_lags(lags: list[float]):
+    kits = [kit(f"kit_{i}", 4001 + i) for i in range(3)]
+    response = [e for i in range(3) for e in _lag_by_vehicle(4001 + i, lags)]
+    return kits, response
+
+
+def test_prediction_exactly_on_p75_is_inside():
+    p = PRED.tau_motor_s
+    kits, response = _three_kit_lags([0.001, 0.002, 0.003, p, 0.2])
+    comparisons = compare_kits(kits, response)
+    assert row(comparisons[0], "lag").real_p75 == p
+    assert not {r.quantity: r for r in recommendations(comparisons)}["lag"].recommended
+
+
+def test_prediction_exactly_on_p25_is_inside():
+    p = PRED.tau_motor_s
+    kits, response = _three_kit_lags([0.001, p, 0.3, 0.4, 0.5])
+    comparisons = compare_kits(kits, response)
+    assert row(comparisons[0], "lag").real_p25 == p
+    assert not {r.quantity: r for r in recommendations(comparisons)}["lag"].recommended
+
+
+def test_effectiveness_recommended_with_roll_and_pitch_only():
+    m = {"effectiveness.roll": 1.0, "effectiveness.pitch": 1.0,
+         "hover.thr_mdl_fac": 0.0, "hover.command": 0.4}
+    kits, response = _three_kits_response(**m)
+    comparisons = compare_kits(kits, response)
+    assert not any(r.quantity.endswith("yaw") for r in comparisons[0].rows)
+    recs = {r.quantity: r for r in recommendations(comparisons)}
+    assert recs["effectiveness"].recommended
+
+
+def test_effectiveness_with_one_axis_inside_is_not_recommended():
+    m = {"effectiveness.roll": 1.0, "effectiveness.pitch": PRED.effectiveness_pitch,
+         "hover.thr_mdl_fac": 0.0, "hover.command": 0.4}
+    kits, response = _three_kits_response(**m)
+    recs = {r.quantity: r for r in recommendations(compare_kits(kits, response))}
+    assert not recs["effectiveness"].recommended
+
+
+def test_to_command_space_refuses_non_positive_hover():
+    assert to_command_space(10.0, 0.3, 0.0) is None
+    assert to_command_space(10.0, 0.3, -0.2) is None
+
+
+def test_effectiveness_dropped_for_zero_hover_command():
+    m = {"effectiveness.roll": 50.0, "hover.thr_mdl_fac": 0.0, "hover.command": 0.0}
+    result = compare_kits([kit()], vehicles(5, **m))[0]
+    assert not any(r.quantity.startswith("effectiveness") for r in result.rows)
+
+
+def test_non_positive_effectiveness_is_dropped():
+    for value in (0.0, -5.0):
+        m = {"effectiveness.roll": value, "hover.thr_mdl_fac": 0.0, "hover.command": 0.4}
+        result = compare_kits([kit()], vehicles(5, **m))[0]
+        assert not any(r.quantity.startswith("effectiveness") for r in result.rows)
+
+
+def test_converted_non_positive_effectiveness_is_dropped():
+    m = {"effectiveness.roll": 50.0, "hover.thr_mdl_fac": 3.0, "hover.command": 0.1}
+    result = compare_kits([kit()], vehicles(5, **m))[0]
+    assert not any(r.quantity.startswith("effectiveness") for r in result.rows)

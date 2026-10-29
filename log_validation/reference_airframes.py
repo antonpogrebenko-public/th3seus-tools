@@ -117,7 +117,20 @@ def load_kits(path: Path) -> list[Kit]:
         raise ValueError(f"kits file is not valid JSON: {e}") from e
     if not isinstance(data, list):
         raise ValueError("kits file must hold a JSON list of kits")
-    return [_parse_kit(index, item) for index, item in enumerate(data)]
+    kits = [_parse_kit(index, item) for index, item in enumerate(data)]
+    _refuse_shared(kits)
+    return kits
+
+
+def _refuse_shared(kits: Sequence[Kit]) -> None:
+    """Two kits on one airframe share vehicles and would count twice as evidence."""
+    for field in ("airframe_id", "name"):
+        first: dict[Any, str] = {}
+        for kit in kits:
+            value = getattr(kit, field)
+            if value in first:
+                raise ValueError(f"kits {first[value]} and {kit.name} share {field} {value!r}")
+            first[value] = kit.name
 
 
 def _parse_kit(index: int, item: Any) -> Kit:
@@ -166,8 +179,8 @@ def to_command_space(effectiveness: float, thr_mdl_fac: float | None,
     PX4 applies the thrust-model inverse after allocation, so a log flown with
     f = THR_MDL_FAC > 0 shows the effectiveness divided by dT/du at hover. The
     value is multiplied by (1 - f) + 2 f u_hover. None when f or u_hover is
-    missing or not finite."""
-    if not _finite(thr_mdl_fac) or not _finite(hover_command):
+    missing, not finite, or the hover command is not positive."""
+    if not _finite(thr_mdl_fac) or not _finite(hover_command) or hover_command <= 0.0:
         return None
     return effectiveness * ((1.0 - thr_mdl_fac) + 2.0 * thr_mdl_fac * hover_command)
 
@@ -192,10 +205,11 @@ def _log_effectiveness(measurements: Mapping[str, Any], axis: str) -> float | No
     if measurements.get("bat_scale_en") == 1:
         return None
     raw = _number(measurements, f"effectiveness.{axis}")
-    if raw is None:
+    if raw is None or raw <= 0.0:
         return None
-    return to_command_space(raw, _number(measurements, "hover.thr_mdl_fac"),
-                            _number(measurements, HOVER))
+    converted = to_command_space(raw, _number(measurements, "hover.thr_mdl_fac"),
+                                 _number(measurements, HOVER))
+    return converted if converted is not None and converted > 0.0 else None
 
 
 def _log_values(measurements: Mapping[str, Any]) -> dict[str, float]:
@@ -293,27 +307,38 @@ def _kit_side(comparison: KitComparison, formula: str) -> tuple[bool, int]:
 def _recommend(formula: str, comparisons: Sequence[KitComparison]) -> Recommendation:
     evidence = [(c.kit, _kit_side(c, formula)) for c in comparisons if c.compared]
     with_data = [(name, side) for name, (has, side) in evidence if has]
+    without = tuple(name for name, (has, _) in evidence if not has)
     names = tuple(name for name, _ in with_data)
-    consistent = len(with_data) >= 2 and len({side for _, side in with_data}) == 1 \
-        and with_data[0][1] != 0
+    consistent = (len(with_data) >= 2 and len({side for _, side in with_data}) == 1
+                  and with_data[0][1] != 0)
+    tail = _without_data_note(without)
     label = FORMULA_OF[formula]
     if formula == HOVER:
         note = ("hover throttle discrepancy is reported for the thrust basis K_CT, "
                 "which is never recommended for change")
         if consistent:
             note += f"; the prediction is off the same way in all {len(names)} kits"
-        return Recommendation(formula, label, False, names, note)
+        return Recommendation(formula, label, False, names, note + tail)
     if consistent:
         direction = "above" if with_data[0][1] > 0 else "below"
         note = (f"review the formula: the prediction is {direction} the real p25 to p75 "
                 f"in all {len(names)} compared kits")
-        return Recommendation(formula, label, True, names, note)
-    return Recommendation(formula, label, False, names, _no_change_note(len(names)))
+        return Recommendation(formula, label, True, names, note + tail)
+    return Recommendation(formula, label, False, names, _no_change_note(len(names)) + tail)
+
+
+def _without_data_note(without: Sequence[str]) -> str:
+    if not without:
+        return ""
+    return "; compared kits without data for this formula: " + ", ".join(without)
 
 
 def _no_change_note(n_kits: int) -> str:
     if n_kits < 2:
-        return f"no change recommended: {n_kits} compared kits have data, at least 2 are needed"
+        verb = "has" if n_kits == 1 else "have"
+        kits = "kit" if n_kits == 1 else "kits"
+        return (f"no change recommended: {n_kits} compared {kits} {verb} data, "
+                "at least 2 are needed")
     return "no change recommended: the evidence is not consistent across the compared kits"
 
 
