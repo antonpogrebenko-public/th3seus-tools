@@ -136,3 +136,9 @@ class TestExtract:
         err = capsys.readouterr().err
         assert (status, data) == ("load_error", None)
         assert err == "bad01: OSError\n"  # the message, which holds the path, is not printed
+
+    @pytest.mark.parametrize("cells", [0, 15])
+    def test_cell_count_out_of_range_in_a_file_is_refused(self, tmp_path, cells):
+        path = save_extracted(replace(make_data("a01"), cell_count=cells), tmp_path)
+        with pytest.raises(ValueError, match="cell_count"):
+            load_extracted(path)

@@ -208,6 +208,8 @@ def load_extracted(path: Path) -> LogBatteryData:
     shapes = {a.shape for a in series if a is not None}
     if len(shapes) != 1 or len(next(iter(shapes))) != 1:
         raise ValueError(f"{name}: series must be one-dimensional and of one length")
+    if not 1 <= data.cell_count <= MAX_CELL_COUNT:
+        raise ValueError(f"{name}: cell_count {data.cell_count} is outside 1..{MAX_CELL_COUNT}")
     return data
 
 
