@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import sys
 from collections import defaultdict
 from dataclasses import dataclass
@@ -95,6 +96,15 @@ def get_model_ref(param: str) -> tuple[float, str]:
     return 0.0, ""
 
 
+def clean_measurements(measurements: dict[str, Any]) -> dict[str, float]:
+    """Return a copy without None, NaN or Inf values (as the TH3SEUS seeding does)."""
+    return {
+        k: v
+        for k, v in measurements.items()
+        if isinstance(v, (int, float)) and math.isfinite(v)
+    }
+
+
 def _compute_sensors(
     measurements_list: list[dict[str, Any]], min_logs: int
 ) -> dict[str, SensorStats]:
@@ -136,7 +146,7 @@ def aggregate_profiles(
     buckets: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
 
     for r in results:
-        measurements = r.get("measurements")
+        measurements = clean_measurements(r.get("measurements") or {})
         if not measurements:
             continue
         hw = r.get("hardware") or {}

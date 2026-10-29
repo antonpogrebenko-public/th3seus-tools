@@ -112,3 +112,39 @@ def test_to_json_includes_kind_key_and_percentiles():
     assert {"kind", "key", "sample_count", "sensors"} <= set(row)
     sensor = row["sensors"][GYRO]
     assert "p5" in sensor and "p95" in sensor
+
+
+def test_nan_and_inf_values_are_dropped_not_poisoning_group():
+    results = [_entry(0.001 * (i + 1)) for i in range(5)]
+    results.append(_entry(float("nan")))
+    results.append(_entry(float("inf")))
+    results.append(_entry(None))
+    group = _by_key(aggregate_profiles(results))[("mcu_family", "STM32F7")]
+    assert group.sample_count == 5
+    stats = group.sensors[GYRO]
+    assert stats.count == 5
+    assert np.isfinite([stats.p5, stats.median, stats.p95, stats.std]).all()
+
+
+def test_small_group_with_nan_stays_finite():
+    results = [_entry(0.001), _entry(0.002), _entry(0.003), _entry(float("nan"))]
+    group = _by_key(aggregate_profiles(results))[("mcu_family", "ALL")]
+    assert group.sample_count == 3
+    assert np.isfinite(group.sensors[GYRO].median)
+
+
+def test_all_nan_log_is_skipped_everywhere():
+    results = [_entry(0.001 * (i + 1)) for i in range(3)]
+    results.append(_entry(float("nan")))
+    groups = _by_key(aggregate_profiles(results))
+    assert all(g.sample_count == 3 for g in groups.values())
+
+
+def test_param_below_min_logs_omitted_but_group_kept():
+    results = [_entry(0.001 * (i + 1)) for i in range(3)]
+    for r in results[:2]:
+        r["measurements"]["accel.accel_noise_density"] = 0.01
+    group = _by_key(aggregate_profiles(results))[("mcu_family", "STM32F7")]
+    assert group.sample_count == 3
+    assert GYRO in group.sensors
+    assert "accel.accel_noise_density" not in group.sensors
