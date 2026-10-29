@@ -93,6 +93,34 @@ def test_noise_list_has_contributing_logs_only():
     assert lists["noise"] == [f"n{i:02d}" for i in range(8)]
 
 
+def test_noise_list_has_every_entry_behind_a_published_noise_number():
+    entries = [noise("legacy_only", **{"gyro.legacy_noise_density": 2e-3}),
+               noise("profile_only", **{"baro.noise_sigma": 0.1}),
+               noise("new_only", **{"accel.accel_noise_density": 1e-3}),
+               noise("none"), noise("nan_only", **{"gyro.legacy_noise_density": math.nan})]
+    assert log_id_lists(entries, EMPTY_BATTERY, [])["noise"] == [
+        "legacy_only", "new_only", "profile_only"]
+
+
+def _f7(log_id: str, legacy, new) -> dict:
+    measurements = {"gyro.gyro_noise_density": new}
+    if legacy is not None:
+        measurements["gyro.legacy_noise_density"] = legacy
+    return {**noise(log_id, f"v-{log_id}"), "hardware": {"mcu": "STM32F7xx"},
+            "measurements": measurements}
+
+
+def test_before_after_medians_are_paired_per_family():
+    entries = [_f7(f"p{i}", 2e-3, 1e-4) for i in range(3)]
+    entries += [_f7(f"u{i}", None, 9e-4) for i in range(3)]
+    row = next(r for r in noise_before_after(entries) if r["mcu_family"] == "STM32F7")
+    assert row["gyro_n_logs"] == 3
+    assert row["new_gyro_density"] == pytest.approx(1e-4)
+    assert row["legacy_gyro_density"] == pytest.approx(2e-3)
+    text = render_report(entries, EMPTY_BATTERY, [], airframes_dict(), [], run_info())
+    assert "| STM32F7 | 3 | 0.002 | 0.0001 | 20 |" in text
+
+
 def test_lag_quantity_uses_lag_minus_filter():
     logs = [resp(f"l{i}", f"v{i}", **{"lag_minus_filter_s.roll": 0.01, "lag_s.roll": 0.5})
             for i in range(5)]

@@ -40,6 +40,7 @@ from typing import Any, Mapping, Sequence
 
 import numpy as np
 
+from .aggregate import clean_measurements
 from .reference_airframes import finite_number, is_finite_number, log_effectiveness, vehicle_key
 from .th3seus_model import AXES
 
@@ -132,14 +133,11 @@ def log_id_lists(noise: Sequence[dict], battery: Mapping[str, Any],
                  response: Sequence[dict]) -> dict[str, list[str]]:
     """Sorted log IDs that contributed, under `noise`, `battery` and `response`.
 
-    Noise: entries with a finite gyro or accel density. Battery: the fit log IDs
-    plus the scored holdout log IDs. Response: entries that give at least one
-    value to a ranges-table quantity after the table's filters."""
+    Noise: entries for which `contributes_to_noise` holds. Battery: the fit log
+    IDs plus the scored holdout log IDs. Response: entries that give at least
+    one value to a ranges-table quantity after the table's filters."""
+    noise_ids = {e["log_id"] for e in noise if contributes_to_noise(e)}
     scratch: dict[str, list[_Sample]] = defaultdict(list)
-    for entry in noise:
-        _add_noise(scratch, entry)
-    noise_ids = {s.log_id for group in scratch.values() for s in group}
-    scratch = defaultdict(list)
     for entry in response:
         _add_response(scratch, entry)
     response_ids = {s.log_id for group in scratch.values() for s in group}
@@ -147,6 +145,17 @@ def log_id_lists(noise: Sequence[dict], battery: Mapping[str, Any],
         battery.get("holdout_scored_log_ids") or [])
     return {"noise": sorted(noise_ids), "battery": sorted(battery_ids),
             "response": sorted(response_ids)}
+
+
+def contributes_to_noise(entry: Mapping[str, Any]) -> bool:
+    """True when the entry gives a finite value to a published noise number.
+
+    The published noise numbers are the new densities (the ranges), the legacy
+    and new densities (the report's before and after table) and the
+    noise-profile parameters (`noise-profiles.json`). The profiles take every
+    finite measurement of an entry (`aggregate.clean_measurements`), so an
+    entry contributes when it has at least one finite measurement."""
+    return bool(clean_measurements(entry.get("measurements") or {}))
 
 
 # ---- samples ----

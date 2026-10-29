@@ -56,7 +56,8 @@ def _noise_rows(rows: Sequence[Mapping[str, Any]], sensor: str) -> list[list[str
     for r in rows:
         legacy, new = r[f"legacy_{sensor}_density"], r[f"new_{sensor}_density"]
         ratio = legacy / new if legacy is not None and new else None
-        out.append([r["mcu_family"], str(r["n_logs"]), _num(legacy), _num(new), _num(ratio, ".3g"),
+        out.append([r["mcu_family"], str(r[f"{sensor}_n_logs"]), _num(legacy), _num(new),
+                    _num(ratio, ".3g"),
                     _num(r[f"legacy_{sensor}_per_sample_400hz"]),
                     _num(r[f"new_{sensor}_per_sample_400hz"])])
     return out
@@ -65,10 +66,11 @@ def _noise_rows(rows: Sequence[Mapping[str, Any]], sensor: str) -> list[list[str
 def _noise(noise: Sequence[dict]) -> list[str]:
     rows = noise_before_after(noise)
     lines = ["Median noise density at rest per MCU family. The current column is the estimator "
-             "TH3SEUS uses today; the new column is the fixed estimator. Per-sample noise is "
-             f"density times sqrt({TICK_HZ:g}), the noise one {TICK_HZ:g} Hz tick adds.", ""]
+             "TH3SEUS uses today; the new column is the fixed estimator. Both medians are taken "
+             "over the same logs, those with both values; Logs is their number. Per-sample noise "
+             f"is density times sqrt({TICK_HZ:g}), the noise one {TICK_HZ:g} Hz tick adds.", ""]
     if not rows:
-        return lines + ["No MCU family has enough logs with a noise result.", ""]
+        return lines + ["No MCU family has enough logs with both noise values.", ""]
     heads = ["MCU family", "Logs", "Current (TH3SEUS estimator)", "New", "Current / new",
              f"Current per sample at {TICK_HZ:g} Hz", f"New per sample at {TICK_HZ:g} Hz"]
     for sensor, label in (("gyro", "Gyro, rad/s/sqrt(Hz); per sample rad/s"),
