@@ -227,22 +227,20 @@ class BatteryFitResult:
 def _isotonic_increasing(values: list[float]) -> list[float]:
     """Enforce monotone-increasing constraint via pool-adjacent-violators.
 
+    A stack of (sum, count) blocks: each value is pushed as its own block and
+    merged with the previous block while the previous mean is greater, so it
+    ends after at most n merges (repeated pairwise averaging could cycle
+    forever on values a few ULPs apart).  Each value becomes its block's mean.
     Returns a new list; the input is not modified (immutable pattern).
     """
-    out = list(values)
-    n = len(out)
-    changed = True
-    while changed:
-        changed = False
-        i = 0
-        while i < n - 1:
-            if out[i] > out[i + 1]:
-                avg = (out[i] + out[i + 1]) / 2.0
-                out[i] = avg
-                out[i + 1] = avg
-                changed = True
-            i += 1
-    return out
+    blocks: list[tuple[float, int]] = []
+    for value in values:
+        total, count = float(value), 1
+        while blocks and blocks[-1][0] / blocks[-1][1] > total / count:
+            prev_total, prev_count = blocks.pop()
+            total, count = total + prev_total, count + prev_count
+        blocks.append((total, count))
+    return [total / count for total, count in blocks for _ in range(count)]
 
 
 def _extract_r_observations(

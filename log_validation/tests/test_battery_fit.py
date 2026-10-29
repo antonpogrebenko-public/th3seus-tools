@@ -51,6 +51,12 @@ from log_validation.tests.fakes import FakeULog, ts_us
 # ---------------------------------------------------------------------------
 
 
+def _ocv_like_values(seed: int, n: int = 50) -> list[float]:
+    """Sorted V/cell values plus noise, like OCV bin medians with some violations."""
+    rng = np.random.default_rng(seed)
+    return (np.sort(rng.uniform(3.3, 4.2, n)) + rng.normal(0.0, 0.03, n)).tolist()
+
+
 class TestIsotonicIncreasing:
     def test_already_monotone_unchanged(self):
         vals = [1.0, 2.0, 3.0, 4.0]
@@ -78,6 +84,48 @@ class TestIsotonicIncreasing:
         original = list(vals)
         _isotonic_increasing(vals)
         assert vals == original
+
+    def test_few_ulp_decreasing_block_terminates(self):
+        # OCV bin values from a real 24-log sample: a pooled block left a few
+        # ULPs apart in decreasing order, on which pairwise averaging never ends.
+        vals = [3.7428839320228207, 3.74288393202282, 3.7428839320228198,
+                3.742883932022819, 3.7428839320228184, 3.742883932022818,
+                3.742883932022818, 3.7758580446243286, 3.79372501373291]
+        assert not _previous_isotonic(vals, max_sweeps=10_000)[1]
+        result = _isotonic_increasing(vals)
+        assert all(a <= b for a, b in zip(result, result[1:]))
+        assert result[0] == pytest.approx(3.742883932022819, abs=1e-12)
+
+    @pytest.mark.parametrize("vals", [
+        [3.0, 2.0, 1.0],
+        [0.0, 4.0, 1.0, 1.0],
+        [2.0, 1.0, 1.4],
+        _ocv_like_values(seed=4),  # 17 violations; seed 4 is one the old loop finishes
+    ])
+    def test_equals_the_previous_algorithm_where_it_converges(self, vals):
+        expected, converged = _previous_isotonic(vals, max_sweeps=100_000)
+        assert converged
+        assert _isotonic_increasing(vals) == pytest.approx(expected, abs=1e-9)
+
+
+def _previous_isotonic(values: list[float], max_sweeps: int) -> tuple[list[float], bool]:
+    """The pre-change pairwise-averaging loop, copied, with a sweep cap: (result, converged)."""
+    out = list(values)
+    n = len(out)
+    changed = True
+    sweeps = 0
+    while changed and sweeps < max_sweeps:
+        changed = False
+        sweeps += 1
+        i = 0
+        while i < n - 1:
+            if out[i] > out[i + 1]:
+                avg = (out[i] + out[i + 1]) / 2.0
+                out[i] = avg
+                out[i + 1] = avg
+                changed = True
+            i += 1
+    return out, not changed
 
 
 # ---------------------------------------------------------------------------
