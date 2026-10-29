@@ -106,10 +106,14 @@ python -m log_validation.calibration_report --noise noise.json --battery battery
 
 A large corpus can run in chunks, for example one folder per batch of logs. For the
 noise and response passes, run each chunk to its own JSON file and merge them (a log
-ID in two parts is an error):
+ID in two parts is an error). Each chunk applies the per-vehicle cap to its own logs
+only, so pass the manifest to the merge: it keeps the `--max-per-vehicle` smallest
+log IDs of each vehicle over all the parts (default 3; give the cap the passes used),
+keeps entries whose log has no manifest row, and prints how many entries it dropped:
 
 ```bash
-python -m log_validation.outputs merge -o noise.json noise-part1.json noise-part2.json
+python -m log_validation.outputs merge --manifest manifest.csv --max-per-vehicle 3 \
+    -o noise.json noise-part1.json noise-part2.json
 ```
 
 For the battery pass, extract each chunk with `--extract-to`, then fit once over all

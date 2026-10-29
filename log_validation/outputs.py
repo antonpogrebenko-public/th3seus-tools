@@ -8,8 +8,11 @@ import json
 import math
 import os
 import socket
+import sys
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any, Mapping, Sequence
+
+from .manifest import DEFAULT_MAX_PER_VEHICLE, cap_per_vehicle, read_manifest
 
 MIN_FORBIDDEN_LEN = 3
 
@@ -88,14 +91,50 @@ def merge_per_log(paths: Sequence[Path]) -> list[dict]:
     return [merged[k] for k in sorted(merged)]
 
 
-def main(argv: list[str] | None = None) -> int:
+def recap_per_vehicle(records: Sequence[dict], vehicle_of: Mapping[str, str],
+                      max_per_vehicle: int) -> list[dict]:
+    """The records kept by the per-vehicle cap over all of them, in their order.
+
+    The cap is `manifest.cap_per_vehicle`, the rule each pass applies to its own
+    chunk; applied again to the merged records it keeps the same logs as one
+    pass over every chunk. A record whose log has no manifest row is kept."""
+    listed = [r["log_id"] for r in records if r["log_id"] in vehicle_of]
+    kept = set(cap_per_vehicle(listed, vehicle_of, max_per_vehicle))
+    return [r for r in records if r["log_id"] not in vehicle_of or r["log_id"] in kept]
+
+
+def _merge_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="python -m log_validation.outputs")
     sub = parser.add_subparsers(dest="command", required=True)
     merge = sub.add_parser("merge", help="merge per-log JSON parts into one file")
     merge.add_argument("-o", "--output", type=Path, required=True)
+    merge.add_argument("--manifest", type=Path, default=None, metavar="PATH",
+                       help="CSV with columns log_id,vehicle_id; apply the per-vehicle cap "
+                            "again over all parts (logs without a row are kept)")
+    merge.add_argument("--max-per-vehicle", type=int, default=None, metavar="K",
+                       help=f"keep the K smallest log IDs of each vehicle (default "
+                            f"{DEFAULT_MAX_PER_VEHICLE}; only with --manifest)")
     merge.add_argument("parts", nargs="+", type=Path, metavar="PART")
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = _merge_parser()
     args = parser.parse_args(argv)
-    write_json(args.output, merge_per_log(args.parts), forbidden_strings())
+    if args.max_per_vehicle is not None and args.manifest is None:
+        parser.error("--max-per-vehicle needs --manifest")
+    try:
+        records = merge_per_log(args.parts)
+        if args.manifest is not None:
+            cap = DEFAULT_MAX_PER_VEHICLE if args.max_per_vehicle is None else args.max_per_vehicle
+            kept = recap_per_vehicle(records, read_manifest(args.manifest), cap)
+            print(f"Per-vehicle cap of {cap}: dropped {len(records) - len(kept)} of "
+                  f"{len(records)} entries", file=sys.stderr)
+            records = kept
+        write_json(args.output, records, forbidden_strings())
+    except (ValueError, OSError, KeyError) as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 2
     return 0
 
 

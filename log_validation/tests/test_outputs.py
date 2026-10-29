@@ -93,6 +93,42 @@ def test_merge_command(tmp_path):
     assert json.loads(out.read_text()) == [{"log_id": "a"}, {"log_id": "b"}]
 
 
+def _chunks(tmp_path: Path) -> tuple[Path, Path, Path]:
+    """Chunk 1 holds a01..a04 of one vehicle, chunk 2 a05, a06 and a log without a row."""
+    p1, p2 = tmp_path / "1.json", tmp_path / "2.json"
+    p1.write_text(json.dumps([{"log_id": f"a0{i}"} for i in range(1, 5)]))
+    p2.write_text(json.dumps([{"log_id": "a05"}, {"log_id": "a06"}, {"log_id": "z99"}]))
+    manifest = tmp_path / "m.csv"
+    manifest.write_text("log_id,vehicle_id\n" + "".join(f"a0{i},v1\n" for i in range(1, 7)))
+    return p1, p2, manifest
+
+
+def test_merge_with_a_manifest_recaps_over_all_chunks(tmp_path, capsys):
+    p1, p2, manifest = _chunks(tmp_path)
+    out = tmp_path / "merged.json"
+    code = outputs.main(["merge", "-o", str(out), "--manifest", str(manifest),
+                         "--max-per-vehicle", "3", str(p1), str(p2)])
+    assert code == 0
+    ids = [r["log_id"] for r in json.loads(out.read_text())]
+    assert ids == ["a01", "a02", "a03", "z99"]
+    assert "dropped 3" in capsys.readouterr().err
+
+
+def test_merge_cap_defaults_to_3_with_a_manifest(tmp_path):
+    p1, p2, manifest = _chunks(tmp_path)
+    out = tmp_path / "merged.json"
+    assert outputs.main(["merge", "-o", str(out), "--manifest", str(manifest), str(p1), str(p2)]) == 0
+    assert [r["log_id"] for r in json.loads(out.read_text())] == ["a01", "a02", "a03", "z99"]
+
+
+def test_merge_cap_needs_a_manifest(tmp_path):
+    p1, p2, _ = _chunks(tmp_path)
+    with pytest.raises(SystemExit) as stop:
+        outputs.main(["merge", "-o", str(tmp_path / "o.json"), "--max-per-vehicle", "2",
+                      str(p1), str(p2)])
+    assert stop.value.code == 2
+
+
 def test_write_json_refuses_non_ascii_forbidden(tmp_path):
     target = tmp_path / "o.json"
     with pytest.raises(PrivateDataError):
