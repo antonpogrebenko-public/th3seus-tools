@@ -71,6 +71,19 @@ def test_forbidden_strings_include_home_and_extra(tmp_path):
     assert all(len(s) >= 3 for s in forbidden_strings("ab", tmp_path))
 
 
+def test_bare_relative_name_is_forbidden_only_resolved(tmp_path, monkeypatch):
+    # "obs" alone would refuse any output containing those letters
+    # (e.g. "n_total_observations"); its absolute path is still forbidden.
+    monkeypatch.chdir(tmp_path)
+    f = forbidden_strings("obs")
+    assert "obs" not in f
+    assert str((tmp_path / "obs").resolve()) in f
+
+
+def test_relative_path_with_a_separator_is_forbidden_as_given():
+    assert "data/downloaded" in forbidden_strings("data/downloaded")
+
+
 def test_merge_command(tmp_path):
     p1, p2 = tmp_path / "1.json", tmp_path / "2.json"
     p1.write_text(json.dumps([{"log_id": "b"}]))

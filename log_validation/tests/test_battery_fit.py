@@ -669,3 +669,10 @@ class TestCli:
         assert {"p10_mohm_per_cell", "p90_mohm_per_cell", "n_vehicles"} <= set(doc["r_fits"][0])
         md = (out / "dir.md").read_text()
         assert "p10" in md and doc["fit_log_ids"][0] in md and doc["holdout_log_ids"][0] in md
+
+    def test_relative_obs_dir_writes_its_json(self, tmp_path, monkeypatch):
+        extract_dir(_log_dir(tmp_path, CORPUS), tmp_path / "obs", loader=load_by_stem)
+        monkeypatch.chdir(tmp_path)
+        code = main(["--obs-dir", "obs", "--out-json", "out/fit.json", "--out-md", "out/fit.md"])
+        assert code in (0, 1)  # 2 would be an error such as a refused output
+        assert "n_total_observations" in (tmp_path / "out" / "fit.json").read_text()

@@ -6,6 +6,7 @@ import argparse
 import getpass
 import json
 import math
+import os
 import socket
 from pathlib import Path
 from typing import Any, Sequence
@@ -18,10 +19,16 @@ class PrivateDataError(ValueError):
 
 
 def forbidden_strings(*extra: str | Path) -> tuple[str, ...]:
-    """Strings no output may contain: home dir, user, host, and each extra (as given and resolved)."""
+    """Strings no output may contain: home dir, user, host, and each extra (resolved).
+
+    An extra is also forbidden as given when it holds a path separator; a bare
+    relative name such as "obs" is not, since it would match ordinary words.
+    """
     candidates: list[str] = [str(Path.home()), getpass.getuser(), socket.gethostname()]
     for item in extra:
-        candidates.append(str(item))
+        given = str(item)
+        if os.sep in given or "/" in given:
+            candidates.append(given)
         candidates.append(str(Path(item).resolve()))
     out: list[str] = []
     for s in candidates:
