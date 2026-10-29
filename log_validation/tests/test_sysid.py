@@ -258,8 +258,8 @@ def test_thr_mdl_fac_outside_unit_interval_is_refused(f):
         hover_command(0.4, f)
 
 
-def test_negative_or_non_finite_thrust_is_refused():
-    for thrust in (-0.1, float("nan"), float("inf")):
+def test_negative_non_finite_or_above_one_thrust_is_refused():
+    for thrust in (-0.1, float("nan"), float("inf"), 1.01):
         with pytest.raises(ValueError, match="thrust"):
             hover_command(thrust, 0.3)
 

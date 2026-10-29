@@ -32,6 +32,7 @@ None of these functions changes the log or any array it reads.
 from __future__ import annotations
 
 import math
+from collections.abc import Callable
 from typing import Any
 
 import numpy as np
@@ -147,7 +148,7 @@ def _hover_estimate(ulog: Any, windows: list[Window]) -> float | None:
     t, x = _series(data, "hover_thrust")
     if "valid" in data:
         _, valid = _series(data, "valid")
-        x = np.where(valid != 0, x, np.nan)
+        x = np.where(np.isfinite(valid) & (valid != 0), x, np.nan)  # NaN is not valid
     return _median_in(t, x, windows)
 
 
@@ -241,14 +242,26 @@ def inflight_noise_measurements(ulog: Any, windows: list[Window], cutoff_hz: flo
     return _finite_only(measurements, errors)
 
 
-def hover_group(ulog: Any, params: dict[str, Any], segments: list[FlightSegment],
-                cutoff_hz: float, gap_intervals: float) -> Measured:
-    """The hover and in-flight noise keys; a log without a hover segment gets one error."""
+def _unguarded(_group: str, measure: Callable[[], Measured]) -> Measured:
+    return measure()
+
+
+def hover_group(
+    ulog: Any, params: dict[str, Any], segments: list[FlightSegment], cutoff_hz: float,
+    gap_intervals: float,
+    guard: Callable[[str, Callable[[], Measured]], Measured] = _unguarded,
+) -> Measured:
+    """The hover and in-flight noise keys; a log without a hover segment gets one error.
+
+    ``guard(name, measure)`` runs each of the two sub-groups ("hover", "inflight noise"),
+    so a failure in one leaves the other's keys.
+    """
     windows = hover_windows(segments)
     if not windows:
         return {}, ["no hover segment (hover values and in-flight gyro noise need one)"]
-    hover_m, hover_e = hover_measurements(ulog, params, windows)
-    noise_m, noise_e = inflight_noise_measurements(ulog, windows, cutoff_hz, gap_intervals)
+    hover_m, hover_e = guard("hover", lambda: hover_measurements(ulog, params, windows))
+    noise_m, noise_e = guard("inflight noise", lambda: inflight_noise_measurements(
+        ulog, windows, cutoff_hz, gap_intervals))
     return {**hover_m, **noise_m}, [*hover_e, *noise_e]
 
 
@@ -305,6 +318,9 @@ def _fit_esc(used: list[tuple[np.ndarray, np.ndarray]], dt_s: float,
         return f"implausible gain ({fit.gain:.3g} rpm per unit command, need > 0)"
     if not fit.r2 >= min_r2:
         return f"low fit quality (R^2 {fit.r2:.3f} < {min_r2})"
+    if fit.tau_s >= MOTOR_TAUS_S[-1] - 1e-9:
+        return (f"motor lag at grid edge (time constant {fit.tau_s * 1e3:.0f} ms is the largest "
+                "tried, the true lag is longer or the RPM does not follow the command)")
     return fit
 
 
@@ -339,8 +355,9 @@ def motor_lag_measurements(ulog: Any, windows: list[Window], min_cmd_std: float,
     Index i of esc_status is assumed to be motor i of actuator_motors (PX4 numbers
     both by output channel). ``windows`` are the in-air windows; an ESC is fitted on
     those where its command's std exceeds min_cmd_std. Both signals must be logged
-    at MIN_ESC_RPM_RATE_HZ or more, and a gap of more than gap_intervals median
-    intervals in either is left empty.
+    at MIN_ESC_RPM_RATE_HZ or more; the grid step and that rate check come from the
+    first live ESC (the ESCs are assumed to log at one rate). A gap of more than
+    gap_intervals median intervals in either is left empty.
     """
     inputs = _live_escs(ulog)
     if isinstance(inputs, str):

@@ -168,6 +168,9 @@ class ResponseGates:
     noise_cutoff_hz: float = 20.0  # in-flight noise: the cut-off below which the signal is not noise
     min_motor_cmd_std: float = 0.02  # motor lag: the least std of the motor command in a window
     min_first_stage_r2: float = 0.05  # instrument strength: R^2 of the torque on it
+    # Motor lag fit quality per ESC. Provisional; Task 13 sets it. Much higher than min_r2:
+    # real ESC fits with R^2 0.14 to 0.4 gave lags anywhere from 16 to 170 ms.
+    min_motor_r2: float = 0.5
 
 
 @dataclass(frozen=True)
@@ -493,21 +496,24 @@ def _measure(ulog: Any, log_id: str, params: dict[str, Any], gates: ResponseGate
     except Exception as e:
         print(f"{log_id}: flight segments failed: {type(e).__name__}: {e}", file=sys.stderr)
         segments = None
-    measurements: dict[str, float] = dict(_battery_scaling(params))
+    measurements: dict[str, float] = {}
     errors: list[str] = []
-    groups: list[Measured] = []
+    groups: list[Measured] = [
+        _guarded("battery scaling", log_id, lambda: (_battery_scaling(params), []))]
     if segments is None:
         groups.append(({}, ["flight segments failed (effectiveness, hover, noise and motor "
                             "lag not measured)"]))
     else:
-        groups.append(_effectiveness_and_lag(ulog, params, gates, segments))
-        windows, _ = _in_air_windows(segments)
+        groups.append(_guarded("effectiveness", log_id,
+                               lambda: _effectiveness_and_lag(ulog, params, gates, segments)))
         groups.append(_guarded("hover", log_id, lambda: hover_group(
-            ulog, params, segments, gates.noise_cutoff_hz, MAX_GAP_INTERVALS)))
+            ulog, params, segments, gates.noise_cutoff_hz, MAX_GAP_INTERVALS,
+            lambda name, measure: _guarded(name, log_id, measure))))
         groups.append(_guarded("motor lag", log_id, lambda: motor_lag_measurements(
-            ulog, windows, gates.min_motor_cmd_std, gates.min_r2, MAX_GAP_INTERVALS)))
+            ulog, _in_air_windows(segments)[0], gates.min_motor_cmd_std, gates.min_motor_r2,
+            MAX_GAP_INTERVALS)))
     groups.append(_guarded("rates", log_id, lambda: rate_measurements(ulog)))
-    groups.append(param_measurements(params))
+    groups.append(_guarded("parameters", log_id, lambda: param_measurements(params)))
     groups.append(_guarded("cell count", log_id, lambda: cell_count_measurements(ulog)))
     for group_measurements, group_errors in groups:
         measurements.update(group_measurements)
@@ -616,6 +622,9 @@ def _build_parser() -> argparse.ArgumentParser:
     gates.add_argument("--min-motor-cmd-std", type=float, default=defaults.min_motor_cmd_std,
                        help="motor lag gate: motor command std "
                             f"(default {defaults.min_motor_cmd_std})")
+    gates.add_argument("--min-motor-r2", type=float, default=defaults.min_motor_r2,
+                       help="motor lag gate: fit R^2 per ESC "
+                            f"(default {defaults.min_motor_r2}, provisional)")
     gates.add_argument("--min-first-stage-r2", type=float, default=defaults.min_first_stage_r2,
                        help="instrument strength gate: first-stage R^2 per axis "
                             f"(default {defaults.min_first_stage_r2})")
@@ -628,7 +637,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Error: {args.log_dir} is not a directory", file=sys.stderr)
         return 2
     gates = ResponseGates(args.min_torque_std, args.min_r2, args.noise_cutoff_hz,
-                          args.min_motor_cmd_std, args.min_first_stage_r2)
+                          args.min_motor_cmd_std, args.min_first_stage_r2, args.min_motor_r2)
     try:
         response_batch(args.log_dir, args.output, args.manifest, args.max_per_vehicle,
                        args.jobs, gates)

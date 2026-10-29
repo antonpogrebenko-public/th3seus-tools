@@ -9,7 +9,10 @@ import numpy as np
 import pytest
 
 from log_validation.response import MAX_GAP_INTERVALS, ResponseGates, analyze_response
-from log_validation.response_measures import MIN_ESC_RPM_RATE_HZ
+from log_validation.response_measures import (
+    MIN_ESC_RPM_RATE_HZ,
+    inflight_noise_measurements,
+)
 from log_validation.sysid import hover_command
 from log_validation.tests.response_fakes import (
     HOVER_ESTIMATE,
@@ -272,20 +275,156 @@ def test_new_measurements_do_not_change_the_log():
     assert all(np.array_equal(before[t][k], datasets[t][k]) for t in before for k in before[t])
 
 
-def test_two_dropped_samples_are_interpolated():
-    # Two consecutive dropped samples at 400 Hz leave a gap of 3 intervals: bridged, not
-    # left empty, whatever the rounding of the timestamps.
-    assert MAX_GAP_INTERVALS == 3.5
-    base = _analyze().measurements
-    datasets = quad_datasets(FAST)
-    for topic, stamp in (("vehicle_torque_setpoint", "timestamp"),
-                         ("vehicle_angular_velocity", "timestamp_sample"),
-                         ("vehicle_rates_setpoint", "timestamp")):
+def _jittered(datasets: dict, seed: int = 4) -> dict:
+    """The same topics with stamps off the round 2.5 ms grid (+-0.4 ms), still increasing."""
+    rng = np.random.default_rng(seed)
+    out = {}
+    for topic, data in datasets.items():
+        if topic not in ("vehicle_torque_setpoint", "vehicle_angular_velocity",
+                         "vehicle_rates_setpoint"):
+            out[topic] = data
+            continue
+        jitter = np.round(rng.uniform(-400.0, 400.0, data["timestamp"].size))
+        out[topic] = {k: (v + jitter if k.startswith("timestamp") else v)
+                      for k, v in data.items()}
+    return out
+
+
+def _drop_pairs(datasets: dict) -> dict:
+    out = dict(datasets)
+    for topic in ("vehicle_torque_setpoint", "vehicle_angular_velocity",
+                  "vehicle_rates_setpoint"):
         data = datasets[topic]
-        drop = np.zeros(data[stamp].size, dtype=bool)
-        for index in (2000, 2001, 3000, 3001, 4000, 4001):
+        drop = np.zeros(data["timestamp"].size, dtype=bool)
+        for index in (1500, 1501, 2000, 2001, 2500, 2501, 3000, 3001, 3500, 3501, 4000, 4001):
             drop[index] = True
-        datasets[topic] = {k: v[~drop] for k, v in data.items()}
-    m = _analyze(FAST, datasets).measurements
+        out[topic] = {k: v[~drop] for k, v in data.items()}
+    return out
+
+
+def test_two_dropped_samples_are_interpolated():
+    # Two consecutive dropped samples at 400 Hz leave a gap of about 3 intervals; with
+    # timestamp jitter it is above or below 3 by chance. The limit sits above it, so every
+    # such gap is bridged and the used share equals that of the log without drops.
+    full = _jittered(quad_datasets(FAST))
+    base = _analyze(FAST, full).measurements
+    m = _analyze(FAST, _drop_pairs(full)).measurements
+    # A fit-grid step differs by a microsecond with the median interval: under a sample.
     for axis in ("roll", "pitch", "yaw"):
-        assert m[f"used_fraction.{axis}"] == pytest.approx(base[f"used_fraction.{axis}"], abs=1e-9)
+        assert m[f"used_fraction.{axis}"] == pytest.approx(base[f"used_fraction.{axis}"], abs=5e-4)
+
+
+def test_gap_limit_sits_above_three_intervals():
+    assert MAX_GAP_INTERVALS == 3.5
+
+
+def test_a_gap_of_four_dropped_samples_is_left_empty():
+    full = _jittered(quad_datasets(FAST))
+    base = _analyze(FAST, full).measurements
+    data = full["vehicle_rates_setpoint"]
+    drop = np.zeros(data["timestamp"].size, dtype=bool)
+    drop[2000:2004] = True
+    cut = dict(full)
+    cut["vehicle_rates_setpoint"] = {k: v[~drop] for k, v in data.items()}
+    m = _analyze(FAST, cut).measurements
+    assert m["used_fraction.roll"] < base["used_fraction.roll"] - 1e-4
+
+
+# ---------------------------------------------------------------------------
+# Guards: one failing group does not take the others with it
+# ---------------------------------------------------------------------------
+
+
+def test_effectiveness_failure_keeps_the_other_groups(monkeypatch, capsys):
+    import log_validation.response as response
+
+    def broken(*_args, **_kwargs):
+        raise RuntimeError("fit exploded at /home/someone/x")
+
+    monkeypatch.setattr(response, "fit_first_order_plant_runs", broken)
+    result = _analyze()
+    assert {"hover.command", "motor_lag_s", "inflight_gyro_noise.roll",
+            "rate.torque_setpoint_hz", "param.IMU_GYRO_RATEMAX", "cell_count"} \
+        <= set(result.measurements)
+    assert result.errors == ["effectiveness failed: RuntimeError"]
+    assert "/home/someone/x" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("name, group, other", [
+    ("hover_measurements", "hover", "inflight_gyro_noise.roll"),
+    ("inflight_noise_measurements", "inflight noise", "hover.command"),
+])
+def test_hover_and_noise_fail_separately(monkeypatch, name, group, other):
+    import log_validation.response_measures as measures
+
+    def broken(*_args, **_kwargs):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(measures, name, broken)
+    result = _analyze()
+    assert other in result.measurements
+    assert result.errors == [f"{group} failed: RuntimeError"]
+
+
+def test_battery_scaling_and_params_failures_are_contained(monkeypatch):
+    import log_validation.response as response
+
+    def broken(*_args, **_kwargs):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(response, "_battery_scaling", broken)
+    monkeypatch.setattr(response, "param_measurements", broken)
+    result = _analyze()
+    assert "hover.command" in result.measurements and "effectiveness.roll" in result.measurements
+    assert sorted(result.errors) == ["battery scaling failed: RuntimeError",
+                                     "parameters failed: RuntimeError"]
+
+
+# ---------------------------------------------------------------------------
+# Motor lag gates (Ruling 24) and minors
+# ---------------------------------------------------------------------------
+
+
+def test_motor_lag_has_its_own_r2_gate():
+    assert ResponseGates().min_motor_r2 == 0.5
+    result = _analyze(FAST, None, replace(GATES, min_motor_r2=0.99999))
+    assert "motor_lag_s" not in result.measurements
+    assert any("ESC RPM" in e and "low fit quality" in e for e in result.errors)
+    assert "motor_lag_s" in _analyze(FAST, None, replace(GATES, min_r2=0.99999)).measurements
+
+
+def test_motor_lag_at_the_grid_edge_is_refused():
+    result = _analyze(replace(FAST, motor_lag_s=0.25))
+    assert "motor_lag_s" not in result.measurements
+    assert any("motor lag at grid edge" in e for e in result.errors)
+
+
+def test_thr_mdl_fac_zero_is_a_valid_linear_model():
+    result = _analyze(replace(FAST, params={"THR_MDL_FAC": 0.0}))
+    assert result.measurements["hover.command"] == pytest.approx(HOVER_THRUST)
+    assert result.measurements["hover.thr_mdl_fac"] == 0.0
+    assert result.errors == []
+
+
+def test_thrust_above_one_gets_no_command():
+    result = _analyze(replace(FAST, hover_thrust=1.2))
+    assert result.measurements["hover.thrust"] == pytest.approx(1.2)
+    assert "hover.command" not in result.measurements
+    assert any("hover command refused" in e for e in result.errors)
+
+
+def test_nan_valid_flag_is_invalid():
+    datasets = quad_datasets(FAST)
+    est = dict(datasets["hover_thrust_estimate"])
+    t = est["timestamp"] * 1e-6
+    est["valid"] = np.where(t < 15.0, np.nan, 1.0)
+    est["hover_thrust"] = np.where(t < 15.0, 0.9, 0.4)
+    datasets["hover_thrust_estimate"] = est
+    assert _analyze(FAST, datasets).measurements["hover.estimate"] == pytest.approx(0.4)
+
+
+def test_hover_segment_shorter_than_the_noise_window():
+    # 20 ms of hover at 400 Hz is 8 samples; the 20 Hz window needs 20.
+    measurements, errors = inflight_noise_measurements(quad_log(FAST), [(10.0, 10.02)], 20.0, 3.5)
+    assert not any(k.startswith("inflight_gyro_noise") for k in measurements)
+    assert len(errors) == 1 and "too short" in errors[0]

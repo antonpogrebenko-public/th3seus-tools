@@ -430,13 +430,13 @@ def hover_command(thrust: float, thr_mdl_fac: float) -> float:
     """The motor command u with (1 - f) * u + f * u**2 == thrust, f = THR_MDL_FAC.
 
     u = thrust for f == 0, else (-(1 - f) + sqrt((1 - f)**2 + 4 f thrust)) / (2 f).
-    ValueError when f is not in [0, 1] (or not finite) or the thrust is negative
-    or not finite.
+    ValueError when f or the thrust is not in [0, 1] (or not finite): a collective
+    thrust above 1 is not physical.
     """
     if not (math.isfinite(thr_mdl_fac) and 0.0 <= thr_mdl_fac <= 1.0):
         raise ValueError(f"THR_MDL_FAC must be in [0, 1], got {thr_mdl_fac}")
-    if not (math.isfinite(thrust) and thrust >= 0.0):
-        raise ValueError(f"thrust must be finite and >= 0, got {thrust}")
+    if not (math.isfinite(thrust) and 0.0 <= thrust <= 1.0):
+        raise ValueError(f"thrust must be in [0, 1], got {thrust}")
     if thr_mdl_fac == 0.0:
         return float(thrust)
     f = thr_mdl_fac

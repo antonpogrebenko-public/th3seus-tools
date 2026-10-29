@@ -319,7 +319,8 @@ def test_analysis_failure_reports_the_type_only(capsys):
             return real.get_dataset(name, multi_instance)
 
     result = analyze_response(Broken(), "log9", None, GATES)
-    assert result.errors == ["analysis failed: ValueError"]
+    assert result.errors[0] == "effectiveness failed: ValueError"
+    assert all(e.endswith("failed: ValueError") for e in result.errors)
     err = capsys.readouterr().err
     assert "log9" in err and "/home/someone/flight.ulg" in err
 
