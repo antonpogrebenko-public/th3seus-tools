@@ -91,7 +91,7 @@ def test_low_excitation_axis():
     assert "effectiveness.roll" not in m and "lag_s.roll" not in m
     assert "lag_minus_filter_s.roll" not in m
     errors = [e for e in result.errors if "excitation" in e]
-    assert len(errors) == 1 and "roll" in errors[0] and "0.02" in errors[0]
+    assert len(errors) == 1 and "roll" in errors[0] and f"< {GATES.min_torque_std})" in errors[0]
     assert "effectiveness.pitch" in m and "effectiveness.yaw" in m
 
 

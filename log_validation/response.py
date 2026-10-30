@@ -170,20 +170,35 @@ ERROR_WORKER_DIED = "worker process died"
 
 @dataclass(frozen=True)
 class ResponseGates:
-    """Per-axis acceptance gates (provisional, to be set from a run on real logs)."""
+    """Per-axis acceptance gates, set from a sample of 200 real quadrotor logs (143 vehicles)
+    analyzed with every gate at 0 before the full calibration run.
 
-    min_torque_std: float = 0.02  # excitation: torque setpoint std over the used time
+    The evidence is within one vehicle: each fit's gain against the mean of the same
+    vehicle's fits, so differences between airframes do not enter.
+    """
+
+    # Excitation: torque setpoint std over the used time. Among fits that pass min_r2 the
+    # gain did not depend on it down to 0.003, the lowest value seen, so the gate only
+    # refuses axes that hardly move (hover only). 0.02 would have refused half the good fits.
+    min_torque_std: float = 0.002
     # Fit quality: the share of the angular acceleration the fitted model explains. Pure
     # noise gives about k / N (6 instruments over N samples; under 0.001 on the test
-    # fakes), real fits 0.1 and up; 0.05 sits between them with a wide margin.
-    min_r2: float = 0.05
+    # fakes). Below 0.05 the gain came out 0.5 to 0.7 times the same vehicle's other fits;
+    # from 0.1 up it did not depend on R^2, and stricter gates (0.2, 0.5) did not make the
+    # fits of one vehicle agree better (median deviation 5 to 12 % at all three).
+    min_r2: float = 0.1
     # In-flight noise: f sets a moving-average window of 1/f seconds (first null at f,
     # -3 dB near 0.44 f); the noise is the std of the signal minus that average.
     noise_cutoff_hz: float = 20.0
-    min_motor_cmd_std: float = 0.02  # motor lag: the least std of the motor command in a window
-    min_first_stage_r2: float = 0.05  # instrument strength: R^2 of the torque on it
-    # Motor lag fit quality per ESC, provisional like the others. Much higher than min_r2:
-    # real ESC fits with R^2 0.14 to 0.4 gave lags anywhere from 16 to 170 ms.
+    # Motor lag: the least std of the motor command in a window. At 0 the run gained only 4
+    # fits (lags 26 to 31 ms), too few to move it.
+    min_motor_cmd_std: float = 0.02
+    # Instrument strength: R^2 of the torque on the instruments. Above min_r2 the gain did not
+    # depend on it, and 0.2 did not make the fits of one vehicle agree better.
+    min_first_stage_r2: float = 0.05
+    # Motor lag fit quality per ESC. Much higher than min_r2: real ESC fits with R^2 0.14 to
+    # 0.4 gave lags anywhere from 16 to 170 ms; in the run most fits were above 0.95, with a
+    # gap between 0.44 and 0.57.
     min_motor_r2: float = 0.5
 
 
