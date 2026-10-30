@@ -123,8 +123,9 @@ def load_kits(path: Path) -> list[Kit]:
     """Kits from a JSON list of {name, airframe_id, build, sources}.
 
     Raises ValueError, naming the kit and field, for malformed JSON, a non-list,
-    an unknown or missing Build field, or a value Build rejects. A build field
-    with no source is listed in `missing_sources` and the kit's `build` is None."""
+    an unknown or missing Build field, a value Build rejects, or a null value with
+    a source. A build field with no source, null when no maker publishes it, is
+    listed in `missing_sources` and the kit's `build` is None."""
     try:
         data = json.loads(Path(path).read_text(encoding="utf-8"))
     except json.JSONDecodeError as e:
@@ -159,7 +160,7 @@ def _parse_kit(index: int, item: Any) -> Kit:
     values, sources = item.get("build"), item.get("sources", {})
     if not isinstance(values, dict) or not isinstance(sources, dict):
         raise ValueError(f"kit {name}: build and sources must be JSON objects")
-    build = _build_of(name, values)
+    build = _build_of(name, values, sources)
     for field in sources:
         if field not in BUILD_FIELDS:
             raise ValueError(f"kit {name}: source for unknown build field {field!r}")
@@ -168,7 +169,8 @@ def _parse_kit(index: int, item: Any) -> Kit:
                sources=dict(sources), missing_sources=missing)
 
 
-def _build_of(name: str, values: Mapping[str, Any]) -> Build:
+def _build_of(name: str, values: Mapping[str, Any], sources: Mapping[str, str]) -> Build | None:
+    """The kit's Build, or None when a value is null (unknown): such a kit is listed, never compared."""
     for field in values:
         if field not in BUILD_FIELDS:
             raise ValueError(f"kit {name}: unknown build field {field!r}")
@@ -176,8 +178,12 @@ def _build_of(name: str, values: Mapping[str, Any]) -> Build:
         if field not in values:
             raise ValueError(f"kit {name}: build field {field!r} is missing")
     for field, value in values.items():
+        if value is None and sources.get(field):
+            raise ValueError(f"kit {name}: build field {field!r} is null but has a source")
         if value is not None and (isinstance(value, bool) or not isinstance(value, (int, float))):
             raise ValueError(f"kit {name}: build field {field!r} must be a number, got {value!r}")
+    if any(value is None for value in values.values()):
+        return None
     try:
         return Build(**values)
     except ValueError as e:

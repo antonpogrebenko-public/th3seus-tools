@@ -74,6 +74,17 @@ def test_unsourced_value_is_not_compared(tmp_path):
     assert not result.compared and "motor_kv" in result.note and result.rows == ()
 
 
+def test_unknown_required_value_is_not_compared(tmp_path):
+    # A value no maker publishes is null with no source: the kit is listed, never guessed.
+    item = kit_item()
+    item["build"]["motor_weight_g"] = None
+    del item["sources"]["motor_weight_g"]
+    kits = load_kits(kits_json(tmp_path, [item]))
+    assert kits[0].build is None and kits[0].missing_sources == ("motor_weight_g",)
+    result = compare_kits(kits, vehicles(6, **{"hover.command": 0.4}))[0]
+    assert not result.compared and "no source for motor_weight_g" in result.note
+
+
 def test_too_few_vehicles():
     result = compare_kits([kit()], vehicles(3, **{"hover.command": 0.4}), min_vehicles=5)[0]
     assert result.n_vehicles == 3 and not result.compared and result.rows == ()
@@ -280,9 +291,14 @@ def test_uncompared_kits_are_ignored_by_recommendations():
 
 # ---- load_kits validation ----
 
-def test_load_kits_empty_bundled_table():
+def test_bundled_table_cites_every_value_and_lists_the_unknown_ones():
     bundled = Path(__file__).parent.parent / "reference_kits.json"
-    assert load_kits(bundled) == []
+    items = json.loads(bundled.read_text(encoding="utf-8"))
+    kits = load_kits(bundled)
+    assert [k.airframe_id for k in kits] == [item["airframe_id"] for item in items]
+    for item, k in zip(items, kits):
+        assert all(url.startswith("https://") for url in item["sources"].values())
+        assert set(k.missing_sources) == {f for f, v in item["build"].items() if v is None}
 
 
 def test_load_kits_good_kit(tmp_path):
@@ -327,6 +343,13 @@ def test_load_kits_missing_required_field(tmp_path):
     item = kit_item()
     del item["build"]["frame_weight_g"]
     with pytest.raises(ValueError, match=r"kit_a.*frame_weight_g"):
+        load_kits(kits_json(tmp_path, [item]))
+
+
+def test_load_kits_null_value_with_a_source(tmp_path):
+    item = kit_item()
+    item["build"]["motor_weight_g"] = None
+    with pytest.raises(ValueError, match=r"kit_a.*motor_weight_g"):
         load_kits(kits_json(tmp_path, [item]))
 
 
