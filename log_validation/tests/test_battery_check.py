@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import dataclasses
 import re
+import warnings
 from pathlib import Path
 
 import numpy as np
@@ -83,6 +84,19 @@ class TestStepCheck:
         nan_pack = dataclasses.replace(pack, v=v)
         full = step_check([pack], lambda cells: 9.0, {}).n_steps
         assert step_check([nan_pack], lambda cells: 9.0, {}).n_steps == full - 1
+
+    def test_infinite_current_is_skipped_without_a_warning(self):
+        # Real logs carry runs of +inf current; samples 6 and 7 end the steps (5,6) and (7,8).
+        pack = _pack("p1", 4, 9.0)
+        i = pack.i.copy()
+        i[[6, 7]] = np.inf
+        inf_pack = dataclasses.replace(pack, i=i)
+        full = step_check([pack], lambda cells: 9.0, {}).n_steps
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            sc = step_check([inf_pack], lambda cells: 9.0, {})
+        assert sc.n_steps == full - 2
+        assert sc.median_err_v_per_cell == pytest.approx(0.0, abs=1e-9)
 
     def test_vehicles_counted_once_and_unlisted_log_is_its_own(self):
         packs = [_pack(i, 4, 9.0) for i in ("p1", "p2", "p3")]

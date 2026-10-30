@@ -168,18 +168,22 @@ def _extract_r_observations(
 
     For each adjacent sample pair where the current changed abruptly
     (|dI| > MIN_STEP_dI_A) and a corresponding voltage change is visible,
-    compute R = -dV/dI and normalise per cell.
+    compute R = -dV/dI and normalise per cell.  Pairs with a non-finite
+    current or voltage change (real logs carry +inf and NaN samples) are skipped.
 
     Returns a list of plausible R values in mΩ/cell.
     """
     if len(i) < 2:
         return []
-    dt = np.diff(t)
-    d_i = np.diff(i)
-    d_v = np.diff(v)
+    with np.errstate(invalid="ignore"):
+        dt = np.diff(t)
+        d_i = np.diff(i)
+        d_v = np.diff(v)
 
     step_mask = (
-        (dt < MAX_STEP_DT_S)
+        np.isfinite(d_i)
+        & np.isfinite(d_v)
+        & (dt < MAX_STEP_DT_S)
         & (np.abs(d_i) > MIN_STEP_dI_A)
         & (np.abs(d_v) > MIN_STEP_dV_V)
     )
@@ -460,8 +464,8 @@ def _holdout_mae(data: LogBatteryData, ocv: OcvCurve, r_mohm_per_cell: float) ->
 
 def _step_errors(data: LogBatteryData, r_mohm_per_cell: float) -> np.ndarray:
     """Per-cell voltage-change errors over the steps of one log (adjacent sample pairs)."""
-    dt, d_i, d_v = np.diff(data.t_s), np.diff(data.i), np.diff(data.v)
     with np.errstate(invalid="ignore"):
+        dt, d_i, d_v = np.diff(data.t_s), np.diff(data.i), np.diff(data.v)
         is_step = (dt < MAX_STEP_DT_S) & (np.abs(d_i) > MIN_STEP_dI_A)
     is_step &= np.isfinite(dt) & np.isfinite(d_i) & np.isfinite(d_v)
     d_v_pred = -d_i[is_step] * data.cell_count * r_mohm_per_cell / 1000.0

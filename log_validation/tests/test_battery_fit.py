@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import math
 import uuid
+import warnings
 from dataclasses import replace
 from pathlib import Path
 
@@ -197,6 +198,19 @@ class TestExtractRObservations:
             np.array([16.0]), np.array([5.0]), np.array([0.0]), 4
         )
         assert obs == []
+
+    def test_non_finite_current_is_skipped_without_a_warning(self):
+        # Real logs carry +inf and NaN current samples; the pairs touching them
+        # are steps (9,10), (11,12) and (19,20) of this trace.
+        v, i, t = self._make_step_trace(4, 9.0, n_steps=30, step_di=20.0)
+        clean = _extract_r_observations(v, i, t, 4)
+        bad_i = i.copy()
+        bad_i[[10, 11]] = np.inf
+        bad_i[20] = np.nan
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            obs = _extract_r_observations(v, bad_i, t, 4)
+        assert obs == pytest.approx([9.0] * (len(clean) - 3))
 
 
 # ---------------------------------------------------------------------------
