@@ -1,1 +1,132 @@
-[]
+[
+  {
+    "name": "DJI F450",
+    "airframe_id": 4011,
+    "build": {
+      "frame_weight_g": 282,
+      "motor_kv": null,
+      "motor_weight_g": null,
+      "esc_continuous_amps": null,
+      "prop_diameter_in": null,
+      "prop_pitch_in": null,
+      "prop_blade_count": null,
+      "battery_cells": 3,
+      "battery_capacity_mah": 5200,
+      "battery_c_rating": 12,
+      "battery_weight_g": null,
+      "fc_weight_g": 90
+    },
+    "sources": {
+      "frame_weight_g": "https://www-v1.dji.com/flame-wheel-arf/spec.html",
+      "battery_cells": "https://docs.px4.io/v1.13/en/frames_multicopter/dji_f450_cuav_5plus.html",
+      "battery_capacity_mah": "https://docs.px4.io/v1.13/en/frames_multicopter/dji_f450_cuav_5plus.html",
+      "battery_c_rating": "https://docs.px4.io/v1.13/en/frames_multicopter/dji_f450_cuav_5plus.html",
+      "fc_weight_g": "https://docs.px4.io/v1.13/en/flight_controller/cuav_v5_plus.html"
+    },
+    "notes": [
+      "PX4 airframe 4011 is 'DJI F450 w/ DJI ESCs' (removed in PX4 v1.14).",
+      "DJI's ARF page gives the frame weight and only recommendations: 15A OPTO ESCs, 10 x 3.8 in or 8 x 4.5 in props, 3S to 4S LiPo.",
+      "The PX4 v1.13 build page (CUAV V5+) uses DJI E305 2312E motors, Hobbywing XRotor 20A ESCs and 9.4 x 5 in props; its parts list and electronics table give different motor KV (960 and 800), so motor, ESC and prop values are left unknown.",
+      "Battery and flight controller come from that PX4 build: Turnigy 5200 mAh 3S 12C pack (weight not on the page) and CUAV V5+."
+    ]
+  },
+  {
+    "name": "Holybro S500",
+    "airframe_id": 4015,
+    "build": {
+      "frame_weight_g": null,
+      "motor_kv": null,
+      "motor_weight_g": null,
+      "esc_continuous_amps": null,
+      "prop_diameter_in": 10,
+      "prop_pitch_in": 4.5,
+      "prop_blade_count": null,
+      "battery_cells": null,
+      "battery_capacity_mah": null,
+      "battery_c_rating": null,
+      "battery_weight_g": null,
+      "fc_weight_g": null
+    },
+    "sources": {
+      "prop_diameter_in": "https://docs.px4.io/v1.16/en/frames_multicopter/holybro_s500_v2_pixhawk4.html",
+      "prop_pitch_in": "https://docs.px4.io/v1.16/en/frames_multicopter/holybro_s500_v2_pixhawk4.html"
+    },
+    "notes": [
+      "The PX4 S500 V2 build page lists 'Propeller 1045' (10 x 4.5 in) and 'Motors - 2216 KV880' marked as a V2 update; other listings give KV920, so the KV is left unknown.",
+      "The kit's flight controller changed from Pixhawk 4 to Pixhawk 6C, which has two case weights; no battery is included or named."
+    ]
+  },
+  {
+    "name": "Holybro X500 V2",
+    "airframe_id": 4019,
+    "build": {
+      "frame_weight_g": null,
+      "motor_kv": 920,
+      "motor_weight_g": null,
+      "esc_continuous_amps": 20,
+      "prop_diameter_in": 10,
+      "prop_pitch_in": 4.5,
+      "prop_blade_count": null,
+      "battery_cells": 4,
+      "battery_capacity_mah": null,
+      "battery_c_rating": null,
+      "battery_weight_g": null,
+      "fc_weight_g": 59.3
+    },
+    "sources": {
+      "motor_kv": "https://docs.holybro.com/drone-development-kit/px4-development-kit-x500v2.md",
+      "esc_continuous_amps": "https://docs.holybro.com/drone-development-kit/px4-development-kit-x500v2.md",
+      "prop_diameter_in": "https://docs.holybro.com/drone-development-kit/px4-development-kit-x500v2.md",
+      "prop_pitch_in": "https://docs.holybro.com/drone-development-kit/px4-development-kit-x500v2.md",
+      "battery_cells": "https://docs.holybro.com/drone-development-kit/px4-development-kit-x500v2.md",
+      "fc_weight_g": "https://docs.holybro.com/autopilot/pixhawk-6c/technical-specification.md"
+    },
+    "notes": [
+      "Holybro lists 'Weight: 610g' for the kit without saying what it covers, so the frame weight is left unknown.",
+      "Holybro recommends a 4S 2000-5000mAh LiPo (not included) and names no pack, so capacity, C rating and battery weight are unknown.",
+      "The flight controller is the Pixhawk 6C; 59.3 g is its aluminum-case weight, the case the kit page links to."
+    ]
+  },
+  {
+    "name": "BetaFPV Beta75X 2S",
+    "airframe_id": 4041,
+    "build": {
+      "frame_weight_g": 7.3,
+      "motor_kv": 11000,
+      "motor_weight_g": null,
+      "esc_continuous_amps": 12,
+      "esc_burst_amps": 18,
+      "prop_diameter_in": 1.57,
+      "prop_pitch_in": null,
+      "prop_blade_count": 4,
+      "prop_weight_g": 0.55,
+      "battery_cells": 2,
+      "battery_capacity_mah": 350,
+      "battery_c_rating": 35,
+      "battery_weight_g": 20,
+      "battery_voltage_v": 7.4,
+      "fc_weight_g": 2.7
+    },
+    "sources": {
+      "frame_weight_g": "https://betafpv.com/products/beta75x-2s-whoop-frame",
+      "motor_kv": "https://betafpv.com/products/beta75x-2s-whoop-quadcopter",
+      "esc_continuous_amps": "https://betafpv.com/products/f4-2s-brushless-flight-controller-and-esc",
+      "esc_burst_amps": "https://betafpv.com/products/f4-2s-brushless-flight-controller-and-esc",
+      "prop_diameter_in": "https://betafpv.com/products/beta75x-2s-whoop-quadcopter",
+      "prop_blade_count": "https://betafpv.com/products/beta75x-2s-whoop-quadcopter",
+      "prop_weight_g": "https://betafpv.com/products/gemfan-40mm-4-blade-propellers-1-5mm-shaft",
+      "battery_cells": "https://betafpv.com/products/beta75x-2s-whoop-quadcopter",
+      "battery_capacity_mah": "https://betafpv.com/products/beta75x-2s-whoop-quadcopter",
+      "battery_c_rating": "https://betafpv.com/products/350mah-2s-lipo-battery-2pcs",
+      "battery_weight_g": "https://betafpv.com/products/350mah-2s-lipo-battery-2pcs",
+      "battery_voltage_v": "https://betafpv.com/products/350mah-2s-lipo-battery-2pcs",
+      "fc_weight_g": "https://betafpv.com/products/f4-2s-brushless-flight-controller-and-esc"
+    },
+    "notes": [
+      "The kit is the 2S 12A ESC version; its stock battery is the BetaFPV 350mAh 2S 35C pack.",
+      "Props are 40 mm (1.57 in) 4-blade; the prop page gives 2.2 g for a set of 4, so 0.55 g each, and no pitch.",
+      "The 1103 motor page gives KV options but no weight.",
+      "The flight controller and ESC are one board; its page now shows a newer firmware target (BETAFPVF405) than the kit page (OMNIBUSF4SD), and its 2.7 g may cover the ESC too, so the ESC weight is left at the default."
+    ]
+  }
+]

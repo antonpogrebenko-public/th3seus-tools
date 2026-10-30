@@ -1,0 +1,60 @@
+{
+ "comparisons": [
+  {
+   "airframe_id": 4011,
+   "compared": false,
+   "kit": "DJI F450",
+   "n_vehicles": 9,
+   "note": "not compared: no source for motor_kv; no source for motor_weight_g; no source for esc_continuous_amps; no source for prop_diameter_in; no source for prop_pitch_in; no source for prop_blade_count; no source for battery_weight_g",
+   "rows": []
+  },
+  {
+   "airframe_id": 4015,
+   "compared": false,
+   "kit": "Holybro S500",
+   "n_vehicles": 5,
+   "note": "not compared: no source for frame_weight_g; no source for motor_kv; no source for motor_weight_g; no source for esc_continuous_amps; no source for prop_blade_count; no source for battery_cells; no source for battery_capacity_mah; no source for battery_c_rating; no source for battery_weight_g; no source for fc_weight_g",
+   "rows": []
+  },
+  {
+   "airframe_id": 4019,
+   "compared": false,
+   "kit": "Holybro X500 V2",
+   "n_vehicles": 12,
+   "note": "not compared: no source for frame_weight_g; no source for motor_weight_g; no source for prop_blade_count; no source for battery_capacity_mah; no source for battery_c_rating; no source for battery_weight_g",
+   "rows": []
+  },
+  {
+   "airframe_id": 4041,
+   "compared": false,
+   "kit": "BetaFPV Beta75X 2S",
+   "n_vehicles": 12,
+   "note": "not compared: no source for motor_weight_g; no source for prop_pitch_in",
+   "rows": []
+  }
+ ],
+ "min_vehicles": 5,
+ "recommendations": [
+  {
+   "formula": "thrust basis K_CT (reported, never changed)",
+   "kits": [],
+   "note": "hover throttle discrepancy is reported for the thrust basis K_CT, which is never recommended for change",
+   "quantity": "hover.command",
+   "recommended": false
+  },
+  {
+   "formula": "motor lag tau = 0.02 + 15/KV",
+   "kits": [],
+   "note": "no change recommended: 0 compared kits have data, at least 2 are needed",
+   "quantity": "lag",
+   "recommended": false
+  },
+  {
+   "formula": "inertia and arm-length formulas",
+   "kits": [],
+   "note": "no change recommended: 0 compared kits have data, at least 2 are needed",
+   "quantity": "effectiveness",
+   "recommended": false
+  }
+ ]
+}

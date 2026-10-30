@@ -164,6 +164,16 @@ the gyro bias sigma and the baro, mag and GPS parameters measured in the still w
 because the still window and the Allan fit now use `sensor_combined` (when the log has
 it) rather than `sensor_gyro`; compare those profile values with the deployed ones too.
 
+The kit table `reference_kits.json` gives each build value with the public page it
+came from. A required value that no maker publishes is `null` with no source, and that
+kit is listed as not compared, naming the missing sources; fill a value only from a
+page that states it.
+
+The committed run is in [`calibration/2026-10-30/`](calibration/2026-10-30/report.md):
+8,671 public Flight Review quadrotor logs for IMU noise and the battery, and 953 logs
+recorded at full rate for the response pass, at most 3 logs per vehicle in each set.
+Its `run-info.json` gives the parameters and commands.
+
 ## Tests
 
 ```bash
