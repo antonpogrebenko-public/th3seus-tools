@@ -11,9 +11,11 @@ the gain (``effectiveness.<axis>``, rad/s^2 per unit of normalized torque), the
 delay plus time constant (``lag_s.<axis>``), the share of the angular acceleration
 the fitted model explains (``fit_r2.<axis>``), the shares of the torque and of the
 angular acceleration the instruments explain (``first_stage_r2.<axis>``,
-``reduced_form_r2.<axis>``) and the share of in-air time the fit scores
+``reduced_form_r2.<axis>``), the share of in-air time the fit scores
 (``used_fraction.<axis>``: each run's first 40 ms, which only feed the delay, and
-any in-air time without data are left out). Inputs:
+any in-air time without data are left out) and the std of the torque setpoint over
+the runs the fit uses (``torque_std.<axis>``, the excitation the gate checks, also
+reported when the gate refuses the axis). Inputs:
 ``vehicle_torque_setpoint.xyz[k]`` on its ``timestamp`` (applied when published),
 ``vehicle_angular_velocity.xyz_derivative[k]`` on its ``timestamp_sample`` and
 ``vehicle_rates_setpoint`` roll, pitch and yaw on their ``timestamp``, all resampled
@@ -427,6 +429,7 @@ def _axis_response(
     if not runs:
         return measurements, [f"{axis}: no in-air samples with all signals finite"]
     torque_std = float(np.std(np.concatenate([run[0] for run in runs])))
+    measurements[f"torque_std.{axis}"] = torque_std
     if not torque_std >= gates.min_torque_std:
         return measurements, [f"{axis}: low excitation (torque setpoint std {torque_std:.4f} "
                               f"< {gates.min_torque_std})"]

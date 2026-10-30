@@ -95,6 +95,15 @@ def test_low_excitation_axis():
     assert "effectiveness.pitch" in m and "effectiveness.yaw" in m
 
 
+def test_torque_std_is_reported_on_both_sides_of_the_excitation_gate():
+    # Task 13 sets the excitation gate from where the gain stops depending on this value,
+    # so a gated axis must report it too.
+    m = _analyze(QuadSpec(constant_axes=(0,))).measurements
+    assert 0.0 <= m["torque_std.roll"] < GATES.min_torque_std
+    assert m["torque_std.pitch"] >= GATES.min_torque_std
+    assert m["torque_std.yaw"] >= GATES.min_torque_std
+
+
 @pytest.mark.parametrize("seed", range(1, 13))
 def test_low_fit_quality_axis_gets_no_estimate(seed):
     result = _analyze(QuadSpec(noise_only=True, seed=seed))
@@ -208,7 +217,7 @@ def test_rate_setpoint_logged_too_slowly_gets_no_fit():
 def _only_log_level(measurements: dict) -> bool:
     """No per-axis fit value, but the log-level ones a blocked fit still reports."""
     fit_keys = ("effectiveness.", "lag_s.", "fit_r2.", "first_stage_r2.", "reduced_form_r2.",
-                "lag_minus_filter_s.", "used_fraction.")
+                "lag_minus_filter_s.", "used_fraction.", "torque_std.")
     return (not any(k.startswith(fit_keys) for k in measurements)
             and {"filter_delay_s", "angular_accel_from_rate"} <= set(measurements))
 
