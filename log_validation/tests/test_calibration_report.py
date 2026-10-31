@@ -581,3 +581,12 @@ def test_vibration_evidence_is_none_without_both_sides():
     assert vibration_evidence(noise_entries(), []) is None
     zero_rest = [{"log_id": "n", "measurements": {"gyro.gyro_noise_density": 0.0}}]
     assert vibration_evidence(zero_rest, response_entries()) is None
+
+
+def test_a_pipe_in_a_reason_does_not_split_its_counts_row():
+    noise = noise_entries()
+    noise[-1] = {**noise[-1], "errors": ["gyro.x: field 'a|b' not in topic 'sensor_gyro'"]}
+    text = render_report(noise, battery_dict(), response_entries(), airframes_dict(), [],
+                         run_info())
+    row = next(line for line in text.splitlines() if "a\\|b" in line)
+    assert row == "| gyro.x: field 'a\\|b' not in topic 'sensor_gyro' | 1 |"

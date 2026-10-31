@@ -30,9 +30,14 @@ def _num(value: Any, spec: str = ".4g") -> str:
     return format(value, spec) if ok else NA
 
 
+def _cell(text: str) -> str:
+    """A table cell: a "|" in the text (a log-controlled reason may hold one) is escaped."""
+    return str(text).replace("|", "\\|")
+
+
 def _table(headers: Sequence[str], rows: Sequence[Sequence[str]]) -> list[str]:
     lines = ["| " + " | ".join(headers) + " |", "|" + "---|" * len(headers)]
-    lines.extend("| " + " | ".join(row) + " |" for row in rows)
+    lines.extend("| " + " | ".join(_cell(c) for c in row) + " |" for row in rows)
     return lines + [""]
 
 

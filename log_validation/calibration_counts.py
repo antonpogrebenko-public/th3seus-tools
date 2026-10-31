@@ -16,6 +16,9 @@ from typing import Any, Mapping, Sequence
 
 FAILURE_PATTERN = re.compile(r"failed|worker process died|unavailable")
 _PARENTHESIZED = re.compile(r"\([^()]*\)")
+# The list of names ulog_loader appends to a missing topic or field, such as
+# "Available topics: ['sensor_accel', 'sensor_gyro']"; it differs from log to log.
+_AVAILABLE_LIST = re.compile(r"\s*Available \w+: \[(?:'[^']*'(?:, )?)*\]")
 _NUMBER = re.compile(r"[-+]?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?")
 NUMBER_MARK = "N"
 
@@ -32,11 +35,13 @@ class PassCounts:
 
 
 def normalize_reason(text: str) -> str:
-    """Key for counting error reasons: parenthesized details dropped, numbers as "N".
+    """Key for counting error reasons: details and name lists dropped, numbers as "N".
 
     Response errors carry measured values, for example "roll: low excitation
-    (std 0.001 < 0.02)"; counting exact strings would give one reason per log."""
-    stripped = text
+    (std 0.001 < 0.02)", and noise errors the log's topics or fields
+    ("Available topics: [...]"); counting exact strings would give one reason
+    per log."""
+    stripped = _AVAILABLE_LIST.sub("", text)
     while True:
         shorter = _PARENTHESIZED.sub("", stripped)
         if shorter == stripped:

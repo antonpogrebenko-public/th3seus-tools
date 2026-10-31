@@ -99,3 +99,15 @@ def test_battery_json_has_the_unsampled_and_unscored_counts():
     holdout_side = doc["holdout_logs_not_scored"]
     assert fit_side >= 1 and holdout_side >= 1  # the seed puts quiet logs on both sides
     assert fit_side + holdout_side == len(QUIET_IDS)
+
+
+def test_available_topic_and_field_lists_are_dropped():
+    a = normalize_reason("gps.horizontal_noise_sigma: \"topic 'vehicle_gps_position' not in log. "
+                         "Available topics: ['sensor_accel', 'sensor_gyro']\"")
+    b = normalize_reason("gps.horizontal_noise_sigma: \"topic 'vehicle_gps_position' not in log. "
+                         "Available topics: ['sensor_accel', 'sensor_combined', 'vehicle_air_data']\"")
+    assert a == b == "gps.horizontal_noise_sigma: \"topic 'vehicle_gps_position' not in log.\""
+    fields = normalize_reason("gyro.x: \"topic 'sensor_combined' missing field 'gyro_rad[2]'. "
+                              "Available fields: ['gyro_rad[0]', 'gyro_rad[1]', 'timestamp']\"")
+    assert fields == "gyro.x: \"topic 'sensor_combined' missing field 'gyro_rad[N]'.\""
+    assert normalize_reason("Available fields: []") == ""
