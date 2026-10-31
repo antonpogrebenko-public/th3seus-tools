@@ -67,7 +67,7 @@ def _per_log_lines(r: BatteryFitResult) -> list[str]:
     lines = [
         "## Per-Log Resistance (fit side)",
         "",
-        "| Log ID | Vehicle | Cell count | Median (mΩ/cell) |",
+        "| Log ID | Vehicle | Cell count | Median (mohm/cell) |",
         "|---|---|---|---|",
     ]
     lines += [
@@ -122,15 +122,15 @@ def write_markdown_summary(
         "",
         "## Internal Resistance",
         "",
-        f"Overall pooled median: **{r.overall_r_median_mohm_per_cell:.2f} mΩ/cell** "
+        f"Overall pooled median: **{r.overall_r_median_mohm_per_cell:.2f} mohm/cell** "
         f"(n={r.overall_r_n} step events)",
         "",
         f"A class falls back to the pooled median (the **Deployed** column, which "
         f"is what Rust uses) when it has fewer than {MIN_R_OBSERVATIONS_PER_CLASS} "
         f"step events OR its fitted median is implausibly low "
-        f"(< {R_PLAUSIBLE_FLOOR_MOHM_PER_CELL:.0f} mΩ/cell, a sign of biased data).",
+        f"(< {R_PLAUSIBLE_FLOOR_MOHM_PER_CELL:.0f} mohm/cell, a sign of biased data).",
         "",
-        "| Cell count | Median (mΩ/cell) | p10 | p90 | Deployed (mΩ/cell) | IQR "
+        "| Cell count | Median (mohm/cell) | p10 | p90 | Deployed (mohm/cell) | IQR "
         "| n step events | Vehicles | fallback reason |",
         "|---|---|---|---|---|---|---|---|---|",
     ]
@@ -139,10 +139,10 @@ def write_markdown_summary(
         if not f.low_n:
             reason = "none"
         elif f.n_observations < MIN_R_OBSERVATIONS_PER_CLASS:
-            reason = f"low-n (<{MIN_R_OBSERVATIONS_PER_CLASS}) → pooled"
+            reason = f"low-n (<{MIN_R_OBSERVATIONS_PER_CLASS}) -> pooled"
         else:
             reason = (
-                f"implausible (<{R_PLAUSIBLE_FLOOR_MOHM_PER_CELL:.0f} mΩ/cell) → pooled"
+                f"implausible (<{R_PLAUSIBLE_FLOOR_MOHM_PER_CELL:.0f} mohm/cell) -> pooled"
             )
         lines.append(
             f"| {f.cell_count}S | {f.median_mohm_per_cell:.2f} | "
@@ -206,7 +206,7 @@ def emit_rust_constants(r: BatteryFitResult) -> str:
     """
     lines: list[str] = []
     lines.append(
-        "// FITTED_R_TABLE: deployed per-cell R (mΩ/cell), keyed by cell count."
+        "// FITTED_R_TABLE: deployed per-cell R (mohm/cell), keyed by cell count."
     )
     lines.append(
         f"// Canonical run, split seed={r.split_seed}, {r.real_log_count} real logs, "
@@ -215,7 +215,7 @@ def emit_rust_constants(r: BatteryFitResult) -> str:
     lines.append("const FITTED_R_TABLE: &[(u8, f64)] = &[")
     for f in r.r_fits:
         note = (
-            f"n={f.n_observations} LOW-N → pooled median"
+            f"n={f.n_observations} LOW-N -> pooled median"
             if f.low_n
             else f"n={f.n_observations}"
         )

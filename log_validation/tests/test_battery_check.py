@@ -181,3 +181,22 @@ def test_battery_outputs_and_sources_have_no_long_dashes(tmp_path):
     texts = [_markdown(tmp_path, result), emit_rust_constants(result)]
     texts += [Path(m.__file__).read_text(encoding="utf-8") for m in (battery_output, battery_model)]
     assert [d for t in texts for d in LONG_DASHES if d in t] == []
+
+
+def _with_both_fallbacks(result):
+    """The result with a low-n class and a below-floor class, so both reasons render."""
+    fit = result.r_fits[0]
+    low_n = dataclasses.replace(fit, low_n=True, n_observations=1)
+    below_floor = dataclasses.replace(fit, cell_count=fit.cell_count + 8, low_n=True,
+                                      n_observations=10_000, median_mohm_per_cell=1.0)
+    return dataclasses.replace(result, r_fits=[low_n, below_floor])
+
+
+def test_battery_outputs_and_sources_are_ascii(tmp_path):
+    _, result = _corpus_result()
+    result = _with_both_fallbacks(result)
+    md = _markdown(tmp_path, result)
+    assert "low-n" in md and "implausible" in md
+    texts = [md, emit_rust_constants(result)]
+    texts += [Path(m.__file__).read_text(encoding="utf-8") for m in (battery_output, battery_model)]
+    assert [sorted({c for c in t if ord(c) > 127}) for t in texts] == [[], [], [], []]
