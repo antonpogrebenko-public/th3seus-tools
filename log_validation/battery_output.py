@@ -176,8 +176,8 @@ def write_markdown_summary(
         "",
         "| Metric | Value |",
         "|---|---|",
-        f"| Holdout real logs in split | {r.holdout_log_count} |",
-        f"| Holdout logs scored (passed filters) | {r.holdout_scored_count} |",
+        f"| Held-out logs with a voltage error (MAE) | {r.holdout_scored_count} of "
+        f"{r.holdout_log_count} real held-out logs, usable or not |",
         f"| Median MAE (V/cell) | **{r.holdout_median_mae_v_per_cell:.4f}** |",
         f"| Mean MAE (V/cell) | {r.holdout_mean_mae_v_per_cell:.4f} |",
         f"| p75 MAE (V/cell) | {r.holdout_p75_mae_v_per_cell:.4f} |",

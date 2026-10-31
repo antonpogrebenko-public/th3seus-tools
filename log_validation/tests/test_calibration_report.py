@@ -613,3 +613,9 @@ def test_reference_airframes_section_names_its_logs():
     section = " ".join(text.split("## Reference airframes")[1].split("## ")[0].split())
     assert ("Each kit is compared on the logs of `log-ids/response.txt` whose airframe ID "
             "is the kit's.") in section
+
+
+def test_battery_held_out_count_says_what_it_counts():
+    text = render_report([], battery_dict(), [], airframes_dict(), [], run_info())
+    assert ("| Held-out logs with a voltage error (MAE) | 2 of 3 real held-out logs, "
+            "usable or not |") in text

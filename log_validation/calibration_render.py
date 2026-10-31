@@ -108,8 +108,9 @@ def _battery(battery: Mapping[str, Any]) -> list[str]:
     step = battery.get("step_check") or {}
     met = "met" if battery.get("validation_target_met") else "not met"
     return lines + ["Held-out checks:", "", *_table(["Check", "Value"], [
-        ["Held-out logs scored", f"{battery.get('holdout_scored_count', NA)} of "
-                                 f"{battery.get('holdout_log_count', NA)}"],
+        ["Held-out logs with a voltage error (MAE)",
+         f"{battery.get('holdout_scored_count', NA)} of "
+         f"{battery.get('holdout_log_count', NA)} real held-out logs, usable or not"],
         ["Voltage MAE, median (V per cell)", _num(battery.get("holdout_median_mae_v_per_cell"))],
         ["Voltage MAE, p75 (V per cell)", _num(battery.get("holdout_p75_mae_v_per_cell"))],
         ["Target of 0.1 V per cell", met],

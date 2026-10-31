@@ -168,6 +168,13 @@ def _markdown(tmp_path, result) -> str:
     return out.read_text(encoding="utf-8")
 
 
+def test_markdown_held_out_count_says_what_it_counts(tmp_path):
+    _, result = _corpus_result()
+    md = _markdown(tmp_path, result)
+    assert (f"| Held-out logs with a voltage error (MAE) | {result.holdout_scored_count} of "
+            f"{result.holdout_log_count} real held-out logs, usable or not |") in md
+
+
 def test_markdown_title_has_no_date_and_names_the_rust_format(tmp_path):
     _, result = _corpus_result()
     md = _markdown(tmp_path, result)
