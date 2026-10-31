@@ -58,6 +58,7 @@ def battery_dict() -> dict:
         "holdout_p75_mae_v_per_cell": 0.05, "validation_target_met": True,
         "per_log_r": per_log, "fit_log_ids": [f"b{i}" for i in range(N_VEHICLES)],
         "holdout_log_ids": ["h1", "h2", "h3"], "holdout_scored_log_ids": ["h1", "h2"],
+        "fit_logs_without_samples": 0, "holdout_logs_not_scored": 1,
         "step_check": {"n_steps": 40, "n_vehicles": 4, "median_err_v_per_cell": 0.02,
                        "p75_err_v_per_cell": 0.04},
     }

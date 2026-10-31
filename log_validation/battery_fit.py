@@ -551,6 +551,8 @@ def fit_extracted(
     }
     real = (STATUS_OK, STATUS_UNUSABLE)  # loaded and not simulation, as before
     holdout_real = [i for i in holdout_ids if statuses[i] in real]
+    fit_log_ids = [o.log_id for o in observations if o.r_obs or o.ocv_obs]
+    holdout_scored_log_ids = tuple(sorted(scored_by_steps | scored_by_mae))
     return BatteryFitResult(
         real_log_count=sum(1 for s in statuses.values() if s in real),
         sim_log_count=sum(1 for s in statuses.values() if s == STATUS_SIM),
@@ -567,11 +569,13 @@ def fit_extracted(
         validation_target_met=(median_mae < VALIDATION_TARGET_V_PER_CELL),
         split_seed=seed,
         per_log_r=_per_log_r(observations, vehicle_of),
-        fit_log_ids=[o.log_id for o in observations if o.r_obs or o.ocv_obs],
+        fit_log_ids=fit_log_ids,
         holdout_log_ids=holdout_real,
         logs_without_manifest_row=logs_without_manifest_row,
         step_check=step_check(scored, deployed, vehicle_of),
-        holdout_scored_log_ids=tuple(sorted(scored_by_steps | scored_by_mae)),
+        holdout_scored_log_ids=holdout_scored_log_ids,
+        fit_logs_without_samples=len(observations) - len(fit_log_ids),
+        holdout_logs_not_scored=len(scored) - len(holdout_scored_log_ids),
     )
 
 

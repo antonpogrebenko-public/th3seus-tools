@@ -53,6 +53,8 @@ def result_to_dict(r: BatteryFitResult) -> dict:
         "fit_log_ids": list(r.fit_log_ids),
         "holdout_log_ids": list(r.holdout_log_ids),
         "holdout_scored_log_ids": list(r.holdout_scored_log_ids),
+        "fit_logs_without_samples": r.fit_logs_without_samples,
+        "holdout_logs_not_scored": r.holdout_logs_not_scored,
         "step_check": {
             "n_steps": r.step_check.n_steps,
             "n_vehicles": r.step_check.n_vehicles,
@@ -118,6 +120,8 @@ def write_markdown_summary(
         f"| Skipped (load error or no usable battery data) | {r.skipped_log_count} |",
         f"| Holdout (validation only) | {r.holdout_log_count} |",
         f"| Fit logs with at least one observation | {len(r.fit_log_ids)} |",
+        f"| Usable fit logs without a step or OCV sample | {r.fit_logs_without_samples} |",
+        f"| Usable holdout logs scored by neither check | {r.holdout_logs_not_scored} |",
         f"| Logs without a manifest row (left out) | {r.logs_without_manifest_row} |",
         "",
         "## Internal Resistance",

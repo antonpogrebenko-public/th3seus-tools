@@ -3,7 +3,8 @@
 An entry is *analyzed* when its log ID is in the pass's contributing list (see
 `calibration_report.log_id_lists`). Any other entry is *failed* when one of its
 error texts says a step failed (see `FAILURE_PATTERN`) and *skipped* otherwise.
-The battery result keeps only totals, so its counts come from those totals.
+The battery result keeps only totals, so its counts come from those totals; they
+partition the logs the battery pass read (see `battery_counts`).
 """
 
 from __future__ import annotations
@@ -66,16 +67,22 @@ def entry_counts(name: str, entries: Sequence[Mapping[str, Any]],
     return PassCounts(name, analyzed, skipped, failed, _ranked(reasons))
 
 
+# Battery reason rows and the battery JSON total each one counts.
+BATTERY_REASONS = (("simulation log excluded", "sim_log_count"),
+                   ("load error or no usable battery data", "skipped_log_count"),
+                   ("fit log without a usable step or OCV sample", "fit_logs_without_samples"),
+                   ("holdout log not scored", "holdout_logs_not_scored"),
+                   ("log without a manifest row, left out", "logs_without_manifest_row"))
+
+
 def battery_counts(battery: Mapping[str, Any], contributing: Sequence[str]) -> PassCounts:
-    """Battery pass counts from the fit's totals; load errors cannot be told from unusable logs."""
-    sim = int(battery.get("sim_log_count") or 0)
-    skipped = int(battery.get("skipped_log_count") or 0)
-    unscored = int(battery.get("holdout_log_count") or 0) - int(
-        battery.get("holdout_scored_count") or 0)
-    reasons = Counter({"simulation log excluded": sim,
-                       "load error or no usable battery data": skipped,
-                       "holdout log not scored": max(unscored, 0),
-                       "log without a manifest row, left out":
-                           int(battery.get("logs_without_manifest_row") or 0)})
-    return PassCounts("battery", len(contributing), sim + skipped, None,
+    """Battery pass counts from the fit's totals, one row per log the pass read.
+
+    The logs read are the selected logs and those without a manifest row, which
+    the pass counts and leaves out. Analyzed are `contributing` (the fit logs with
+    a sample and the holdout logs scored by either check); every other log is in
+    exactly one reason row, so analyzed + skipped is the number read. Load errors
+    cannot be told from unusable logs, so failed is None (counted with skipped)."""
+    reasons = Counter({reason: int(battery.get(key) or 0) for reason, key in BATTERY_REASONS})
+    return PassCounts("battery", len(contributing), sum(reasons.values()), None,
                       _ranked(Counter({k: v for k, v in reasons.items() if v > 0})))

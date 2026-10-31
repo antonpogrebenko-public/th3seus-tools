@@ -97,6 +97,11 @@ class BatteryFitResult:
     fit-side logs that gave at least one resistance or OCV observation;
     ``holdout_log_ids`` are the real logs of the holdout side; ``per_log_r``
     has one row per fit-side log with resistance observations.
+    ``fit_logs_without_samples`` counts the usable fit-side logs that gave no
+    observation, and ``holdout_logs_not_scored`` the usable holdout-side logs
+    in neither score (not in ``holdout_scored_log_ids``), so every selected log
+    is in exactly one of: fit_log_ids, holdout_scored_log_ids, those two
+    counts, sim_log_count and skipped_log_count.
     """
 
     real_log_count: int
@@ -119,3 +124,5 @@ class BatteryFitResult:
     logs_without_manifest_row: int
     step_check: StepCheck
     holdout_scored_log_ids: tuple[str, ...]  # sorted; scored by the MAE or the step check
+    fit_logs_without_samples: int  # usable fit-side logs with no step and no OCV sample
+    holdout_logs_not_scored: int  # usable holdout-side logs scored by neither check
