@@ -180,6 +180,18 @@ def test_rpm_logged_too_slowly_names_the_measured_rate():
     assert "20 Hz" in error and f"{MIN_ESC_RPM_RATE_HZ:.0f}" in error
 
 
+def test_implausibly_short_motor_command_interval_is_refused():
+    datasets = quad_datasets(FAST)
+    t = np.arange(0.0, FAST.duration_s, 5e-5)  # 20 kHz, above the 10 kHz bound
+    datasets["actuator_motors"] = {"timestamp": t * 1e6, **{
+        f"control[{i}]": 0.5 + 0.05 * np.sin(7.0 * t + i) for i in range(4)}}
+    result = _analyze(FAST, datasets)
+    assert "motor_lag_s" not in result.measurements
+    errors = _errors_with(result, "implausible logged interval")
+    assert len(errors) == 1 and "actuator_motors median" in errors[0]
+    assert "below 0.0001 s" in errors[0]
+
+
 def test_steady_motor_command_gets_no_lag():
     datasets = quad_datasets(FAST)
     motors = {k: (np.full_like(v, 0.5) if k.startswith("control") else v)

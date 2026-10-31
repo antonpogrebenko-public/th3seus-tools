@@ -84,6 +84,9 @@ ESC_RATE_TOLERANCE = 0.05
 MAX_ESCS = 8
 # Finite stretches shorter than this are not fitted.
 MIN_MOTOR_RUN_S = 0.25
+# A median logged interval below this (above 10 kHz) is not a plausible PX4 logging
+# rate; a crafted log could use it to make the resampling grids needlessly large.
+MIN_LOGGED_INTERVAL_S = 1e-4
 # Seconds cut from both ends of each in-air and each hover segment, leaving out
 # takeoff and landing. Defined here, not in response.py, which imports this module.
 TRIM_S = 2.0
@@ -99,6 +102,14 @@ def median_interval(t_s: np.ndarray, windows: list[Window]) -> float:
     inside = _inside(t_s, windows)
     steps = np.diff(t_s)[inside[1:] & inside[:-1]]
     return float(np.median(steps)) if steps.size else float("nan")
+
+
+def implausible_interval(name: str, dt_s: float) -> str | None:
+    """Why a topic's median interval is implausibly short, or None."""
+    if dt_s >= MIN_LOGGED_INTERVAL_S:
+        return None
+    return (f"implausible logged interval ({name} median {dt_s:.2g} s, below "
+            f"{MIN_LOGGED_INTERVAL_S:g} s: above {1e-3 / MIN_LOGGED_INTERVAL_S:g} kHz)")
 
 
 def _inside(t_s: np.ndarray, windows: list[Window]) -> np.ndarray:
@@ -288,6 +299,9 @@ def _rate_error(name: str, t_s: np.ndarray, windows: list[Window]) -> tuple[floa
     dt = median_interval(t_s, windows)
     if not math.isfinite(dt):
         return dt, f"ESC RPM: no {name} samples in the used in-air time"
+    implausible = implausible_interval(name, dt)
+    if implausible:
+        return dt, f"ESC RPM: {implausible}"
     if 1.0 / dt < MIN_ESC_RPM_RATE_HZ * (1.0 - ESC_RATE_TOLERANCE):
         return dt, (f"ESC RPM: {name} logged at {1.0 / dt:.0f} Hz, need "
                     f"{MIN_ESC_RPM_RATE_HZ:.0f} Hz (a lag of tens of ms is not resolved)")

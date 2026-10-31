@@ -214,6 +214,15 @@ def test_rate_setpoint_logged_too_slowly_gets_no_fit():
                              "vehicle_rates_setpoint at 150 Hz; need 190 Hz)"]
 
 
+def test_implausibly_short_logged_interval_is_refused():
+    # 20 kHz: above the 10 kHz bound, so the fit grid would be needlessly large.
+    result = _analyze(replace(FAST, rates_sp_hz=20000.0))
+    assert _only_log_level(result.measurements)
+    assert len(result.errors) == 1
+    assert result.errors[0].startswith("implausible logged interval (vehicle_rates_setpoint median ")
+    assert "below 0.0001 s" in result.errors[0]
+
+
 def _only_log_level(measurements: dict) -> bool:
     """No per-axis fit value, but the log-level ones a blocked fit still reports."""
     fit_keys = ("effectiveness.", "lag_s.", "fit_r2.", "first_stage_r2.", "reduced_form_r2.",
