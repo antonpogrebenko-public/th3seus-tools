@@ -13,7 +13,10 @@ import log_validation.parallel as parallel
 from log_validation.parallel import run_per_log
 
 DIED = -1
-DEATH_DELAY_S = 0.5
+# Item 0 dies once the other items have finished, then this long after, so their
+# results reach the parent first; it gives up waiting after WAIT_LIMIT_S.
+RESULT_GRACE_S = 0.2
+WAIT_LIMIT_S = 10.0
 
 
 def square_or_die(n: int) -> int:
@@ -37,16 +40,24 @@ def died(_item: int) -> int:
     return DIED
 
 
+def _wait_for(folder: Path, names: tuple[str, ...]) -> None:
+    deadline = time.monotonic() + WAIT_LIMIT_S
+    while not all((folder / n).exists() for n in names) and time.monotonic() < deadline:
+        time.sleep(0.01)
+    time.sleep(RESULT_GRACE_S)
+
+
 def square_dying_once(item: tuple[int, str]) -> int:
-    """Records each call; item 0 dies the first time only, after the others finished."""
+    """Records each call; item 0 dies the first time only, after items 1 and 2 finished."""
     n, folder = item
     calls = Path(folder)
     (calls / f"call-{n}-{os.getpid()}-{time.monotonic_ns()}").touch()
     marker = calls / "died-once"
     if n == 0 and not marker.exists():
         marker.touch()
-        time.sleep(DEATH_DELAY_S)
+        _wait_for(calls, ("done-1", "done-2"))
         os._exit(1)
+    (calls / f"done-{n}").touch()
     return n * n
 
 
