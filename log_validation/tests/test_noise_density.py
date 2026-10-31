@@ -15,7 +15,8 @@ INTERVAL_US = 4000.0
 DURATION_S = 400
 
 
-def _combined(n, rate_hz, seed=3, interval_us=INTERVAL_US, with_gyro_dt=True, zero_first=0):
+def _combined(n, rate_hz, seed=3, interval_us=INTERVAL_US, with_gyro_dt=True, zero_first=0,
+              with_accel_dt=True):
     """sensor_combined whose samples average white noise over interval_us."""
     rng = np.random.default_rng(seed)
     root = math.sqrt(interval_us * 1e-6)
@@ -27,7 +28,8 @@ def _combined(n, rate_hz, seed=3, interval_us=INTERVAL_US, with_gyro_dt=True, ze
         gdt = np.full(n, interval_us)
         gdt[:zero_first] = 0.0
         d["gyro_integral_dt"] = gdt
-    d["accelerometer_integral_dt"] = np.full(n, interval_us)
+    if with_accel_dt:
+        d["accelerometer_integral_dt"] = np.full(n, interval_us)
     return d
 
 
@@ -67,6 +69,27 @@ def test_no_integration_interval():
     rows = report.analyze(_log(_combined(DURATION_S, 1.0, with_gyro_dt=False)))
     row = _row(rows, "gyro", "gyro_noise_density")
     assert row.measured is None and "gyro_integral_dt" in row.note
+
+
+def test_no_accelerometer_integration_interval():
+    rows = report.analyze(_log(_combined(DURATION_S, 1.0, with_accel_dt=False)))
+    for param in ("accel_noise_density", "integration_interval_s"):
+        row = _row(rows, "accel", param)
+        assert row.measured is None and "accelerometer_integral_dt" in row.note
+    assert measured(rows, "gyro", "gyro_noise_density") is not None
+
+
+def test_log_without_sensor_combined_names_the_missing_interval():
+    rng = np.random.default_rng(5)
+    t = ts_us(DURATION_S, 1.0)
+    gyro = {"timestamp": t, **{a: rng.normal(0, 0.0047, DURATION_S) for a in "xyz"}}
+    rows = report.analyze(FakeULog({"sensor_gyro": gyro}))
+    for sensor, dt_field in (("gyro", "gyro_integral_dt"), ("accel", "accelerometer_integral_dt")):
+        density = _row(rows, sensor, f"{sensor}_noise_density")
+        assert density.measured is None
+        assert density.note == (f"no integration interval: topic 'sensor_combined' (which "
+                                f"carries {dt_field}) not in log")
+        assert _row(rows, sensor, "integration_interval_s").note == density.note
 
 
 def test_zero_intervals_are_ignored():

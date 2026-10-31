@@ -120,6 +120,12 @@ def analyze(ulog: ul.ULog) -> list[Row]:
 def _density_rows(ulog, window, sensor, param_key, field, dt_field) -> list[Row]:
     """Noise density and integration interval from one sensor_combined vector field."""
     interval_param = "integration_interval_s"
+    if TOPIC_COMBINED not in ul.topic_names(ulog):
+        # sensor_gyro alone can give the still window, but not the integration interval.
+        note = (f"no integration interval: topic '{TOPIC_COMBINED}' (which carries "
+                f"{dt_field}) not in log")
+        return [_row(sensor, param_key, ref.IMU, None, note),
+                _info_row(sensor, interval_param, None, "s", note)]
     try:
         t, xyz = ul.vec3(ulog, TOPIC_COMBINED, field)
         dt_us = ul.series(ulog, TOPIC_COMBINED, dt_field).values

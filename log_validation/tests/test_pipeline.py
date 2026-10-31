@@ -134,6 +134,21 @@ def test_pipeline_recovers_injected_noise():
     assert abs(_measured(rows, "gps", "update_rate_hz") - 5.0) < 0.5
 
 
+def test_pipeline_without_sensor_combined_falls_back_to_sensor_gyro():
+    full = _build_log()
+    log = FakeULog({d.name: d.data for d in full.data_list if d.name != "sensor_combined"})
+    rows = report.analyze(log)
+    # The still window comes from sensor_gyro; the densities need sensor_combined's
+    # integration intervals, so only the legacy densities and the other sensors remain.
+    assert _measured(rows, "gyro", "gyro_noise_density") is None
+    assert _measured(rows, "accel", "accel_noise_density") is None
+    assert abs(_measured(rows, "gyro", "legacy_noise_density") - 0.001) / 0.001 < 0.1
+    assert abs(_measured(rows, "accel", "legacy_noise_density") - 0.008) / 0.008 < 0.1
+    assert _measured(rows, "gyro", "gyro_bias_sigma") is not None
+    assert abs(_measured(rows, "baro", "noise_sigma") - 0.2) / 0.2 < 0.15
+    assert abs(_measured(rows, "gps", "update_rate_hz") - 5.0) < 0.5
+
+
 def test_pipeline_verdicts_present():
     rows = report.analyze(_build_log())
     verdicts = {r.verdict for r in rows}
