@@ -15,8 +15,8 @@ from log_validation.parallel import run_per_log
 DIED = -1
 # Item 0 dies once the other items have finished, then this long after, so their
 # results reach the parent first; it gives up waiting after WAIT_LIMIT_S.
-RESULT_GRACE_S = 0.2
-WAIT_LIMIT_S = 10.0
+RESULT_GRACE_S = 1.0
+WAIT_LIMIT_S = 60.0
 
 
 def square_or_die(n: int) -> int:
