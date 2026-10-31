@@ -451,3 +451,133 @@ def test_vibration_ratio_says_it_is_biased_low():
     assert "biased low" in gaps and "IMU_GYRO_CUTOFF" in gaps
     doc = " ".join(vibration_evidence.__doc__.split())
     assert "biased low" in doc and "IMU_GYRO_CUTOFF" in doc
+
+
+def _args(paths: dict[str, Path], out: Path) -> list[str]:
+    return ["--noise", str(paths["noise"]), "--battery", str(paths["battery"]),
+            "--response", str(paths["response"]), "--airframes", str(paths["airframes"]),
+            "--run-info", str(paths["run_info"]), "--out-dir", str(out)]
+
+
+def _rewrite(path: Path, change) -> None:
+    doc = json.loads(path.read_text())
+    change(doc)
+    path.write_text(json.dumps(doc))
+
+
+@pytest.mark.parametrize("name, change", [
+    ("noise", lambda d: d[0].__setitem__("measurements", ["x"])),
+    ("noise", lambda d: d[0].__setitem__("errors", 5)),
+    ("response", lambda d: d[0].__setitem__("measurements", "x")),
+    ("battery", lambda d: d.__setitem__("per_log_r", 5)),
+    ("airframes", lambda d: d.__setitem__("recommendations", [3])),
+])
+def test_malformed_nested_row_exits_2_without_writing(tmp_path, capsys, name, change):
+    paths = write_inputs(tmp_path / "in")
+    _rewrite(paths[name], change)
+    out = tmp_path / "out"
+    assert main(_args(paths, out)) == 2
+    last = capsys.readouterr().err.strip().splitlines()[-1]
+    assert last.startswith("Error: ") and "malformed" in last
+    assert not out.exists()
+
+
+@pytest.mark.parametrize("name, text, message", [
+    ("noise", "{not json", "noise results is not valid JSON"),
+    ("response", json.dumps({"log_id": "x"}), "response results must hold a JSON list"),
+    ("battery", json.dumps([1, 2]), "battery fit must hold a JSON dict"),
+    ("noise", json.dumps([{"measurements": {}}]), "per-log results must be objects with a log_id"),
+    ("response", json.dumps([{"log_id": 7}]), "per-log results must be objects with a log_id"),
+    ("airframes", json.dumps({"min_vehicles": 5}), "airframes JSON lacks comparisons, recommendations"),
+])
+def test_input_refusals_exit_2(tmp_path, capsys, name, text, message):
+    paths = write_inputs(tmp_path / "in")
+    paths[name].write_text(text)
+    out = tmp_path / "out"
+    assert main(_args(paths, out)) == 2
+    assert message in capsys.readouterr().err
+    assert not out.exists()
+
+
+def test_out_dir_that_is_a_file_is_refused(tmp_path, capsys):
+    paths = write_inputs(tmp_path / "in")
+    out = tmp_path / "out"
+    out.write_text("a file")
+    assert main(_args(paths, out)) == 2
+    assert "not empty" in capsys.readouterr().err
+    assert out.read_text() == "a file"
+
+
+@pytest.fixture
+def other_identity(monkeypatch):
+    """A user and host name no temporary path holds, so only the folder rules can refuse."""
+    from log_validation import outputs
+
+    monkeypatch.setattr(outputs.getpass, "getuser", lambda: "zz-test-user-zz")
+    monkeypatch.setattr(outputs.socket, "gethostname", lambda: "zz-test-host-zz")
+
+
+@pytest.mark.parametrize("private", ["input folder", "home"])
+def test_input_folder_and_home_are_refused_without_forbid(tmp_path, capsys, other_identity,
+                                                         private):
+    paths = write_inputs(tmp_path / "in")
+    folder = str(paths["noise"].resolve().parent) if private == "input folder" else str(Path.home())
+    _rewrite(paths["run_info"],
+             lambda d: d.__setitem__("commands", [f"python -m log_validation.batch_analyze {folder}"]))
+    out = tmp_path / "out"
+    assert main(_args(paths, out)) == 2
+    assert "private data" in capsys.readouterr().err
+    assert not out.exists()
+
+
+def test_input_folder_given_through_a_symlink_is_refused(tmp_path, capsys, other_identity):
+    real = tmp_path / "real"
+    paths = write_inputs(real)
+    link = tmp_path / "link"
+    link.symlink_to(real, target_is_directory=True)
+    linked = {k: link / p.name for k, p in paths.items()}
+    _rewrite(paths["run_info"],
+             lambda d: d.__setitem__("commands", [f"python -m log_validation.batch_analyze {link}"]))
+    out = tmp_path / "out"
+    assert main(_args(linked, out)) == 2
+    assert "private data" in capsys.readouterr().err
+    assert not out.exists()
+
+
+def test_vibration_evidence_numbers():
+    from log_validation.calibration_noise import vibration_evidence
+
+    evidence = vibration_evidence(noise_entries(), response_entries())
+    # At rest: 1.0e-4 .. 1.5e-4 over six logs, median 1.25e-4. In flight: std 0.02 on
+    # every axis at 250 Hz, density 0.02 / sqrt(250).
+    assert evidence.at_rest_density == pytest.approx(1.25e-4)
+    assert evidence.inflight_density == pytest.approx(0.02 / math.sqrt(250.0))
+    assert evidence.ratio == pytest.approx(0.02 / math.sqrt(250.0) / 1.25e-4)
+    assert (evidence.n_at_rest, evidence.n_inflight) == (6, 6)
+    assert evidence.median_inflight_std == pytest.approx(0.02)
+    assert evidence.median_rate_hz == pytest.approx(250.0)
+
+
+def test_vibration_evidence_uses_the_mean_of_the_axes_and_skips_incomplete_logs():
+    from log_validation.calibration_noise import vibration_evidence
+
+    flight = {"inflight_gyro_noise.roll": 0.01, "inflight_gyro_noise.pitch": 0.02,
+              "inflight_gyro_noise.yaw": 0.03, "inflight_gyro_rate_hz": 400.0}
+    no_yaw = {k: v for k, v in flight.items() if k != "inflight_gyro_noise.yaw"}
+    response = [{"log_id": "a", "measurements": flight},
+                {"log_id": "b", "measurements": no_yaw},
+                {"log_id": "c", "measurements": {**flight, "inflight_gyro_rate_hz": 0.0}}]
+    rest = [{"log_id": "n", "measurements": {"gyro.gyro_noise_density": 1e-4}}]
+    evidence = vibration_evidence(rest, response)
+    assert evidence.n_inflight == 1
+    assert evidence.median_inflight_std == pytest.approx(0.02)
+    assert evidence.inflight_density == pytest.approx(0.02 / 20.0)
+
+
+def test_vibration_evidence_is_none_without_both_sides():
+    from log_validation.calibration_noise import vibration_evidence
+
+    assert vibration_evidence([], response_entries()) is None
+    assert vibration_evidence(noise_entries(), []) is None
+    zero_rest = [{"log_id": "n", "measurements": {"gyro.gyro_noise_density": 0.0}}]
+    assert vibration_evidence(zero_rest, response_entries()) is None

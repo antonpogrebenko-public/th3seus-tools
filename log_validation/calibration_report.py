@@ -86,11 +86,14 @@ def _by_log_id(entries: list) -> list[dict]:
 def _forbidden(inputs: Sequence[Path], extra: Sequence[str]) -> tuple[str, ...]:
     """Home, user, host and the input folders, plus each extra as a literal string.
 
+    Each input's folder is forbidden both as given (made absolute, symlinks kept)
+    and resolved, so a folder reached through a symlink is caught either way.
     An extra is a cloud account ID or a bucket name, not a path, so it is not
     resolved the way `forbidden_strings` resolves its arguments."""
     if any(len(s) < MIN_FORBIDDEN_LEN for s in extra):
         raise ValueError(f"a --forbid string needs at least {MIN_FORBIDDEN_LEN} characters")
-    folders = sorted({Path(p).resolve().parent for p in inputs})
+    folders = sorted({folder for p in inputs
+                      for folder in (Path(p).absolute().parent, Path(p).resolve().parent)})
     return (*forbidden_strings(*folders), *extra)
 
 
@@ -116,9 +119,9 @@ def write_calibration_dir(
 ) -> None:
     """Write report.md, ranges.csv, log-ids/{noise,battery,response}.txt and the normalized inputs.
 
-    Raises ValueError for an input of the wrong shape or an `out_dir` that is not empty.
-    Raises PrivateDataError when any output would hold a private string; then nothing
-    is written to `out_dir`."""
+    Raises ValueError for an input of the wrong shape (a nested row included) or an
+    `out_dir` that is not empty. Raises PrivateDataError when any output would hold
+    a private string; then nothing is written to `out_dir`."""
     out = Path(out_dir)
     if out.exists() and (not out.is_dir() or any(out.iterdir())):
         raise ValueError("the output directory exists and is not empty; use a new or empty one")
@@ -133,7 +136,12 @@ def write_calibration_dir(
     forbidden = _forbidden(inputs, extra_forbidden)
     with tempfile.TemporaryDirectory() as tmp:
         stage = Path(tmp) / "calibration"
-        _stage(stage, forbidden, noise, battery, response, airframes, run_info)
+        try:
+            _stage(stage, forbidden, noise, battery, response, airframes, run_info)
+        except (KeyError, TypeError, AttributeError) as e:
+            # The top-level shapes are checked above; a nested row of the wrong shape
+            # shows up only while rendering. Nothing has reached out_dir yet.
+            raise ValueError(f"an input holds a malformed row ({type(e).__name__}: {e})") from e
         shutil.copytree(stage, out, dirs_exist_ok=True)
 
 
