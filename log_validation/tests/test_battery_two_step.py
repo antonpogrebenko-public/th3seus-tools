@@ -34,6 +34,8 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 def _expected_code(out_json: Path) -> int:
     """The exit status main must return for the fit it wrote: 0 met, 1 missed."""
     return 0 if json.loads(out_json.read_text())["validation_target_met"] else 1
+
+
 # Six vehicles over the corpus; a09 has no manifest row.
 ROWS_WITHOUT_A09 = {i: f"v{k % 6}" for k, i in enumerate(CORPUS) if i != "a09"}
 
