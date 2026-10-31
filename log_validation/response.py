@@ -587,12 +587,13 @@ def analyze_response_file(
     gates: ResponseGates,
     loader: Callable[[Path], Any] = load_response_topics,
 ) -> ResponseResult:
-    """Load one log and analyze it; a load failure is reported by exception type only
-    (its message often holds the file path)."""
+    """Load one log and analyze it; a load failure's entry has the exception type only
+    (its message often holds the file path), the full message goes to stderr."""
     log_id = Path(path).stem
     try:
         ulog = loader(path)
     except Exception as e:
+        print(f"{log_id}: load failed: {type(e).__name__}: {e}", file=sys.stderr)
         return ResponseResult(log_id, vehicle_id, None, {}, {},
                               [f"load failed: {type(e).__name__}"])
     return analyze_response(ulog, log_id, vehicle_id, gates)

@@ -437,6 +437,14 @@ def test_bad_and_dying_logs_do_not_stop_the_run(tmp_path):
     assert "effectiveness.roll" in by_id["a1"]["measurements"]
 
 
+def test_load_failure_message_goes_to_stderr_and_the_entry_keeps_the_type(tmp_path, capsys):
+    log_dir = _touch(tmp_path, ["bad"])
+    results = response_batch(log_dir, None, loader=load_by_stem)
+    assert results[0].errors == ["load failed: OSError"]
+    err = capsys.readouterr().err
+    assert f"bad: load failed: OSError: cannot parse {log_dir / 'bad.ulg'}" in err
+
+
 def test_jobs_do_not_change_the_output(tmp_path):
     log_dir = _touch(tmp_path, ["c3", "a1", "b2"])
     one, two = tmp_path / "one.json", tmp_path / "two.json"
