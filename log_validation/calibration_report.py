@@ -7,9 +7,8 @@ Usage:
 
 Everything is written through `outputs` with the forbidden strings (home, user, host,
 the folders of the input files and each `--forbid` value), into a staging folder first,
-so a refused write leaves the output folder as it was. The same inputs give the same
-files, except the Run date line of report.md (and `run-info.json`, whose date is the
-input's).
+so a refused write leaves the output folder as it was. The Run date line of report.md
+is the `date` of run-info.json, so the same inputs give the same files.
 """
 
 from __future__ import annotations

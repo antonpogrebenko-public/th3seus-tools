@@ -1,18 +1,23 @@
 # log_validation
 
-Validate the `hitl-sensors` noise models against **real** PX4 flight logs.
+Validate the `hitl-sensors` noise models against **real** PX4 flight logs, and
+calibrate the TH3SEUS simulator from them.
 
 The HITL sim ships synthetic IMU/GPS/baro/mag noise (`hitl-sensors`). This tool
 downloads public `.ulg` logs from PX4 flight-review, measures the real sensor
 noise from each log's on-ground (stationary) segment, and compares it against
 the model defaults so you can tell whether the simulated noise is realistic.
+The calibration run (below) adds passes for the battery (internal resistance and
+open-circuit curve), the vehicle response (control effectiveness, lag, hover command,
+motor lag, in-flight gyro noise) and a comparison of TH3SEUS's predictions with real
+logs of reference kits, and writes the ranges TH3SEUS randomizes over.
 
 ## What it validates
 
 | Sensor | Model param | How it's measured |
 |--------|-------------|-------------------|
-| Gyro   | `gyro_noise_density` | first-diff white-noise std × √dt, stationary |
-| Accel  | `accel_noise_density` | first-diff white-noise std × √dt, stationary |
+| Gyro   | `gyro_noise_density` | first-diff white-noise std x sqrt(dt), stationary |
+| Accel  | `accel_noise_density` | first-diff white-noise std x sqrt(dt), stationary |
 | Gyro   | `gyro_bias_sigma` | Allan-deviation floor (approximate) |
 | Baro   | `noise_sigma` | first-diff std of `baro_alt_meter`, stationary |
 | Mag    | `noise_sigma_gauss` | first-diff std per axis, stationary |
@@ -26,9 +31,11 @@ with `hitl-sensors/src/*.rs`).
 
 ### Not yet validated
 
-- **GPS `delay_ms`** — needs motion cross-correlation against the EKF estimate.
-- **Physics models** (`hitl-physics`) — out of scope here; physics replay needs
-  the airframe's mass/prop/inertia, which logs do not carry.
+- **GPS `delay_ms`**: needs motion cross-correlation against the EKF estimate.
+- **Physics replay** (`hitl-physics`): the calibration run measures the battery and
+  the vehicle response from logs, and compares TH3SEUS's predictions with them only
+  for reference kits whose build is published; replaying a log through the physics
+  would need the airframe's mass, props and inertia, which logs do not carry.
 
 ## Setup
 
@@ -91,10 +98,25 @@ python -m log_validation.response LOGS --manifest manifest.csv -o response.json
 python -m log_validation.reference_airframes response.json -o airframes.json
 ```
 
-`battery_fit` exits with status 1 when the held-out median voltage error misses the
-0.1 V per cell target, even though it has written `battery.json` and `battery.md`; a
-script that stops on any non-zero status must accept 1 there and go on (status 2 is
-an error).
+`batch_analyze`, `response` and `battery_fit` take `--jobs N` to run the logs in N
+worker processes (default 1); the output is the same for any N, and a log whose
+worker dies is recorded as such without stopping the others.
+
+Exit statuses, per command (a usage error is 2 for all of them):
+
+| Command | 0 | 1 | 2 |
+|---|---|---|---|
+| `batch_analyze` | done | error: no such folder, bad manifest, private data refused | |
+| `battery_fit` | done; target met | target missed, both files written | error |
+| `response` | done | | error |
+| `reference_airframes` | done | | error |
+| `outputs merge` | done | | error |
+| `calibration_report` | done | | error, private data refused |
+
+`batch_analyze` keeps 1 for an error, as it had before these passes. `battery_fit`
+exits with status 1 when the held-out median voltage error misses the 0.1 V per cell
+target, even though it has written `battery.json` and `battery.md`; a script that
+stops on any non-zero status must accept 1 there and go on.
 
 Write a `run-info.json` with `date`, `tool_commit`, `parameters` (caps, gates,
 cut-offs, seeds, N) and `commands`, and optionally `inputs`, the input counts, for
@@ -146,15 +168,18 @@ The calibration directory holds:
   needs at least 5 vehicles; the overall row is given whenever one vehicle has a value.
 - `log-ids/noise.txt`, `log-ids/battery.txt`, `log-ids/response.txt`: the Flight
   Review log IDs behind each pass's numbers, one per line, sorted.
-- `noise-results.json`, `noise-profiles.json`, `battery-fit.json`,
-  `response-results.json`, `airframes.json`, `run-info.json`: the inputs, normalized.
+- `noise-results.json`, `battery-fit.json`, `response-results.json`, `airframes.json`,
+  `run-info.json`: the inputs, normalized.
+- `noise-profiles.json`: derived from `noise-results.json` (the `aggregate` profiles
+  per MCU family, board and IMU chip, and over all logs); these are the values
+  TH3SEUS is seeded from.
 
 Every file is checked before it is written: the write is refused (exit status 2, and
 nothing is written) when any output contains the home directory, the user or host
 name, the folder of an input file, or a `--forbid` string. Only those are checked, so
 pass `--forbid` for every other private string, such as a cloud account ID or a
-bucket name. `--out-dir` must be new or empty. The same inputs give the same files,
-except the Run date line of `report.md`.
+bucket name. `--out-dir` must be new or empty. The Run date line of `report.md` is the
+`date` of `run-info.json`, so the same inputs give the same files.
 
 Deployment note: re-seeding the TH3SEUS profiles from this run lowers the simulated
 IMU noise for every TH3SEUS user, because the old estimator overstated the per-sample
@@ -180,13 +205,15 @@ Its `run-info.json` gives the parameters and commands.
 python -m pytest log_validation/tests -q
 ```
 
-Tests cover the estimators on synthetic signals with known parameters (no real
-logs required).
+Tests cover the noise estimators, the battery fit, the response fits, the
+reference-airframe comparison and the calibration report on synthetic logs and
+signals with known parameters (no real logs required).
 
 ## Caveats
 
-- Logs do not carry airframe specs, so this validates **sensor noise**, not
-  flight dynamics.
+- Logs do not carry airframe specs. The noise validation covers **sensor noise**
+  only; the calibration passes measure the battery and the vehicle response, and
+  check TH3SEUS's flight dynamics only against reference kits with a published build.
 - A clean noise floor needs an on-ground / pre-arm segment; logs that start
   mid-air are skipped with a note.
 - Bias rows are order-of-magnitude (Gauss-Markov vs Allan signatures differ).
