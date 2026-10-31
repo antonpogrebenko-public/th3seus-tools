@@ -112,3 +112,27 @@ def test_available_topic_and_field_lists_are_dropped():
                               "Available fields: ['gyro_rad[0]', 'gyro_rad[1]', 'timestamp']\"")
     assert fields == "gyro.x: \"topic 'sensor_combined' missing field 'gyro_rad[N]'.\""
     assert normalize_reason("Available fields: []") == ""
+
+
+def test_worker_death_and_unavailable_count_as_failed():
+    entries = [{"log_id": "a", "errors": ["worker process died"]},
+               {"log_id": "b", "errors": ["parameters unavailable: AttributeError"]},
+               {"log_id": "c", "errors": ["roll: low excitation (std 0.001 < 0.02)"]},
+               {"log_id": "d", "errors": []}]
+    counts = entry_counts("noise", entries, ["d"])
+    assert (counts.analyzed, counts.skipped, counts.failed) == (1, 1, 2)
+    assert dict(counts.reasons) == {"worker process died": 1,
+                                    "parameters unavailable: AttributeError": 1,
+                                    "roll: low excitation": 1}
+
+
+def test_each_battery_total_has_its_reason_row_most_common_first():
+    doc = {"sim_log_count": 1, "skipped_log_count": 2, "fit_logs_without_samples": 3,
+           "holdout_logs_not_scored": 4, "logs_without_manifest_row": 5}
+    counts = battery_counts(doc, [])
+    assert counts.reasons == (("log without a manifest row, left out", 5),
+                              ("holdout log not scored", 4),
+                              ("fit log without a usable step or OCV sample", 3),
+                              ("load error or no usable battery data", 2),
+                              ("simulation log excluded", 1))
+    assert (counts.analyzed, counts.skipped, counts.failed) == (0, 15, None)

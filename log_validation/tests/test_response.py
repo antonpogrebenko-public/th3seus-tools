@@ -41,6 +41,9 @@ from log_validation.tests.response_fakes import (
 )
 
 GATES = ResponseGates()
+HARDWARE_KEYS = {"fc_board", "fc_board_subtype", "mcu", "px4_version", "imu_name", "imu_devtype",
+                 "mag_name", "baro_name", "accel_ids", "gyro_ids", "mag_ids", "baro_id",
+                 "sys_hitl"}
 CLOSED_LOOP_SEED = 21
 FAST = QuadSpec(duration_s=20.0, takeoff_s=3.0, landing_s=18.0, rate_hz=400.0)
 
@@ -403,7 +406,9 @@ def test_one_entry_per_log(tmp_path):
     assert [e["vehicle_id"] for e in entries] == [f"v{i}" for i in ids]
     assert all(e["airframe_id"] == AIRFRAME for e in entries)
     assert all("effectiveness.roll" in e["measurements"] for e in entries)
-    assert all({"hardware", "errors"} <= set(e) for e in entries)
+    assert all(set(e) == {"log_id", "vehicle_id", "airframe_id", "hardware", "measurements",
+                          "errors"} for e in entries)
+    assert all(set(e["hardware"]) == HARDWARE_KEYS for e in entries)
 
 
 def test_cap_keeps_the_smallest_log_ids_of_a_vehicle(tmp_path):
@@ -469,6 +474,29 @@ def test_cli_has_one_option_per_gate(tmp_path, capsys):
                  "--noise-cutoff-hz", "15", "--min-motor-cmd-std", "0.03",
                  "--min-first-stage-r2", "0.1"])
     assert code == 0 and _read(out) == []
+
+
+def test_cli_passes_each_gate_to_its_own_field(tmp_path, monkeypatch):
+    import inspect
+
+    from log_validation import response
+
+    captured = []
+    signature = inspect.signature(response.response_batch)
+
+    def fake_batch(*args, **kwargs):
+        captured.append(signature.bind(*args, **kwargs).arguments["gates"])
+        return []
+
+    monkeypatch.setattr(response, "response_batch", fake_batch)
+    code = main([str(_touch(tmp_path, [])), "-o", str(tmp_path / "r.json"),
+                 "--min-torque-std", "0.011", "--min-r2", "0.22", "--noise-cutoff-hz", "33",
+                 "--min-motor-cmd-std", "0.044", "--min-first-stage-r2", "0.055",
+                 "--min-motor-r2", "0.66"])
+    assert code == 0
+    assert captured == [ResponseGates(min_torque_std=0.011, min_r2=0.22, noise_cutoff_hz=33.0,
+                                      min_motor_cmd_std=0.044, min_first_stage_r2=0.055,
+                                      min_motor_r2=0.66)]
 
 
 def test_cli_refuses_a_bad_manifest(tmp_path, capsys):

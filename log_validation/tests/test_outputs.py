@@ -64,11 +64,33 @@ def test_merge_sorts_and_rejects_repeats(tmp_path):
         merge_per_log([p1, p2])
 
 
+def _identity(monkeypatch, user: str, host: str) -> None:
+    monkeypatch.setattr(outputs.getpass, "getuser", lambda: user)
+    monkeypatch.setattr(outputs.socket, "gethostname", lambda: host)
+
+
 def test_forbidden_strings_include_home_and_extra(tmp_path):
     f = forbidden_strings(tmp_path)
     assert str(Path.home()) in f
     assert str(tmp_path.resolve()) in f
-    assert all(len(s) >= 3 for s in forbidden_strings("ab", tmp_path))
+
+
+def test_forbidden_strings_include_the_user_and_host_name(tmp_path, monkeypatch):
+    _identity(monkeypatch, "pilot-user", "bench-host")
+    f = forbidden_strings()
+    assert "pilot-user" in f and "bench-host" in f
+    with pytest.raises(PrivateDataError):
+        write_text(tmp_path / "o.md", "made on bench-host", f)
+    assert not (tmp_path / "o.md").exists()
+
+
+def test_strings_shorter_than_the_minimum_are_not_forbidden(monkeypatch):
+    # A two-letter user or host name would refuse any output holding those letters.
+    assert outputs.MIN_FORBIDDEN_LEN == 3
+    _identity(monkeypatch, "ab", "xyz")
+    f = forbidden_strings("/q")  # a path of two characters, given and resolved
+    assert "ab" not in f and "/q" not in f
+    assert "xyz" in f
 
 
 def test_bare_relative_name_is_forbidden_only_resolved(tmp_path, monkeypatch):
@@ -146,3 +168,34 @@ def test_write_json_refuses_backslash_forbidden(tmp_path):
 def test_write_json_is_utf8(tmp_path):
     write_json(tmp_path / "o.json", {"k": "caf\u00e9"}, [])
     assert "caf\u00e9".encode("utf-8") in (tmp_path / "o.json").read_bytes()
+
+
+def _merge_args(tmp_path: Path, *parts: Path) -> list[str]:
+    return ["merge", "-o", str(tmp_path / "out" / "merged.json"), *map(str, parts)]
+
+
+@pytest.mark.parametrize("content, message", [
+    ([{"log_id": "a"}, {"log_id": "a"}], "more than one part: a"),
+    ({"log_id": "a"}, "expected a JSON list"),
+    ([{"vehicle_id": "v1"}], "log_id"),
+])
+def test_merge_command_errors_exit_2(tmp_path, capsys, content, message):
+    part = tmp_path / "1.json"
+    part.write_text(json.dumps(content))
+    assert outputs.main(_merge_args(tmp_path, part)) == 2
+    err = capsys.readouterr().err
+    assert err.startswith("Error: ") and message in err
+    assert not (tmp_path / "out").exists()
+
+
+def test_merge_command_missing_part_exits_2(tmp_path, capsys):
+    assert outputs.main(_merge_args(tmp_path, tmp_path / "absent.json")) == 2
+    assert capsys.readouterr().err.startswith("Error: ")
+
+
+def test_merge_command_refuses_private_data(tmp_path, capsys):
+    part = tmp_path / "1.json"
+    part.write_text(json.dumps([{"log_id": "a", "note": f"seen in {Path.home()}"}]))
+    assert outputs.main(_merge_args(tmp_path, part)) == 2
+    assert "private data" in capsys.readouterr().err
+    assert not (tmp_path / "out" / "merged.json").exists()

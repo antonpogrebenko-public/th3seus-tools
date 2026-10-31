@@ -6,12 +6,23 @@ import json
 import os
 from pathlib import Path
 
-from log_validation.batch_analyze import batch_analyze
+import pytest
+
+from log_validation.batch_analyze import REQUIRED_TOPICS, batch_analyze
 from log_validation.tests.fakes import FakeULog
 from log_validation.tests.test_pipeline import _build_log
 
 SEED_HARDWARE_FIELDS = ["fc_board", "fc_board_subtype", "mcu", "px4_version",
                         "imu_name", "imu_devtype", "mag_name", "baro_name"]
+# The nine values TH3SEUS is seeded from, plus the integration intervals behind the
+# densities and the legacy densities of the before and after table.
+SEED_MEASUREMENTS = {"gyro.gyro_noise_density", "accel.accel_noise_density",
+                     "gyro.gyro_bias_sigma", "baro.noise_sigma", "mag.noise_sigma_gauss",
+                     "gps.horizontal_noise_sigma", "gps.altitude_noise_sigma",
+                     "gps.velocity_noise_sigma", "gps.update_rate_hz"}
+ALL_MEASUREMENTS = SEED_MEASUREMENTS | {
+    "gyro.integration_interval_s", "accel.integration_interval_s",
+    "gyro.legacy_noise_density", "accel.legacy_noise_density"}
 SPI_ICM20689_GYRO_ID = 0x3C000A
 AIRFRAME = 4001
 
@@ -62,8 +73,10 @@ def test_entry_has_the_seeding_fields(tmp_path):
     batch_analyze(log_dir, out, loader=load_by_stem)
     entry = _read(out)[0]
     assert set(SEED_HARDWARE_FIELDS) <= set(entry["hardware"])
-    assert {"log_id", "measurements", "errors", "vehicle_id", "airframe_id"} <= set(entry)
-    assert "gyro.gyro_noise_density" in entry["measurements"]
+    assert set(entry) == {"log_id", "hardware", "measurements", "errors", "vehicle_id",
+                          "airframe_id"}
+    assert set(entry["measurements"]) == ALL_MEASUREMENTS
+    assert all(entry["measurements"][k] > 0 for k in SEED_MEASUREMENTS)
     assert entry["airframe_id"] == AIRFRAME
     assert entry["measurements"]["gyro.integration_interval_s"] > 0
     assert entry["measurements"]["accel.integration_interval_s"] > 0
@@ -75,6 +88,35 @@ def test_airframe_id_is_none_when_zero_or_absent(tmp_path):
     out = tmp_path / "r.json"
     results = batch_analyze(log_dir, out, loader=lambda p: _fake(autostart=0))
     assert results[0].airframe_id is None
+
+
+@pytest.mark.parametrize("params", [{}, {"SYS_AUTOSTART": "4001a"}, {"SYS_AUTOSTART": None}])
+def test_airframe_id_is_none_when_absent_or_not_a_number(tmp_path, params):
+    log_dir = _touch(tmp_path, ["a1"])
+    base = _fake()
+    fake = FakeULog({d.name: d.data for d in base.data_list},
+                    params={"CAL_GYRO0_ID": SPI_ICM20689_GYRO_ID, **params},
+                    info={"ver_hw": "PX4_FMU_V5"})
+    results = batch_analyze(log_dir, None, loader=lambda p: fake)
+    assert results[0].airframe_id is None
+    assert results[0].measurements and results[0].errors == []
+
+
+def test_default_loader_parses_only_the_required_topics(tmp_path, monkeypatch):
+    import log_validation.batch_analyze as module
+
+    filters = []
+
+    def fake_ulog(path, message_name_filter_list=None):
+        filters.append(message_name_filter_list)
+        return _fake()
+
+    monkeypatch.setattr(module, "ULog", fake_ulog)
+    results = batch_analyze(_touch(tmp_path, ["a1"]), None)  # the default loader
+    assert filters == [list(REQUIRED_TOPICS)]
+    assert {"sensor_combined", "sensor_gyro", "sensor_accel", "vehicle_air_data", "sensor_mag",
+            "vehicle_gps_position"} == set(filters[0])
+    assert set(results[0].measurements) == ALL_MEASUREMENTS
 
 
 def test_sitl_log_is_skipped(tmp_path):
