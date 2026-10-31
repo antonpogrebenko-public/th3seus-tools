@@ -85,7 +85,7 @@ from __future__ import annotations
 import argparse
 import sys
 from collections.abc import Callable
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -106,6 +106,7 @@ from .manifest import (
 )
 from .outputs import PrivateDataError, forbidden_strings, write_json
 from .parallel import run_per_log
+from .part_ids import PART_TOPICS, empty_parts_json, identify_parts
 from .response_measures import (
     TRIM_S,
     Measured,
@@ -138,7 +139,7 @@ RESPONSE_TOPICS = (TOPIC_TORQUE, TOPIC_RATE, TOPIC_RATES_SP, "vehicle_status",
                    "vehicle_land_detected", "vehicle_local_position",
                    "vehicle_angular_acceleration",
                    "vehicle_thrust_setpoint", "hover_thrust_estimate", "esc_status",
-                   "actuator_motors", "battery_status")
+                   "actuator_motors", "battery_status", *PART_TOPICS)
 
 # The fit grid: delays 0 to 40 ms and first-order time constants 0 to 60 ms, 1 ms steps.
 FIT_DELAYS_S = tuple(i * 1e-3 for i in range(41))
@@ -214,6 +215,7 @@ class ResponseResult:
     hardware: dict
     measurements: dict[str, float]
     errors: list[str]
+    parts: dict[str, dict[str, Any]] = field(default_factory=empty_parts_json)
 
 
 @dataclass(frozen=True)
@@ -223,6 +225,7 @@ class _Header:
     hardware: dict
     simulation: bool
     errors: tuple[str, ...]
+    parts: dict
 
 
 @dataclass(frozen=True)
@@ -254,7 +257,12 @@ def _read_header(ulog: Any) -> _Header:
     except Exception as e:
         hardware, simulation = {}, False
         errors.append(f"hardware extraction failed: {type(e).__name__}")
-    return _Header(params, _airframe_id(params), hardware, simulation, tuple(errors))
+    try:
+        parts = identify_parts(ulog, params).to_json()
+    except Exception as e:
+        parts = empty_parts_json()
+        errors.append(f"part identification failed: {type(e).__name__}")
+    return _Header(params, _airframe_id(params), hardware, simulation, tuple(errors), parts)
 
 
 def _param_text(value: Any) -> str:
@@ -506,13 +514,15 @@ def _effectiveness_and_lag(
 # ---------------------------------------------------------------------------
 
 
-_NO_HEADER = _Header({}, None, {}, False, ())
+def _no_header() -> _Header:
+    """A header for a log whose header could not be read; each call has its own parts dict."""
+    return _Header({}, None, {}, False, (), empty_parts_json())
 
 
 def _result(log_id: str, vehicle_id: str | None, header: _Header,
             measurements: dict[str, float], errors: list[str]) -> ResponseResult:
     return ResponseResult(log_id, vehicle_id, header.airframe_id, header.hardware,
-                          measurements, [*header.errors, *errors])
+                          measurements, [*header.errors, *errors], header.parts)
 
 
 def _guarded(group: str, log_id: str, measure: Callable[[], Measured]) -> Measured:
@@ -564,7 +574,7 @@ def analyze_response(
     An unexpected failure is reported by exception type only (the output is public);
     the full message goes to stderr with the log ID.
     """
-    header = _NO_HEADER
+    header = _no_header()
     try:
         header = _read_header(ulog)
         refusal = _refusal(ulog, header)

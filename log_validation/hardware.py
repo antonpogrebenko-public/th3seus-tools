@@ -186,6 +186,16 @@ def decode_device_id(
     )
 
 
+def decode_imu_id(dev_id: int) -> DecodedDevice | None:
+    """Decode an IMU device ID: the IMU table first, then the accelerometer table.
+
+    A devtype in neither table keeps the `UNKNOWN_0x..` name and its devtype."""
+    decoded = decode_device_id(dev_id, IMU_DEVTYPES)
+    if decoded and "UNKNOWN" not in decoded.name:
+        return decoded
+    return decode_device_id(dev_id, ACC_DEVTYPES)
+
+
 @dataclass(frozen=True)
 class HardwareInfo:
     """Hardware identification from a PX4 log."""
@@ -262,20 +272,10 @@ def extract_hardware_info(
     imu_devtype = None
 
     primary_imu_id = gyro_ids[0] if gyro_ids else (accel_ids[0] if accel_ids else 0)
-    if primary_imu_id:
-        # Try IMU table first, then ACC table
-        decoded = decode_device_id(primary_imu_id, IMU_DEVTYPES)
-        if decoded and "UNKNOWN" not in decoded.name:
-            imu_name = decoded.name
-            imu_devtype = decoded.devtype
-        else:
-            decoded = decode_device_id(primary_imu_id, ACC_DEVTYPES)
-            if decoded and "UNKNOWN" not in decoded.name:
-                imu_name = decoded.name
-                imu_devtype = decoded.devtype
-            elif decoded:
-                imu_name = decoded.name
-                imu_devtype = decoded.devtype
+    decoded = decode_imu_id(primary_imu_id)
+    if decoded:
+        imu_name = decoded.name
+        imu_devtype = decoded.devtype
 
     # Decode primary mag
     mag_name = None

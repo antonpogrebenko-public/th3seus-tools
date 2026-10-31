@@ -14,15 +14,14 @@ import numpy as np
 from . import noise_stats as ns
 from . import reference as ref
 from . import ulog_loader as ul
+from .part_ids import TOPIC_GPS_POSITION, TOPIC_MAG, LogParts, identify_parts
 from .stationary import find_stationary_window, slice_to_window
 
 # Topic names (modern PX4). Override here if a log uses different names.
 TOPIC_ACCEL = "sensor_accel"
 TOPIC_GYRO = "sensor_gyro"
 TOPIC_COMBINED = "sensor_combined"
-TOPIC_MAG = "sensor_mag"
 TOPIC_AIR_DATA = "vehicle_air_data"
-TOPIC_GPS = "vehicle_gps_position"
 
 # A measured/model ratio inside this band counts as agreement. The band is wide
 # because real airframes, mounts, and GPS receivers vary a lot; the goal is
@@ -97,8 +96,12 @@ def _imu_source(ulog) -> tuple[np.ndarray, np.ndarray, str] | None:
         return None
 
 
-def analyze(ulog: ul.ULog) -> list[Row]:
-    """Run all sensor comparisons that the log supports."""
+def analyze(ulog: ul.ULog, parts: LogParts | None = None) -> list[Row]:
+    """Run all sensor comparisons that the log supports.
+
+    `parts` names the magnetometer instance and the GPS topic to measure; it is identified
+    from the log when not given."""
+    parts = parts or identify_parts(ulog, getattr(ulog, "initial_parameters", None) or {})
     source = _imu_source(ulog)
     if source is None:
         note = f"neither '{TOPIC_COMBINED}' nor '{TOPIC_GYRO}' in log"
@@ -112,8 +115,8 @@ def analyze(ulog: ul.ULog) -> list[Row]:
     rows: list[Row] = []
     rows.extend(_imu_rows(ulog, window, gt, gxyz))
     rows.extend(_baro_rows(ulog, window))
-    rows.extend(_mag_rows(ulog, window))
-    rows.extend(_gps_rows(ulog, window))
+    rows.extend(_mag_rows(ulog, window, parts.mag_instance))
+    rows.extend(_gps_rows(ulog, window, parts.gps_topic or TOPIC_GPS_POSITION))
     return rows
 
 
@@ -196,9 +199,9 @@ def _baro_rows(ulog, window) -> list[Row]:
         return [_row("baro", "noise_sigma", ref.BARO, None, str(exc))]
 
 
-def _mag_rows(ulog, window) -> list[Row]:
+def _mag_rows(ulog, window, instance: int) -> list[Row]:
     try:
-        mt, mxyz = ul.xyz(ulog, TOPIC_MAG)
+        mt, mxyz = ul.xyz(ulog, TOPIC_MAG, instance)
         mask = slice_to_window(mt, window)
         mw = mxyz[mask]
         measured = float(np.mean([ns.white_noise_std(mw[:, a]) for a in range(3)]))
@@ -207,22 +210,22 @@ def _mag_rows(ulog, window) -> list[Row]:
         return [_row("mag", "noise_sigma_gauss", ref.MAG, None, str(exc))]
 
 
-def _gps_rows(ulog, window) -> list[Row]:
+def _gps_rows(ulog, window, topic: str) -> list[Row]:
     rows: list[Row] = []
 
     # PX4 changed GPS field names across versions:
     #   Old (pre-v1.14): lat/lon (int32, 1e-7 deg), alt (int32, mm)
     #   New (v1.14+):    latitude_deg/longitude_deg (float64 deg), altitude_msl_m (float m)
     try:
-        lat = ul.series(ulog, TOPIC_GPS, "lat")
-        lon = ul.series(ulog, TOPIC_GPS, "lon")
-        alt = ul.series(ulog, TOPIC_GPS, "alt")
+        lat = ul.series(ulog, topic, "lat")
+        lon = ul.series(ulog, topic, "lon")
+        alt = ul.series(ulog, topic, "alt")
         is_new_format = False
     except KeyError:
         try:
-            lat = ul.series(ulog, TOPIC_GPS, "latitude_deg")
-            lon = ul.series(ulog, TOPIC_GPS, "longitude_deg")
-            alt = ul.series(ulog, TOPIC_GPS, "altitude_msl_m")
+            lat = ul.series(ulog, topic, "latitude_deg")
+            lon = ul.series(ulog, topic, "longitude_deg")
+            alt = ul.series(ulog, topic, "altitude_msl_m")
             is_new_format = True
         except KeyError as exc:
             return [_row("gps", "horizontal_noise_sigma", ref.GPS, None, str(exc))]
@@ -250,9 +253,9 @@ def _gps_rows(ulog, window) -> list[Row]:
     rows.append(_row("gps", "update_rate_hz", ref.GPS, ns.sample_rate_hz(lat.t_s)))
 
     try:
-        vn = ul.series(ulog, TOPIC_GPS, "vel_n_m_s").values[mask]
-        ve = ul.series(ulog, TOPIC_GPS, "vel_e_m_s").values[mask]
-        vd = ul.series(ulog, TOPIC_GPS, "vel_d_m_s").values[mask]
+        vn = ul.series(ulog, topic, "vel_n_m_s").values[mask]
+        ve = ul.series(ulog, topic, "vel_e_m_s").values[mask]
+        vd = ul.series(ulog, topic, "vel_d_m_s").values[mask]
         vel = float(np.mean([ns.white_noise_std(v) for v in (vn, ve, vd)]))
         rows.append(_row("gps", "velocity_noise_sigma", ref.GPS, vel))
     except (KeyError, ValueError) as exc:

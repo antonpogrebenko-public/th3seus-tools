@@ -9,7 +9,7 @@ from __future__ import annotations
 import argparse
 import sys
 from collections.abc import Callable
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -27,26 +27,28 @@ from .manifest import (
 )
 from .parallel import run_per_log
 from .outputs import PrivateDataError, forbidden_strings, write_json
-from .report import (
-    TOPIC_ACCEL,
-    TOPIC_AIR_DATA,
-    TOPIC_COMBINED,
-    TOPIC_GPS,
-    TOPIC_GYRO,
+from .part_ids import (
+    PART_TOPICS,
+    TOPIC_GPS_POSITION,
     TOPIC_MAG,
+    empty_parts,
+    empty_parts_json,
+    identify_parts,
 )
+from .report import TOPIC_ACCEL, TOPIC_AIR_DATA, TOPIC_COMBINED, TOPIC_GYRO
 
 # The only topics any of the measurements below read. Kept next to the parse so
 # adding a measurement that needs another topic fails loudly here rather than
 # silently returning nothing.
-REQUIRED_TOPICS = (
+REQUIRED_TOPICS = tuple(dict.fromkeys((
     TOPIC_ACCEL,
     TOPIC_GYRO,
     TOPIC_COMBINED,
     TOPIC_MAG,
     TOPIC_AIR_DATA,
-    TOPIC_GPS,
-)
+    TOPIC_GPS_POSITION,
+    *PART_TOPICS,
+)))
 
 
 @dataclass(frozen=True)
@@ -59,6 +61,7 @@ class LogResult:
     errors: list[str]
     vehicle_id: str | None = None
     airframe_id: int | None = None
+    parts: dict[str, dict[str, Any]] = field(default_factory=empty_parts_json)
 
 
 def load_filtered(path: Path) -> ULog:
@@ -127,6 +130,12 @@ def analyze_log(
         hw_dict = {}
         errors.append(_failure(log_id, "hardware extraction failed", e))
 
+    try:
+        parts = identify_parts(ulog, ulog.initial_parameters)
+    except Exception as e:
+        parts = empty_parts()
+        errors.append(_failure(log_id, "part identification failed", e))
+
     # Skip simulation logs: SITL/HIL report synthetic noise that does not
     # represent real hardware, so they must not pollute the noise profiles.
     # Detection is firmware-version-robust (devtype, board name, or bus type).
@@ -138,11 +147,12 @@ def analyze_log(
             errors=["simulation log skipped (SITL/HIL)"],
             vehicle_id=vehicle_id,
             airframe_id=airframe_id,
+            parts=parts.to_json(),
         )
 
     # Run noise analysis
     try:
-        rows = report.analyze(ulog)
+        rows = report.analyze(ulog, parts)
         for row in rows:
             key = f"{row.sensor}.{row.param}"
             if row.measured is not None:
@@ -159,6 +169,7 @@ def analyze_log(
         errors=errors,
         vehicle_id=vehicle_id,
         airframe_id=airframe_id,
+        parts=parts.to_json(),
     )
 
 

@@ -40,6 +40,11 @@ def topic_names(ulog: ULog) -> dict[str, int]:
     return out
 
 
+def instances(ulog: ULog, topic: str) -> list[int]:
+    """Sorted multi-instance IDs of a topic, [] when the topic is not in the log."""
+    return sorted({getattr(d, "multi_id", 0) for d in ulog.data_list if d.name == topic})
+
+
 def _dataset(ulog: ULog, topic: str, instance: int):
     try:
         return ulog.get_dataset(topic, multi_instance=instance)

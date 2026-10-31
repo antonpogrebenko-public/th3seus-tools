@@ -74,7 +74,7 @@ def test_entry_has_the_seeding_fields(tmp_path):
     entry = _read(out)[0]
     assert set(SEED_HARDWARE_FIELDS) <= set(entry["hardware"])
     assert set(entry) == {"log_id", "hardware", "measurements", "errors", "vehicle_id",
-                          "airframe_id"}
+                          "airframe_id", "parts"}
     assert set(entry["measurements"]) == ALL_MEASUREMENTS
     assert all(entry["measurements"][k] > 0 for k in SEED_MEASUREMENTS)
     assert entry["airframe_id"] == AIRFRAME
@@ -115,7 +115,8 @@ def test_default_loader_parses_only_the_required_topics(tmp_path, monkeypatch):
     results = batch_analyze(_touch(tmp_path, ["a1"]), None)  # the default loader
     assert filters == [list(REQUIRED_TOPICS)]
     assert {"sensor_combined", "sensor_gyro", "sensor_accel", "vehicle_air_data", "sensor_mag",
-            "vehicle_gps_position"} == set(filters[0])
+            "vehicle_gps_position", "sensor_baro", "sensor_gps", "sensors_status_imu",
+            "sensors_status_baro", "sensors_status_mag", "vehicle_imu"} == set(filters[0])
     assert set(results[0].measurements) == ALL_MEASUREMENTS
 
 
@@ -199,7 +200,7 @@ def test_worker_death_is_recorded_and_others_survive(tmp_path):
 def test_analysis_failure_entry_has_the_exception_type_only(tmp_path, monkeypatch, capsys):
     import log_validation.report as report
 
-    def broken(_ulog):
+    def broken(_ulog, *_args, **_kwargs):
         raise RuntimeError("secret detail at /some/private/path")
 
     monkeypatch.setattr(report, "analyze", broken)

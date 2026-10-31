@@ -407,7 +407,7 @@ def test_one_entry_per_log(tmp_path):
     assert all(e["airframe_id"] == AIRFRAME for e in entries)
     assert all("effectiveness.roll" in e["measurements"] for e in entries)
     assert all(set(e) == {"log_id", "vehicle_id", "airframe_id", "hardware", "measurements",
-                          "errors"} for e in entries)
+                          "errors", "parts"} for e in entries)
     assert all(set(e["hardware"]) == HARDWARE_KEYS for e in entries)
 
 

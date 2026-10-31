@@ -13,6 +13,7 @@ import math
 import numpy as np
 
 from log_validation import report
+from log_validation.tests.part_fakes import device_id
 
 
 class _Dataset:
@@ -88,6 +89,7 @@ def _build_log() -> FakeULog:
         "x": 0.21 + rng.normal(0, 0.004, bn),
         "y": 0.03 + rng.normal(0, 0.004, bn),
         "z": 0.49 + rng.normal(0, 0.004, bn),
+        "device_id": np.full(bn, device_id(0x06)),  # IST8310
     }
 
     # GPS at 5 Hz: constant position with 1.2 m horizontal noise.
@@ -102,6 +104,11 @@ def _build_log() -> FakeULog:
         "vel_n_m_s": rng.normal(0, 0.08, gn),
         "vel_e_m_s": rng.normal(0, 0.08, gn),
         "vel_d_m_s": rng.normal(0, 0.08, gn),
+        "device_id": np.full(gn, device_id(0xA8)),  # UBX_8
+    }
+    status_imu = {
+        "timestamp": _ts_us(10, 1.0),
+        "gyro_device_id_primary": np.full(10, 0x3C000A),  # ICM20689 on SPI
     }
 
     return FakeULog(
@@ -112,6 +119,7 @@ def _build_log() -> FakeULog:
             "vehicle_air_data": baro,
             "sensor_mag": mag,
             "vehicle_gps_position": gps,
+            "sensors_status_imu": status_imu,
         }
     )
 
