@@ -114,6 +114,17 @@ def test_sys_hitl_1_or_2_is_simulation_with_a_real_primary_gyro():
         assert is_simulation(hw)
 
 
+def test_sys_hitl_minus_1_external_hitl_is_simulation_with_a_real_primary_gyro():
+    hw = _hw_with_params({"CAL_GYRO0_ID": SPI_ICM20689_GYRO_ID, "SYS_HITL": -1})
+    assert hw.sys_hitl == -1
+    assert is_simulation(hw)
+
+
+def test_infinite_sys_hitl_is_read_as_absent():
+    hw = _hw_with_params({"CAL_GYRO0_ID": SPI_ICM20689_GYRO_ID, "SYS_HITL": float("inf")})
+    assert hw.sys_hitl is None
+
+
 def test_sys_hitl_0_or_absent_is_not_simulation():
     off = _hw_with_params({"CAL_GYRO0_ID": SPI_ICM20689_GYRO_ID, "SYS_HITL": 0})
     absent = _hw_with_params({"CAL_GYRO0_ID": SPI_ICM20689_GYRO_ID})

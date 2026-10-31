@@ -224,7 +224,7 @@ def _scalar(arrays: dict[str, np.ndarray], key: str, name: str, convert: Callabl
         raise ValueError(f"{name}: {key} must be a single value, got shape {value.shape}")
     try:
         return convert(value)
-    except (TypeError, ValueError) as e:
+    except (TypeError, ValueError, OverflowError) as e:
         raise ValueError(f"{name}: {key} is not a valid value ({type(e).__name__})") from e
 
 

@@ -187,6 +187,12 @@ class TestMalformedExtract:
         with pytest.raises(ValueError, match=f"a01.npz: {key} must be a single value"):
             load_extracted(path)
 
+    def test_infinite_cell_count_is_refused(self, tmp_path):
+        path = tmp_path / "a01.npz"
+        np.savez(path, **{**_arrays(make_data("a01")), "cell_count": np.array(float("inf"))})
+        with pytest.raises(ValueError, match="a01.npz: cell_count is not a valid value"):
+            load_extracted(path)
+
     def test_missing_key_is_named(self, tmp_path):
         path = tmp_path / "a01.npz"
         arrays = {k: v for k, v in _arrays(make_data("a01")).items() if k not in ("v", "i")}

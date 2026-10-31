@@ -208,7 +208,7 @@ class HardwareInfo:
     mag_ids: tuple[int, ...]
     baro_id: int | None
 
-    # SYS_HITL parameter: 0 off, 1 HITL, 2 SIH on the board; None when absent.
+    # SYS_HITL parameter: -1 external HITL, 0 off, 1 HITL, 2 SIH on the board; None when absent.
     sys_hitl: int | None = None
 
 
@@ -218,7 +218,7 @@ def _optional_int(value: Any) -> int | None:
         return None
     try:
         return int(value)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return None
 
 
@@ -318,13 +318,14 @@ def is_simulation(hw: HardwareInfo) -> bool:
 
     Firmware versions differ in the exact SIM devtype value, so this checks
     four version-robust signals, any of which is conclusive:
-      * SYS_HITL is 1 (HITL) or 2 (SIH on the board): the sensors are
-        simulated even when the CAL IDs name real chips,
+      * SYS_HITL is anything but 0: -1 (external HITL), 1 (HITL) or 2 (SIH on
+        the board), so the sensors are simulated even when the CAL IDs name
+        real chips,
       * primary IMU devtype == the known SIM devtype,
       * the FC board name is a simulation target (PX4_SITL / SIH),
       * the primary gyro's bus type decodes to SIMULATION.
     """
-    if hw.sys_hitl is not None and hw.sys_hitl >= 1:
+    if hw.sys_hitl is not None and hw.sys_hitl != 0:
         return True
 
     if hw.imu_devtype == SIM_IMU_DEVTYPE:
