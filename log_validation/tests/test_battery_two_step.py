@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from log_validation import battery_extract
+from log_validation import battery_extract, battery_fit
 from log_validation.battery_fit import (
     analyze_logs,
     fit_extracted,
@@ -29,6 +29,11 @@ from log_validation.tests.battery_fakes import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+def _expected_code(out_json: Path) -> int:
+    """The exit status main must return for the fit it wrote: 0 met, 1 missed."""
+    return 0 if json.loads(out_json.read_text())["validation_target_met"] else 1
 # Six vehicles over the corpus; a09 has no manifest row.
 ROWS_WITHOUT_A09 = {i: f"v{k % 6}" for k, i in enumerate(CORPUS) if i != "a09"}
 
@@ -93,7 +98,8 @@ class TestFitObsDir:
         out = tmp_path / "out.json"
         monkeypatch.setattr(battery_extract, "ULog", lambda p, message_name_filter_list=None: 0)
         args = ["--obs-dir", str(obs[0]), str(obs[1]), "--manifest", str(manifest)]
-        assert main([*args, "--out-json", str(out), "--out-md", str(tmp_path / "o.md")]) in (0, 1)
+        code = main([*args, "--out-json", str(out), "--out-md", str(tmp_path / "o.md")])
+        assert code == _expected_code(out)
         assert json.loads(out.read_text())["logs_without_manifest_row"] == 1
         with pytest.raises(ValueError, match="more than one"):
             fit_obs_dir([obs[0], obs[0]], manifest)
@@ -113,10 +119,12 @@ class TestCli:
         obs, out = tmp_path / "obs", tmp_path / "out"
         assert main(["--log-dir", str(log_dir), "--extract-to", str(obs)]) == 0
         assert len(list(obs.glob("*.npz"))) == 16
-        main(["--obs-dir", str(obs), "--out-json", str(out / "obs.json"),
-              "--out-md", str(out / "obs.md")])
-        main(["--log-dir", str(log_dir), "--out-json", str(out / "dir.json"),
-              "--out-md", str(out / "dir.md")])
+        code = main(["--obs-dir", str(obs), "--out-json", str(out / "obs.json"),
+                     "--out-md", str(out / "obs.md")])
+        assert code == _expected_code(out / "obs.json")
+        code = main(["--log-dir", str(log_dir), "--out-json", str(out / "dir.json"),
+                     "--out-md", str(out / "dir.md")])
+        assert code == _expected_code(out / "dir.json")
         text = (out / "dir.json").read_text()
         assert (out / "obs.json").read_text() == text
         assert (out / "obs.md").read_text() == (out / "dir.md").read_text()
@@ -141,8 +149,17 @@ class TestCli:
         extract_dir(make_log_dir(tmp_path, CORPUS), tmp_path / "obs", loader=load_by_stem)
         monkeypatch.chdir(tmp_path)
         code = main(["--obs-dir", "obs", "--out-json", "out/fit.json", "--out-md", "out/fit.md"])
-        assert code in (0, 1)  # 2 would be an error such as a refused output
+        assert code == _expected_code(tmp_path / "out" / "fit.json")
         assert "n_total_observations" in (tmp_path / "out" / "fit.json").read_text()
+
+    def test_a_missed_target_exits_1(self, tmp_path, monkeypatch):
+        extract_dir(make_log_dir(tmp_path, CORPUS), tmp_path / "obs", loader=load_by_stem)
+        monkeypatch.setattr(battery_fit, "VALIDATION_TARGET_V_PER_CELL", 0.0)  # no MAE is below
+        out = tmp_path / "fit.json"
+        code = main(["--obs-dir", str(tmp_path / "obs"), "--out-json", str(out),
+                     "--out-md", str(tmp_path / "fit.md")])
+        assert code == 1
+        assert json.loads(out.read_text())["validation_target_met"] is False
 
 
 def test_outputs_do_not_import_the_fit(tmp_path):
@@ -216,6 +233,13 @@ class TestInterruptedExtraction:
         with pytest.raises(ValueError, match="interrupted"):
             fit_obs_dir(obs)
 
+    def test_finished_run_with_a_missing_file_is_refused(self, tmp_path):
+        obs = tmp_path / "obs"
+        extract_dir(make_log_dir(tmp_path, CORPUS), obs, loader=load_by_stem)
+        (obs / "a01.npz").unlink()  # its done file still lists it
+        with pytest.raises(ValueError, match="1 log\\(s\\) of a finished extract run have no file"):
+            fit_obs_dir(obs)
+
     def test_finished_batches_merged_into_one_folder_fit(self, tmp_path):
         obs = tmp_path / "obs"
         for k, stems in enumerate((CORPUS[0::2], CORPUS[1::2])):
@@ -235,6 +259,18 @@ class TestCliErrors:
         (obs / "a01.sim").touch()  # a01 now has two files
         assert main(["--obs-dir", str(obs), "--out-json", str(tmp_path / "o.json")]) == 2
         assert capsys.readouterr().err.strip().splitlines()[-1].startswith("Error: ")
+
+    @pytest.mark.parametrize("error", [RuntimeError("boom"), KeyError("k"), TypeError("t")])
+    def test_unexpected_error_exits_2_not_1(self, tmp_path, monkeypatch, capsys, error):
+        def broken(*_args, **_kwargs):
+            raise error
+
+        monkeypatch.setattr(battery_fit, "fit_obs_dir", broken)
+        out = tmp_path / "o.json"
+        assert main(["--obs-dir", str(tmp_path), "--out-json", str(out)]) == 2
+        last = capsys.readouterr().err.strip().splitlines()[-1]
+        assert last.startswith("Error: ") and type(error).__name__ in last
+        assert not out.exists()
 
     def test_malformed_npz_exits_2(self, tmp_path, capsys):
         obs = tmp_path / "obs"

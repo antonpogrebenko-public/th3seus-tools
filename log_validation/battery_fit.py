@@ -754,13 +754,17 @@ def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
     # Exit 2 with one line for any refused input: ValueError covers ManifestError,
     # PrivateDataError, duplicate or unreadable extract files and a fit with no
-    # holdout scored; OSError covers missing files.  Exit 1 means target missed.
+    # holdout scored; OSError covers missing files.  Any other exception is a fault,
+    # also exit 2 with its type, so that exit 1 only ever means target missed.
     try:
         if args.extract_to is not None:
             return _run_extract(args)
         return _run_fit(args)
     except (ValueError, OSError) as e:
         print(f"Error: {e}", file=sys.stderr)
+        return 2
+    except Exception as e:
+        print(f"Error: unexpected {type(e).__name__}: {e}", file=sys.stderr)
         return 2
 
 
