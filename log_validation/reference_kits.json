@@ -96,6 +96,7 @@
       "motor_weight_g": null,
       "esc_continuous_amps": 12,
       "esc_burst_amps": 18,
+      "esc_total_weight_g": 0,
       "prop_diameter_in": 1.57,
       "prop_pitch_in": null,
       "prop_blade_count": 4,
@@ -112,6 +113,7 @@
       "motor_kv": "https://betafpv.com/products/beta75x-2s-whoop-quadcopter",
       "esc_continuous_amps": "https://betafpv.com/products/f4-2s-brushless-flight-controller-and-esc",
       "esc_burst_amps": "https://betafpv.com/products/f4-2s-brushless-flight-controller-and-esc",
+      "esc_total_weight_g": "https://betafpv.com/products/f4-2s-brushless-flight-controller-and-esc",
       "prop_diameter_in": "https://betafpv.com/products/beta75x-2s-whoop-quadcopter",
       "prop_blade_count": "https://betafpv.com/products/beta75x-2s-whoop-quadcopter",
       "prop_weight_g": "https://betafpv.com/products/gemfan-40mm-4-blade-propellers-1-5mm-shaft",
@@ -126,7 +128,7 @@
       "The kit is the 2S 12A ESC version; its stock battery is the BetaFPV 350mAh 2S 35C pack.",
       "Props are 40 mm (1.57 in) 4-blade; the prop page gives 2.2 g for a set of 4, so 0.55 g each, and no pitch.",
       "The 1103 motor page gives KV options but no weight.",
-      "The flight controller and ESC are one board; its page now shows a newer firmware target (BETAFPVF405) than the kit page (OMNIBUSF4SD), and its 2.7 g may cover the ESC too, so the ESC weight is left at the default."
+      "The flight controller and ESC are one board; its page now shows a newer firmware target (BETAFPVF405) than the kit page (OMNIBUSF4SD). The 2.7 g board is the flight controller and the ESC, so no separate ESC weight is added (esc_total_weight_g 0)."
     ]
   }
 ]

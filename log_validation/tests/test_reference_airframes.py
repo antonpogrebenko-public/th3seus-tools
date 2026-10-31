@@ -312,6 +312,16 @@ def test_bundled_table_cites_every_value_and_lists_the_unknown_ones():
         assert set(k.missing_sources) == {f for f, v in item["build"].items() if v is None}
 
 
+def test_beta75x_board_weight_holds_the_esc():
+    bundled = Path(__file__).parent.parent / "reference_kits.json"
+    item = next(i for i in json.loads(bundled.read_text(encoding="utf-8"))
+                if i["name"] == "BetaFPV Beta75X 2S")
+    board = "https://betafpv.com/products/f4-2s-brushless-flight-controller-and-esc"
+    assert item["build"]["esc_total_weight_g"] == 0
+    assert item["sources"]["esc_total_weight_g"] == board
+    assert any("no separate ESC weight is added" in note for note in item["notes"])
+
+
 def test_load_kits_good_kit(tmp_path):
     k = load_kits(kits_json(tmp_path, [kit_item()]))[0]
     assert k.build == BUILD and k.missing_sources == () and k.airframe_id == 4001
