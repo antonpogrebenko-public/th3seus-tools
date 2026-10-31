@@ -135,7 +135,8 @@ def _response(ranges: Sequence[RangeRow]) -> list[str]:
 
 def _airframes(airframes: Mapping[str, Any]) -> list[str]:
     lines = [f"A kit is compared when it has at least {airframes.get('min_vehicles', NA)} vehicles. "
-             "Ratio is the TH3SEUS prediction over the real median.", ""]
+             "Each kit is compared on the logs of `log-ids/response.txt` whose airframe ID is "
+             "the kit's. Ratio is the TH3SEUS prediction over the real median.", ""]
     for c in airframes.get("comparisons") or []:
         lines += [f"### {c.get('kit')} (airframe {c.get('airframe_id')}, "
                   f"{c.get('n_vehicles')} vehicles)", ""]

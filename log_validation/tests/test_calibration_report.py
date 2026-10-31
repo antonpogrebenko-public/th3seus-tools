@@ -606,3 +606,10 @@ def test_battery_table_shows_why_a_class_falls_back():
     assert rows["| 8S"].endswith(
         "| pooled median: implausible (median below the 4 mohm/cell floor) |")
     assert rows["| 6S"].endswith("| pooled median |")
+
+
+def test_reference_airframes_section_names_its_logs():
+    text = render_report([], battery_dict(), [], airframes_dict(), [], run_info())
+    section = " ".join(text.split("## Reference airframes")[1].split("## ")[0].split())
+    assert ("Each kit is compared on the logs of `log-ids/response.txt` whose airframe ID "
+            "is the kit's.") in section
