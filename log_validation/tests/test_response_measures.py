@@ -9,8 +9,12 @@ import numpy as np
 import pytest
 
 from log_validation.response import MAX_GAP_INTERVALS, ResponseGates, analyze_response
+from log_validation.flight_segments import FlightSegment, SegmentKind
 from log_validation.response_measures import (
     MIN_ESC_RPM_RATE_HZ,
+    TRIM_S,
+    hover_group,
+    hover_windows,
     inflight_noise_measurements,
 )
 from log_validation.sysid import hover_command
@@ -23,6 +27,7 @@ from log_validation.tests.response_fakes import (
     QuadSpec,
     quad_datasets,
     quad_log,
+    quad_params,
 )
 
 GATES = ResponseGates()
@@ -108,6 +113,24 @@ def test_no_hover_segment():
     result = _analyze(FAST, _without_hover(quad_datasets(FAST)))
     assert not any(k.startswith(("hover.", "inflight_gyro")) for k in result.measurements)
     assert len(_errors_with(result, "hover")) == 1  # once for the group, not once per key
+
+
+def test_hover_windows_are_trimmed_like_the_in_air_windows():
+    import log_validation.response as response
+
+    assert response.TRIM_S is TRIM_S and TRIM_S == 2.0
+    segments = [FlightSegment(10.0, 20.0, SegmentKind.HOVER, 100),
+                FlightSegment(30.0, 34.0, SegmentKind.HOVER, 40),  # not longer than 2 * TRIM_S
+                FlightSegment(40.0, 44.5, SegmentKind.HOVER, 45),
+                FlightSegment(50.0, 60.0, SegmentKind.CLIMB, 100)]
+    assert hover_windows(segments) == [(12.0, 18.0), (42.0, 42.5)]
+
+
+def test_hover_segment_too_short_to_trim_gives_the_no_hover_error():
+    segments = [FlightSegment(5.0, 9.0, SegmentKind.HOVER, 40)]
+    measurements, errors = hover_group(quad_log(FAST), quad_params(), segments, 20.0, 3.5)
+    assert measurements == {}
+    assert len(errors) == 1 and "no hover segment longer than 4 s" in errors[0]
 
 
 def test_missing_thrust_topic_keeps_the_noise():

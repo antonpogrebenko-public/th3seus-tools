@@ -5,7 +5,9 @@ failing group adds an error naming the cause and leaves the other groups alone. 
 values are finite (``_finite_only`` drops and reports any that are not).
 
 - Hover (``hover_measurements``): ``hover.thrust`` is the median of
-  ``-vehicle_thrust_setpoint.xyz[2]`` over the HOVER segments;
+  ``-vehicle_thrust_setpoint.xyz[2]`` over the HOVER segments (each trimmed by
+  TRIM_S at both ends, as the in-air windows are; a segment not longer than
+  2 * TRIM_S is left out);
   ``hover.command`` is the motor command that gives it under PX4's thrust model with
   the log's ``THR_MDL_FAC`` (``sysid.hover_command``); ``hover.thr_mdl_fac`` and
   ``hover.mpc_thr_hover`` are the parameters; ``hover.estimate`` is the median
@@ -82,6 +84,9 @@ ESC_RATE_TOLERANCE = 0.05
 MAX_ESCS = 8
 # Finite stretches shorter than this are not fitted.
 MIN_MOTOR_RUN_S = 0.25
+# Seconds cut from both ends of each in-air and each hover segment, leaving out
+# takeoff and landing. Defined here, not in response.py, which imports this module.
+TRIM_S = 2.0
 
 
 # ---------------------------------------------------------------------------
@@ -133,7 +138,9 @@ def _finite_only(measurements: dict[str, float], errors: list[str]) -> Measured:
 
 
 def hover_windows(segments: list[FlightSegment]) -> list[Window]:
-    return [(s.start_s, s.end_s) for s in segments if s.kind == SegmentKind.HOVER]
+    """The HOVER segments longer than 2 * TRIM_S, each trimmed by TRIM_S at both ends."""
+    return [(s.start_s + TRIM_S, s.end_s - TRIM_S) for s in segments
+            if s.kind == SegmentKind.HOVER and s.end_s - s.start_s > 2 * TRIM_S]
 
 
 # ---------------------------------------------------------------------------
@@ -263,7 +270,8 @@ def hover_group(
     """
     windows = hover_windows(segments)
     if not windows:
-        return {}, ["no hover segment (hover values and in-flight gyro noise need one)"]
+        return {}, [f"no hover segment longer than {2 * TRIM_S:.0f} s "
+                    "(hover values and in-flight gyro noise need one)"]
     hover_m, hover_e = guard("hover", lambda: hover_measurements(ulog, params, windows))
     noise_m, noise_e = guard("inflight noise", lambda: inflight_noise_measurements(
         ulog, windows, cutoff_hz, gap_intervals))

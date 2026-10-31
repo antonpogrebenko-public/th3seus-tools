@@ -105,6 +105,7 @@ from .manifest import (
 from .outputs import PrivateDataError, forbidden_strings, write_json
 from .parallel import run_per_log
 from .response_measures import (
+    TRIM_S,
     Measured,
     cell_count_measurements,
     hover_group,
@@ -136,8 +137,6 @@ RESPONSE_TOPICS = (TOPIC_TORQUE, TOPIC_RATE, TOPIC_RATES_SP, "vehicle_status",
                    "vehicle_thrust_setpoint", "hover_thrust_estimate", "esc_status",
                    "actuator_motors", "battery_status")
 
-# Seconds cut from both ends of each in-air segment, leaving out takeoff and landing.
-TRIM_S = 2.0
 # The fit grid: delays 0 to 40 ms and first-order time constants 0 to 60 ms, 1 ms steps.
 FIT_DELAYS_S = tuple(i * 1e-3 for i in range(41))
 FIT_TAUS_S = tuple(i * 1e-3 for i in range(61))
