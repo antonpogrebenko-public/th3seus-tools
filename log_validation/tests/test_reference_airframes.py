@@ -136,6 +136,17 @@ def test_hover_is_never_recommended():
     assert "K_CT" in recs["hover.command"].note
 
 
+def test_hover_note_says_when_no_compared_kit_has_data():
+    recs = {r.quantity: r for r in recommendations([])}
+    assert recs["hover.command"].note.startswith("0 compared kits have data; ")
+    assert "K_CT" in recs["hover.command"].note and "is reported" not in recs["hover.command"].note
+    kits, response = _three_kits_response(**{"lag_minus_filter_s.roll": 0.010})  # no hover data
+    recs = {r.quantity: r for r in recommendations(compare_kits(kits, response))}
+    assert recs["hover.command"].note.startswith("0 compared kits have data; ")
+    assert recs["hover.command"].note.endswith(
+        "; compared kits without data for this formula: kit_0, kit_1, kit_2")
+
+
 def test_vehicle_weighting():
     response = [entry(f"a{i}", "heavy", **{"hover.command": 0.3}) for i in range(4)]
     response += [entry(f"b{i}", f"v{i}", **{"hover.command": 0.5}) for i in range(4)]

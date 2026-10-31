@@ -356,11 +356,7 @@ def _recommend(formula: str, comparisons: Sequence[KitComparison]) -> Recommenda
     tail = _without_data_note(without)
     label = FORMULA_OF[formula]
     if formula == HOVER:
-        note = ("hover throttle discrepancy is reported for the thrust basis K_CT, "
-                "which is never recommended for change")
-        if consistent:
-            note += f"; the prediction is off the same way in all {len(names)} kits"
-        return Recommendation(formula, label, False, names, note + tail)
+        return Recommendation(formula, label, False, names, _hover_note(names, consistent) + tail)
     if consistent and formula == LAG and with_data[0][1] < 0:
         return Recommendation(formula, label, False, names, _lag_below_note(len(names)) + tail)
     if consistent:
@@ -369,6 +365,18 @@ def _recommend(formula: str, comparisons: Sequence[KitComparison]) -> Recommenda
                 f"in all {len(names)} compared kits")
         return Recommendation(formula, label, True, names, note + tail)
     return Recommendation(formula, label, False, names, _no_change_note(len(names)) + tail)
+
+
+def _hover_note(names: Sequence[str], consistent: bool) -> str:
+    """The hover note: it is never a recommendation, and it says when no kit has data."""
+    if not names:
+        return ("0 compared kits have data; a hover throttle discrepancy would be reported "
+                "for the thrust basis K_CT, which is never recommended for change")
+    note = ("hover throttle discrepancy is reported for the thrust basis K_CT, "
+            "which is never recommended for change")
+    if consistent:
+        note += f"; the prediction is off the same way in all {len(names)} kits"
+    return note
 
 
 def _lag_below_note(n_kits: int) -> str:
