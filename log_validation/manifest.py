@@ -38,6 +38,9 @@ def read_manifest(path: Path) -> dict[str, str]:
         if missing:
             raise ManifestError(f"manifest is missing column(s): {', '.join(missing)}")
         for row in reader:
+            if None in row:  # csv puts the fields beyond the header under the key None
+                raise ManifestError(
+                    f"manifest line {reader.line_num} has more fields than the header")
             clean = {(k or "").strip(): (v or "").strip() for k, v in row.items()}
             log_id, vehicle = clean[LOG_ID_COLUMN], clean[VEHICLE_ID_COLUMN]
             if not log_id and not vehicle:

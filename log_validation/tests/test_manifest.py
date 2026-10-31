@@ -89,6 +89,21 @@ def test_manifest_repeated_log_id(tmp_path):
         read_manifest(path)
 
 
+def test_manifest_row_with_an_extra_field_is_refused(tmp_path):
+    path = tmp_path / "m.csv"
+    path.write_text("log_id,vehicle_id\na1,v1\na2,v2,surplus\n")
+    with pytest.raises(ManifestError, match="line 3 has more fields than the header"):
+        read_manifest(path)
+
+
+@pytest.mark.parametrize("row, named", [("a1,", "a1"), (",v1", "v1"), ("a1, ", "a1")])
+def test_manifest_row_with_one_empty_field_is_refused(tmp_path, row, named):
+    path = tmp_path / "m.csv"
+    path.write_text(f"log_id,vehicle_id\n{row}\n")
+    with pytest.raises(ManifestError, match=f"empty field: {named}"):
+        read_manifest(path)
+
+
 def test_manifest_missing_column(tmp_path):
     path = tmp_path / "m.csv"
     path.write_text("log_id,other\na,v1\n")
