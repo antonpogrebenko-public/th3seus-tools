@@ -17,7 +17,7 @@ from collections import Counter
 from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeVar
 
 import numpy as np
 from pyulog import ULog
@@ -26,6 +26,8 @@ from .hardware import extract_hardware_info, is_simulation
 from .manifest import DEFAULT_MAX_PER_VEHICLE, select_logs, selection_counts
 from .parallel import run_per_log
 from .ulog_loader import US_TO_S
+
+T = TypeVar("T")
 
 # ---------------------------------------------------------------------------
 # Extract step constants (the values of the one-pass analysis, named)
@@ -198,8 +200,8 @@ def load_extracted(path: Path) -> LogBatteryData:
     if missing:
         raise ValueError(f"{name}: missing {', '.join(missing)}")
     data = LogBatteryData(
-        log_id=str(arrays["log_id"]),
-        cell_count=int(arrays["cell_count"]),
+        log_id=_scalar(arrays, "log_id", name, str),
+        cell_count=_scalar(arrays, "cell_count", name, int),
         t_s=arrays["t_s"],
         v=arrays["v"],
         i=arrays["i"],
@@ -215,13 +217,25 @@ def load_extracted(path: Path) -> LogBatteryData:
     return data
 
 
+def _scalar(arrays: dict[str, np.ndarray], key: str, name: str, convert: Callable[[Any], T]) -> T:
+    """arrays[key] converted, or ValueError when it is not a single convertible value."""
+    value = arrays[key]
+    if value.ndim != 0:
+        raise ValueError(f"{name}: {key} must be a single value, got shape {value.shape}")
+    try:
+        return convert(value)
+    except (TypeError, ValueError) as e:
+        raise ValueError(f"{name}: {key} is not a valid value ({type(e).__name__})") from e
+
+
 def _read_npz(path: Path) -> dict[str, np.ndarray]:
     """Every array of an .npz file; a file numpy cannot read as one is a ValueError."""
     try:
         with np.load(path, allow_pickle=False) as npz:
             return {k: npz[k] for k in npz.files}
-    except (ValueError, EOFError, AttributeError, zipfile.BadZipFile, zlib.error) as e:
-        # AttributeError: numpy returned a plain array (an .npy), which has no `files`.
+    except (ValueError, EOFError, AttributeError, TypeError, zipfile.BadZipFile, zlib.error) as e:
+        # AttributeError (Python 3.10) or TypeError (3.11 and later): numpy returned a
+        # plain array (an .npy), which is not a context manager and has no `files`.
         raise ValueError(f"{path.name}: not a readable extract file ({type(e).__name__})") from e
 
 

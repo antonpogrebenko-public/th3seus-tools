@@ -148,3 +148,63 @@ class TestExtract:
         path = save_extracted(replace(make_data("a01"), cell_count=cells), tmp_path)
         with pytest.raises(ValueError, match="cell_count"):
             load_extracted(path)
+
+
+# ---------------------------------------------------------------------------
+# Malformed extract files
+# ---------------------------------------------------------------------------
+
+
+def _arrays(data) -> dict[str, np.ndarray]:
+    return {"log_id": np.array(data.log_id), "cell_count": np.array(data.cell_count),
+            "t_s": data.t_s, "v": data.v, "i": data.i}
+
+
+class TestMalformedExtract:
+    def test_npy_under_an_npz_name_is_a_value_error(self, tmp_path):
+        path = tmp_path / "a01.npz"
+        with open(path, "wb") as f:
+            np.save(f, np.arange(3.0))
+        with pytest.raises(ValueError, match="a01.npz"):
+            load_extracted(path)
+
+    def test_type_error_from_numpy_is_a_value_error(self, tmp_path, monkeypatch):
+        # Python 3.11 and later raise TypeError where 3.10 raised AttributeError.
+        def refuse(*_args, **_kwargs):
+            raise TypeError("not a context manager")
+
+        path = save_extracted(make_data("a01"), tmp_path)
+        monkeypatch.setattr(battery_extract.np, "load", refuse)
+        with pytest.raises(ValueError, match="a01.npz: not a readable extract file"):
+            load_extracted(path)
+
+    @pytest.mark.parametrize("key, value", [("cell_count", np.array([4, 4])),
+                                            ("cell_count", np.array([4])),
+                                            ("log_id", np.array(["a01", "b02"]))])
+    def test_non_scalar_cell_count_or_log_id_is_refused(self, tmp_path, key, value):
+        path = tmp_path / "a01.npz"
+        np.savez(path, **{**_arrays(make_data("a01")), key: value})
+        with pytest.raises(ValueError, match=f"a01.npz: {key} must be a single value"):
+            load_extracted(path)
+
+    def test_missing_key_is_named(self, tmp_path):
+        path = tmp_path / "a01.npz"
+        arrays = {k: v for k, v in _arrays(make_data("a01")).items() if k not in ("v", "i")}
+        np.savez(path, **arrays)
+        with pytest.raises(ValueError, match="a01.npz: missing v, i"):
+            load_extracted(path)
+
+    @pytest.mark.parametrize("key, value", [("v", np.zeros(3)), ("i", np.zeros((2, 2)))])
+    def test_series_of_another_length_or_shape_is_refused(self, tmp_path, key, value):
+        path = tmp_path / "a01.npz"
+        np.savez(path, **{**_arrays(make_data("a01")), key: value})
+        with pytest.raises(ValueError, match="one-dimensional and of one length"):
+            load_extracted(path)
+
+    def test_load_named_refuses_a_file_holding_another_log(self, tmp_path):
+        from log_validation.battery_extract import load_named
+
+        path = save_extracted(make_data("b02"), tmp_path)
+        path.rename(tmp_path / "a01.npz")
+        with pytest.raises(ValueError, match="a01.npz holds log b02"):
+            load_named(tmp_path, "a01")
