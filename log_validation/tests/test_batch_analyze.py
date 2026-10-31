@@ -16,11 +16,11 @@ SPI_ICM20689_GYRO_ID = 0x3C000A
 AIRFRAME = 4001
 
 
-def _fake(board: str = "PX4_FMU_V5", autostart: float = AIRFRAME) -> FakeULog:
+def _fake(board: str = "PX4_FMU_V5", autostart: float = AIRFRAME, **params) -> FakeULog:
     base = _build_log()
     return FakeULog(
         {d.name: d.data for d in base.data_list},
-        params={"CAL_GYRO0_ID": SPI_ICM20689_GYRO_ID, "SYS_AUTOSTART": autostart},
+        params={"CAL_GYRO0_ID": SPI_ICM20689_GYRO_ID, "SYS_AUTOSTART": autostart, **params},
         info={"ver_hw": board},
     )
 
@@ -39,6 +39,8 @@ def load_by_stem(path: Path):
         return _NoParams()
     if path.stem.startswith("sitl"):
         return _fake(board="PX4_SITL")
+    if path.stem.startswith("hitl"):
+        return _fake(SYS_HITL=1)
     return _fake()
 
 
@@ -81,6 +83,16 @@ def test_sitl_log_is_skipped(tmp_path):
     batch_analyze(log_dir, out, loader=load_by_stem)
     entry = _read(out)[0]
     assert entry["measurements"] == {} and any("simulation" in e for e in entry["errors"])
+
+
+def test_hitl_log_with_a_real_gyro_id_is_skipped(tmp_path):
+    log_dir = _touch(tmp_path, ["hitl1"])
+    out = tmp_path / "r.json"
+    batch_analyze(log_dir, out, loader=load_by_stem)
+    entry = _read(out)[0]
+    assert entry["measurements"] == {}
+    assert entry["errors"] == ["simulation log skipped (SITL/HIL)"]
+    assert entry["hardware"]["sys_hitl"] == 1
 
 
 def test_cap_applies(tmp_path):

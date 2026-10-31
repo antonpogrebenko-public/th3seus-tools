@@ -208,6 +208,19 @@ class HardwareInfo:
     mag_ids: tuple[int, ...]
     baro_id: int | None
 
+    # SYS_HITL parameter: 0 off, 1 HITL, 2 SIH on the board; None when absent.
+    sys_hitl: int | None = None
+
+
+def _optional_int(value: Any) -> int | None:
+    """A parameter value as an int, or None when absent or not numeric."""
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
 
 def extract_hardware_info(
     msg_info: dict[str, Any], params: dict[str, Any]
@@ -291,6 +304,7 @@ def extract_hardware_info(
         gyro_ids=tuple(gyro_ids),
         mag_ids=tuple(mag_ids),
         baro_id=baro_id,
+        sys_hitl=_optional_int(params.get("SYS_HITL")),
     )
 
 
@@ -303,11 +317,16 @@ def is_simulation(hw: HardwareInfo) -> bool:
     """True if the log comes from SITL/HIL rather than real hardware.
 
     Firmware versions differ in the exact SIM devtype value, so this checks
-    three version-robust signals, any of which is conclusive:
+    four version-robust signals, any of which is conclusive:
+      * SYS_HITL is 1 (HITL) or 2 (SIH on the board): the sensors are
+        simulated even when the CAL IDs name real chips,
       * primary IMU devtype == the known SIM devtype,
       * the FC board name is a simulation target (PX4_SITL / SIH),
       * the primary gyro's bus type decodes to SIMULATION.
     """
+    if hw.sys_hitl is not None and hw.sys_hitl >= 1:
+        return True
+
     if hw.imu_devtype == SIM_IMU_DEVTYPE:
         return True
 
