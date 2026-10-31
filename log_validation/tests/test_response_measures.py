@@ -244,6 +244,14 @@ def test_gyro_parameters_only_when_present():
     assert "param.IMU_GYRO_RATEMAX" not in bare and "param.IMU_DGYRO_CUTOFF" in bare
 
 
+def test_thr_mdl_fac_recorded_without_a_hover_segment():
+    result = _analyze(FAST, _without_hover(quad_datasets(FAST)))
+    assert result.measurements["param.THR_MDL_FAC"] == THR_MDL_FAC
+    assert "hover.thr_mdl_fac" not in result.measurements
+    bare = _analyze(replace(FAST, params={"THR_MDL_FAC": None})).measurements
+    assert "param.THR_MDL_FAC" not in bare
+
+
 def test_cell_count_is_the_first_positive_value():
     m = _analyze(replace(FAST, cell_counts=(0.0, 0.0, 6.0, 4.0))).measurements
     assert m["cell_count"] == 6.0

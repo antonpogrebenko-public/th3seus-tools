@@ -500,6 +500,18 @@ def test_missing_thr_mdl_fac_still_drops_effectiveness():
     assert log_effectiveness({"effectiveness.roll": 200, "hover.command": 0.4}, "roll") is None
 
 
+def test_param_thr_mdl_fac_zero_keeps_effectiveness_without_a_hover_segment():
+    assert log_effectiveness({"effectiveness.roll": 200, "param.THR_MDL_FAC": 0.0}, "roll") == 200
+    # A non-zero factor still needs the hover command.
+    assert log_effectiveness({"effectiveness.roll": 200, "param.THR_MDL_FAC": 0.3}, "roll") is None
+
+
+def test_hover_thr_mdl_fac_is_used_before_the_param_key():
+    m = {"effectiveness.roll": 100.0, "hover.thr_mdl_fac": 1.0, "hover.command": 0.5,
+         "param.THR_MDL_FAC": 0.0}
+    assert log_effectiveness(m, "roll") == pytest.approx(100.0 * (0.0 + 2.0 * 1.0 * 0.5))
+
+
 def test_non_positive_effectiveness_is_dropped():
     for value in (0.0, -5.0):
         m = {"effectiveness.roll": value, "hover.thr_mdl_fac": 0.0, "hover.command": 0.4}

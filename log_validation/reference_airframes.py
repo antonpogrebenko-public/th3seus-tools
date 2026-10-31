@@ -27,7 +27,9 @@ Comparison rules:
   battery before it publishes them, so the published torque is the allocator
   input in either case.
 * TH3SEUS's effectiveness is in motor-command space (THR_MDL_FAC = 0), so each
-  measured value is first converted with `to_command_space`.
+  measured value is first converted with `to_command_space`. The factor is
+  `hover.thr_mdl_fac`, else `param.THR_MDL_FAC` (recorded for every log that
+  has the parameter, so a THR_MDL_FAC 0 log needs no hover segment).
 * A quantity gets a row only when at least `min_vehicles` vehicles contributed.
 """
 
@@ -228,15 +230,24 @@ def _log_lag(measurements: Mapping[str, Any]) -> float | None:
     return sum(values) / len(values) if values else None
 
 
+def _thr_mdl_fac(measurements: Mapping[str, Any]) -> float | None:
+    """hover.thr_mdl_fac when present, else param.THR_MDL_FAC (recorded without hover)."""
+    factor = finite_number(measurements, "hover.thr_mdl_fac")
+    return factor if factor is not None else finite_number(measurements, "param.THR_MDL_FAC")
+
+
 def log_effectiveness(measurements: Mapping[str, Any], axis: str) -> float | None:
     """The log's effectiveness in motor-command space, or None.
 
-    `bat_scale_en` does not matter: the published torque setpoint is already
-    battery-scaled when MC_BAT_SCALE_EN is on, so it is the allocator input."""
+    THR_MDL_FAC comes from hover.thr_mdl_fac, else param.THR_MDL_FAC, so a
+    THR_MDL_FAC 0 log without a hover segment keeps its value; a non-zero factor
+    still needs hover.command. `bat_scale_en` does not matter: the published
+    torque setpoint is already battery-scaled when MC_BAT_SCALE_EN is on, so it
+    is the allocator input."""
     raw = finite_number(measurements, f"effectiveness.{axis}")
     if raw is None or raw <= 0.0:
         return None
-    converted = to_command_space(raw, finite_number(measurements, "hover.thr_mdl_fac"),
+    converted = to_command_space(raw, _thr_mdl_fac(measurements),
                                  finite_number(measurements, HOVER))
     return converted if converted is not None and converted > 0.0 else None
 

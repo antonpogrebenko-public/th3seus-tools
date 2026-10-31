@@ -24,8 +24,9 @@ values are finite (``_finite_only`` drops and reports any that are not).
   over the ESCs that fitted.
 - Rates (``rate_measurements``): ``rate.torque_setpoint_hz`` and
   ``rate.angular_velocity_hz`` from the topics' own timestamps.
-- ``param_measurements`` (IMU_GYRO_RATEMAX, IMU_GYRO_CUTOFF, IMU_DGYRO_CUTOFF, only
-  when present) and ``cell_count_measurements`` (first positive battery cell count).
+- ``param_measurements`` (IMU_GYRO_RATEMAX, IMU_GYRO_CUTOFF, IMU_DGYRO_CUTOFF and
+  THR_MDL_FAC, only when present, with or without a hover segment) and
+  ``cell_count_measurements`` (first positive battery cell count).
 
 None of these functions changes the log or any array it reads.
 """
@@ -62,6 +63,9 @@ TOPIC_ESC = "esc_status"
 TOPIC_MOTORS = "actuator_motors"
 TOPIC_BATTERY = "battery_status"
 GYRO_PARAMS = ("IMU_GYRO_RATEMAX", "IMU_GYRO_CUTOFF", "IMU_DGYRO_CUTOFF")
+# Recorded as param.<name>. THR_MDL_FAC is here as well as in hover.thr_mdl_fac so a
+# log without a hover segment still carries the thrust model its effectiveness needs.
+RECORDED_PARAMS = (*GYRO_PARAMS, "THR_MDL_FAC")
 
 # Motor lag fit grid: large props are slower than the body-rate plant, so delays run
 # 0 to 40 ms and time constants 0 to 150 ms, in 1 ms steps.
@@ -410,8 +414,8 @@ def rate_measurements(ulog: Any) -> Measured:
 
 
 def param_measurements(params: dict[str, Any]) -> Measured:
-    """param.<name> for each gyro parameter the log has."""
-    values = {f"param.{name}": _param_value(params, name) for name in GYRO_PARAMS}
+    """param.<name> for each of RECORDED_PARAMS the log has."""
+    values = {f"param.{name}": _param_value(params, name) for name in RECORDED_PARAMS}
     return {k: v for k, v in values.items() if v is not None}, []
 
 

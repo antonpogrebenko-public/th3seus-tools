@@ -150,6 +150,13 @@ def test_effectiveness_exclusions():
     assert log_id_lists([], EMPTY_BATTERY, no_fac_only)["response"] == []
 
 
+def test_effectiveness_of_a_linear_log_without_a_hover_segment_is_kept():
+    logs = [resp(f"l{i}", f"v{i}", **{"effectiveness.roll": 10.0, "param.THR_MDL_FAC": 0.0})
+            for i in range(5)]
+    assert find(ranges_table([], EMPTY_BATTERY, logs), "effectiveness.roll").n_logs == 5
+    assert log_id_lists([], EMPTY_BATTERY, logs)["response"] == [f"l{i}" for i in range(5)]
+
+
 def test_response_list_only_ranges_table_quantities():
     logs = [resp("rate_only", "v1", **{"rate.torque_setpoint_hz": 250.0}),
             resp("other", "v2", **{"motor_lag_r2": 0.9, "rate.angular_velocity_hz": 100.0}),
