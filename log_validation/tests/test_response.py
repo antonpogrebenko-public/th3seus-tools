@@ -219,7 +219,8 @@ def test_implausibly_short_logged_interval_is_refused():
     result = _analyze(replace(FAST, rates_sp_hz=20000.0))
     assert _only_log_level(result.measurements)
     assert len(result.errors) == 1
-    assert result.errors[0].startswith("implausible logged interval (vehicle_rates_setpoint median ")
+    assert result.errors[0].startswith(
+        "implausible logged interval (vehicle_rates_setpoint median ")
     assert "below 0.0001 s" in result.errors[0]
 
 

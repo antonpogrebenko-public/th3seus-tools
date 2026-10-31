@@ -9,8 +9,18 @@ from .battery_model import (
     MIN_R_OBSERVATIONS_PER_CLASS,
     R_PLAUSIBLE_FLOOR_MOHM_PER_CELL,
     BatteryFitResult,
+    PerCellRFit,
 )
 from .outputs import write_text
+
+
+def fallback_reason(f: PerCellRFit) -> str | None:
+    """Why a class deploys the pooled median, or None when it deploys its own fit."""
+    if not f.low_n:
+        return None
+    if f.n_observations < MIN_R_OBSERVATIONS_PER_CLASS:
+        return f"low-n (fewer than {MIN_R_OBSERVATIONS_PER_CLASS} step events)"
+    return f"implausible (median below the {R_PLAUSIBLE_FLOOR_MOHM_PER_CELL:g} mohm/cell floor)"
 
 
 def result_to_dict(r: BatteryFitResult) -> dict:
@@ -33,6 +43,7 @@ def result_to_dict(r: BatteryFitResult) -> dict:
                 "n_vehicles": f.n_vehicles,
                 "deployed_mohm_per_cell": f.deployed_mohm_per_cell,
                 "low_n": f.low_n,
+                "fallback_reason": fallback_reason(f),
             }
             for f in r.r_fits
         ],
@@ -140,14 +151,8 @@ def write_markdown_summary(
     ]
     for f in r.r_fits:
         iqr = f"{f.p25_mohm_per_cell:.2f} to {f.p75_mohm_per_cell:.2f}"
-        if not f.low_n:
-            reason = "none"
-        elif f.n_observations < MIN_R_OBSERVATIONS_PER_CLASS:
-            reason = f"low-n (<{MIN_R_OBSERVATIONS_PER_CLASS}) -> pooled"
-        else:
-            reason = (
-                f"implausible (<{R_PLAUSIBLE_FLOOR_MOHM_PER_CELL:.0f} mohm/cell) -> pooled"
-            )
+        why = fallback_reason(f)
+        reason = "none" if why is None else f"{why} -> pooled"
         lines.append(
             f"| {f.cell_count}S | {f.median_mohm_per_cell:.2f} | "
             f"{f.p10_mohm_per_cell:.2f} | {f.p90_mohm_per_cell:.2f} | "

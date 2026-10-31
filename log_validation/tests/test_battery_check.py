@@ -200,3 +200,13 @@ def test_battery_outputs_and_sources_are_ascii(tmp_path):
     texts = [md, emit_rust_constants(result)]
     texts += [Path(m.__file__).read_text(encoding="utf-8") for m in (battery_output, battery_model)]
     assert [sorted({c for c in t if ord(c) > 127}) for t in texts] == [[], [], [], []]
+
+
+def test_json_names_why_a_class_falls_back():
+    _, result = _corpus_result()
+    own = dataclasses.replace(result.r_fits[0], low_n=False)
+    fits = result_to_dict(dataclasses.replace(
+        result, r_fits=[own, *_with_both_fallbacks(result).r_fits]))["r_fits"]
+    assert [f["fallback_reason"] for f in fits] == [
+        None, "low-n (fewer than 200 step events)",
+        "implausible (median below the 4 mohm/cell floor)"]

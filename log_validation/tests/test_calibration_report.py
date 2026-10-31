@@ -488,7 +488,8 @@ def test_malformed_nested_row_exits_2_without_writing(tmp_path, capsys, name, ch
     ("battery", json.dumps([1, 2]), "battery fit must hold a JSON dict"),
     ("noise", json.dumps([{"measurements": {}}]), "per-log results must be objects with a log_id"),
     ("response", json.dumps([{"log_id": 7}]), "per-log results must be objects with a log_id"),
-    ("airframes", json.dumps({"min_vehicles": 5}), "airframes JSON lacks comparisons, recommendations"),
+    ("airframes", json.dumps({"min_vehicles": 5}),
+     "airframes JSON lacks comparisons, recommendations"),
 ])
 def test_input_refusals_exit_2(tmp_path, capsys, name, text, message):
     paths = write_inputs(tmp_path / "in")
@@ -522,8 +523,8 @@ def test_input_folder_and_home_are_refused_without_forbid(tmp_path, capsys, othe
                                                          private):
     paths = write_inputs(tmp_path / "in")
     folder = str(paths["noise"].resolve().parent) if private == "input folder" else str(Path.home())
-    _rewrite(paths["run_info"],
-             lambda d: d.__setitem__("commands", [f"python -m log_validation.batch_analyze {folder}"]))
+    command = f"python -m log_validation.batch_analyze {folder}"
+    _rewrite(paths["run_info"], lambda d: d.__setitem__("commands", [command]))
     out = tmp_path / "out"
     assert main(_args(paths, out)) == 2
     assert "private data" in capsys.readouterr().err
@@ -536,8 +537,8 @@ def test_input_folder_given_through_a_symlink_is_refused(tmp_path, capsys, other
     link = tmp_path / "link"
     link.symlink_to(real, target_is_directory=True)
     linked = {k: link / p.name for k, p in paths.items()}
-    _rewrite(paths["run_info"],
-             lambda d: d.__setitem__("commands", [f"python -m log_validation.batch_analyze {link}"]))
+    command = f"python -m log_validation.batch_analyze {link}"
+    _rewrite(paths["run_info"], lambda d: d.__setitem__("commands", [command]))
     out = tmp_path / "out"
     assert main(_args(linked, out)) == 2
     assert "private data" in capsys.readouterr().err
@@ -590,3 +591,18 @@ def test_a_pipe_in_a_reason_does_not_split_its_counts_row():
                          run_info())
     row = next(line for line in text.splitlines() if "a\\|b" in line)
     assert row == "| gyro.x: field 'a\\|b' not in topic 'sensor_gyro' | 1 |"
+
+
+def test_battery_table_shows_why_a_class_falls_back():
+    battery = battery_dict()
+    own = battery["r_fits"][0]
+    floor = {**own, "cell_count": 8, "median_mohm_per_cell": 3.3, "low_n": True,
+             "fallback_reason": "implausible (median below the 4 mohm/cell floor)"}
+    older = {**own, "cell_count": 6, "low_n": True}  # a JSON written before the reason
+    battery["r_fits"] = [own, floor, older]
+    text = render_report([], battery, [], airframes_dict(), [], run_info())
+    rows = {line.split(" | ")[0]: line for line in text.splitlines() if line.startswith("| ")}
+    assert rows["| 4S"].endswith("| own fit |")
+    assert rows["| 8S"].endswith(
+        "| pooled median: implausible (median below the 4 mohm/cell floor) |")
+    assert rows["| 6S"].endswith("| pooled median |")

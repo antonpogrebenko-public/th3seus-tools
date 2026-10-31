@@ -65,7 +65,8 @@ angular acceleration regressed on the projection; the point with the highest
 ``fit_r2`` is kept (the same point as the highest R^2 projected on the instruments).
 A log without ``vehicle_rates_setpoint``, or with it logged too slowly, gets no fit
 but keeps its other measurements; so does a log whose signal is logged with a median
-interval below ``MIN_LOGGED_INTERVAL_S`` (above 10 kHz, not a plausible PX4 rate). Gates per axis: excitation (torque std), instrument strength
+interval below ``MIN_LOGGED_INTERVAL_S`` (above 10 kHz, not a plausible PX4 rate).
+Gates per axis: excitation (torque std), instrument strength
 (``first_stage_r2``, "weak instrument"), fit quality (``fit_r2``), and two
 plausibility gates that no real plant can fail: a gain <= 0 ("implausible gain") or
 a lag below filter_delay_s ("lag below filter delay") gives no estimate.

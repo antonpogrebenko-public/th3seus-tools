@@ -84,12 +84,20 @@ def _noise(noise: Sequence[dict]) -> list[str]:
     return lines
 
 
+def _deployed_from(fit: Mapping[str, Any]) -> str:
+    """"own fit", or "pooled median" with the fit's fallback reason when the JSON has one."""
+    if not fit.get("low_n"):
+        return "own fit"
+    reason = fit.get("fallback_reason")
+    return f"pooled median: {reason}" if reason else "pooled median"
+
+
 def _battery(battery: Mapping[str, Any]) -> list[str]:
     fits = battery.get("r_fits") or []
     rows = [[f"{f.get('cell_count')}S", _num(f.get("median_mohm_per_cell"), ".2f"),
              _num(f.get("p10_mohm_per_cell"), ".2f"), _num(f.get("p90_mohm_per_cell"), ".2f"),
              _num(f.get("deployed_mohm_per_cell"), ".2f"), str(f.get("n_observations", NA)),
-             str(f.get("n_vehicles", NA)), "pooled median" if f.get("low_n") else "own fit"]
+             str(f.get("n_vehicles", NA)), _deployed_from(f)]
             for f in fits]
     lines = ["Internal resistance per cell, from current steps. Deployed is the value the "
              "simulator uses.", "",
