@@ -194,10 +194,11 @@ came from. A required value that no maker publishes is `null` with no source, an
 kit is listed as not compared, naming the missing sources; fill a value only from a
 page that states it.
 
-The committed run is in [`calibration/2026-10-30/`](calibration/2026-10-30/report.md):
+The committed run is in [`calibration/2026-10-31/`](calibration/2026-10-31/report.md):
 8,671 public Flight Review quadrotor logs for IMU noise and the battery, and 953 logs
-recorded at full rate for the response pass, at most 3 logs per vehicle in each set.
-Its `run-info.json` gives the parameters and commands.
+for the response pass (the pass refuses the 90 of them not logged at the rate
+controller's rate), at most 3 logs per vehicle in each set. Its `run-info.json` gives
+the parameters and commands.
 
 ## Tests
 

@@ -38,7 +38,7 @@
   {
    "formula": "thrust basis K_CT (reported, never changed)",
    "kits": [],
-   "note": "hover throttle discrepancy is reported for the thrust basis K_CT, which is never recommended for change",
+   "note": "0 compared kits have data; a hover throttle discrepancy would be reported for the thrust basis K_CT, which is never recommended for change",
    "quantity": "hover.command",
    "recommended": false
   },
