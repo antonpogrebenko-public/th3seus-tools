@@ -106,6 +106,21 @@ def clean_measurements(measurements: dict[str, Any]) -> dict[str, float]:
     }
 
 
+# Measurements that describe a log but are not noise numbers: the logged parameters and the
+# GPS fix type. They are recorded per log and stay out of the noise profiles.
+NOT_PROFILED_PREFIXES = ("param.",)
+NOT_PROFILED_KEYS = frozenset({"gps.fix_type_mode"})
+
+
+def profiled_measurements(measurements: dict[str, Any]) -> dict[str, float]:
+    """`clean_measurements` without the keys that are not noise numbers."""
+    return {
+        k: v
+        for k, v in clean_measurements(measurements).items()
+        if k not in NOT_PROFILED_KEYS and not k.startswith(NOT_PROFILED_PREFIXES)
+    }
+
+
 def _compute_sensors(
     measurements_list: list[dict[str, Any]], min_logs: int
 ) -> dict[str, SensorStats]:
@@ -147,7 +162,7 @@ def aggregate_profiles(
     buckets: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
 
     for r in results:
-        measurements = clean_measurements(r.get("measurements") or {})
+        measurements = profiled_measurements(r.get("measurements") or {})
         if not measurements:
             continue
         hw = r.get("hardware") or {}

@@ -36,6 +36,10 @@ class FakeULog:
         return self._datasets[name]  # raises KeyError if absent (loader wraps it)
 
 
+# Pressure change per meter of altitude near 95000 Pa (ISA), about 11.7 Pa/m.
+RAW_BARO_PA_PER_M = 11.7
+
+
 def _ts_us(n: int, rate_hz: float) -> np.ndarray:
     dt_us = 1e6 / rate_hz
     return (np.arange(n) * dt_us).astype(np.float64)
@@ -83,6 +87,13 @@ def _build_log() -> FakeULog:
         "baro_alt_meter": 1655.0 + rng.normal(0, 0.2, bn),
     }
 
+    # Raw barometer at 50 Hz: 95000 Pa plus 0.2 m equivalent white noise (about 2.4 Pa).
+    baro_raw = {
+        "timestamp": _ts_us(bn, 50.0),
+        "pressure": 95000.0 + rng.normal(0, 0.2 * RAW_BARO_PA_PER_M, bn),
+        "device_id": np.full(bn, device_id(0x3D)),  # MS5611
+    }
+
     # Mag at 50 Hz: 0.004 Gauss noise per axis on a constant field.
     mag = {
         "timestamp": _ts_us(bn, 50.0),
@@ -117,6 +128,7 @@ def _build_log() -> FakeULog:
             "sensor_accel": accel,
             "sensor_combined": combined,
             "vehicle_air_data": baro,
+            "sensor_baro": baro_raw,
             "sensor_mag": mag,
             "vehicle_gps_position": gps,
             "sensors_status_imu": status_imu,

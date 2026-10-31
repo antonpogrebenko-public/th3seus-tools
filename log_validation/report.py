@@ -15,6 +15,7 @@ from . import noise_stats as ns
 from . import reference as ref
 from . import ulog_loader as ul
 from .part_ids import TOPIC_GPS_POSITION, TOPIC_MAG, LogParts, identify_parts
+from .part_measures import Value, baro_chip_values, mag_evidence_values
 from .stationary import find_stationary_window, slice_to_window
 
 # Topic names (modern PX4). Override here if a log uses different names.
@@ -82,6 +83,15 @@ def _info_row(sensor: str, param: str, measured: float | None, unit: str, note: 
     return Row(sensor, param, 0.0, measured, unit, _verdict(measured, 0.0), note)
 
 
+def _value_rows(values: list[Value]) -> list[Row]:
+    """Info rows of part measurement values; the key is `<sensor>.<param>`."""
+    rows = []
+    for v in values:
+        sensor, param = v.key.split(".", 1)
+        rows.append(_info_row(sensor, param, v.value, v.unit, v.note))
+    return rows
+
+
 def _imu_source(ulog) -> tuple[np.ndarray, np.ndarray, str] | None:
     """Gyro stream used for the still window: sensor_combined, else sensor_gyro."""
     try:
@@ -116,6 +126,8 @@ def analyze(ulog: ul.ULog, parts: LogParts | None = None) -> list[Row]:
     rows.extend(_imu_rows(ulog, window, gt, gxyz))
     rows.extend(_baro_rows(ulog, window))
     rows.extend(_mag_rows(ulog, window, parts.mag_instance))
+    rows.extend(_value_rows(baro_chip_values(ulog, window, parts.baro_instance)))
+    rows.extend(_value_rows(mag_evidence_values(ulog, window, parts.mag_instance)))
     rows.extend(_gps_rows(ulog, window, parts.gps_topic or TOPIC_GPS_POSITION))
     return rows
 

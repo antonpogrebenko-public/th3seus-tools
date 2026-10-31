@@ -35,6 +35,7 @@ from .part_ids import (
     empty_parts_json,
     identify_parts,
 )
+from .part_measures import gyro_rate_params
 from .report import TOPIC_ACCEL, TOPIC_AIR_DATA, TOPIC_COMBINED, TOPIC_GYRO
 
 # The only topics any of the measurements below read. Kept next to the parse so
@@ -130,8 +131,9 @@ def analyze_log(
         hw_dict = {}
         errors.append(_failure(log_id, "hardware extraction failed", e))
 
+    params = getattr(ulog, "initial_parameters", None) or {}
     try:
-        parts = identify_parts(ulog, ulog.initial_parameters)
+        parts = identify_parts(ulog, params)
     except Exception as e:
         parts = empty_parts()
         errors.append(_failure(log_id, "part identification failed", e))
@@ -161,6 +163,8 @@ def analyze_log(
                 errors.append(f"{key}: {row.note}")
     except Exception as e:
         errors.append(_failure(log_id, "analysis failed", e))
+
+    measurements.update(gyro_rate_params(params))
 
     return LogResult(
         log_id=log_id,

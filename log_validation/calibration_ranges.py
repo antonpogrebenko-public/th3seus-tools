@@ -40,7 +40,7 @@ from typing import Any, Mapping, Sequence
 
 import numpy as np
 
-from .aggregate import clean_measurements
+from .aggregate import profiled_measurements
 from .reference_airframes import finite_number, is_finite_number, log_effectiveness, vehicle_key
 from .th3seus_model import AXES
 
@@ -153,9 +153,10 @@ def contributes_to_noise(entry: Mapping[str, Any]) -> bool:
     The published noise numbers are the new densities (the ranges), the legacy
     and new densities (the report's before and after table) and the
     noise-profile parameters (`noise-profiles.json`). The profiles take every
-    finite measurement of an entry (`aggregate.clean_measurements`), so an
-    entry contributes when it has at least one finite measurement."""
-    return bool(clean_measurements(entry.get("measurements") or {}))
+    finite noise measurement of an entry (`aggregate.profiled_measurements`: the
+    logged parameters and the GPS fix type are not noise numbers), so an entry contributes
+    when it has at least one."""
+    return bool(profiled_measurements(entry.get("measurements") or {}))
 
 
 # ---- samples ----

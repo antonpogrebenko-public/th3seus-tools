@@ -88,3 +88,48 @@ def test_allan_deviation_white_noise_slope():
     log_dev = np.log10(res.devs)
     slope = np.polyfit(log_tau, log_dev, 1)[0]
     assert -0.6 < slope < -0.4
+
+
+def test_allan_slope_of_white_noise_is_minus_half():
+    x = np.random.default_rng(3).normal(0, 0.1, 3000)
+    assert abs(ns.allan_slope(x) + 0.5) <= 0.15
+
+
+def test_allan_slope_of_a_random_walk_is_not_white():
+    walk = np.cumsum(np.random.default_rng(4).normal(0, 0.1, 3000))
+    assert ns.allan_slope(walk) > -0.35
+
+
+def test_allan_slope_of_a_constant_series_raises():
+    with pytest.raises(ValueError):
+        ns.allan_slope(np.full(100, 2.0))
+
+
+def test_allan_slope_with_too_few_samples_raises():
+    with pytest.raises(ValueError):
+        ns.allan_slope(np.arange(10.0))
+
+
+def test_resolution_is_the_smallest_step():
+    assert ns.resolution(np.array([0.0, 0.5, 0.5, 1.5, 1.0])) == 0.5
+
+
+def test_resolution_without_a_step_raises():
+    with pytest.raises(ValueError):
+        ns.resolution(np.full(10, 1.0))
+
+
+def test_distinct_samples_drop_repeats():
+    t, v = ns.distinct_samples(np.array([0.0, 1, 2, 3]), np.array([1.0, 1, 2, 2]))
+    assert t.tolist() == [0.0, 2.0] and v.tolist() == [1.0, 2.0]
+
+
+def test_distinct_samples_of_rows_drop_a_row_equal_in_every_column():
+    t, v = ns.distinct_samples(np.array([0.0, 1, 2, 3]),
+                               np.array([[1.0, 1], [1, 1], [1, 2], [1, 2]]))
+    assert t.tolist() == [0.0, 2.0] and v.tolist() == [[1.0, 1.0], [1.0, 2.0]]
+
+
+def test_distinct_samples_of_an_empty_series_is_empty():
+    t, v = ns.distinct_samples(np.array([]), np.array([]))
+    assert t.size == 0 and v.size == 0
