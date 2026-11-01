@@ -217,7 +217,7 @@ def test_entry_without_parts_reads_as_unnamed_and_inputs_are_not_mutated():
     assert repr(e) == before
 
 
-def test_task6_fields_have_neutral_defaults():
+def test_unchecked_row_has_no_failures_rate_or_factor():
     r = imu_rows([])["Other"]
     assert isinstance(r, PartRow)
     assert (r.checked, r.failed_slope, r.failed_resolution) == (0, 0, 0)

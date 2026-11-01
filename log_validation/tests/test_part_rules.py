@@ -67,6 +67,13 @@ def test_quantization_fails():
     assert white_noise_failures(allan_slope(x), white_noise_std(x), resolution(x), 0.15)[1]
 
 
+def test_a_log_failing_only_the_resolution_counts_nowhere():
+    r = mag_rows([mag_entry(0, {"mag.resolution_gauss": 0.02}, value=0.01)])
+    for name in ("Rm3100", "Other"):
+        assert (r[name].checked, r[name].failed_slope, r[name].failed_resolution,
+                r[name].logs) == (1, 0, 1, 0)
+
+
 def test_both_conditions_can_fail_for_one_log():
     assert white_noise_failures(0.5, 1e-7, 1e-3, 0.15) == (True, True)
     e = mag_entry(0, {"mag.allan_slope": 0.5, "mag.resolution_gauss": 1.0})
@@ -127,6 +134,12 @@ def test_barometer_uses_the_barometer_simulator_rate():
                     baro="BMP388")
     r = baro_rows([e], RowRules(sim_rate_baro_hz=50.0, sim_rate_mag_hz=200.0))["Bmp388"]
     assert r.median == pytest.approx(0.05) and r.median_factor == pytest.approx(0.5)
+
+
+def test_magnetometer_uses_the_magnetometer_simulator_rate():
+    e = mag_entry(0, {"mag.rate_hz": 200.0})
+    r = mag_rows([e], RowRules(sim_rate_baro_hz=200.0, sim_rate_mag_hz=50.0))["Rm3100"]
+    assert r.median == pytest.approx(0.005) and r.median_factor == pytest.approx(0.5)
 
 
 def test_missing_proposal_names_the_white_noise_check():

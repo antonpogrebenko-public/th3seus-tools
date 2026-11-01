@@ -14,7 +14,7 @@ import pytest
 from log_validation.part_tables import (
     check_noise_entries, load_catalog_spellings, main, part_tables_document)
 from log_validation.part_rows import RowRules, build_part_tables
-from log_validation.tests.part_fakes import noise_entry
+from log_validation.tests.part_fakes import BARO_OK, MAG_OK, noise_entry
 
 OUTPUTS = {"part-tables.json", "board-table.json", "rust/imu_chip.rs", "rust/baro_chip.rs",
            "rust/mag_chip.rs", "rust/gps_chipset.rs", "rust/daemon_aliases.rs"}
@@ -123,6 +123,32 @@ def test_options_reach_the_document(tmp_path):
                                  "sim_rate_baro_hz": 100.0, "sim_rate_mag_hz": 25.0}
 
 
+def _rows(tmp_path, out, part, variant):
+    doc = json.loads((tmp_path / out / "part-tables.json").read_text())
+    return [r for r in doc["rows"] if (r["part"], r["variant"]) == (part, variant)]
+
+
+def test_options_reach_the_rows(tmp_path):
+    entries = [noise_entry(f"l{i}", f"v{i}", {**IMU_M, **BARO_OK, "baro.chip_noise_sigma": 0.1,
+                                              "baro.chip_rate_hz": 200.0,
+                                              "mag.noise_sigma_gauss": 0.01, **MAG_OK,
+                                              "mag.allan_slope": -0.3},
+                           imu="BMI088", baro="BMP388", mag="RM3100") for i in range(5)]
+    assert run(tmp_path, entries, out="default") == 0
+    assert run(tmp_path, entries, "--min-vehicles", "3", "--sim-rate-baro", "100",
+               "--allan-slope-tolerance", "0.25", out="options") == 0
+    imu, baro, mag = (_rows(tmp_path, out, p, v) for out, p, v in (
+        ("default", "imu", "Bmi088"), ("default", "baro", "Bmp388"), ("default", "mag", "Rm3100")))
+    assert all(r["proposed"] is None and r["reason"] == "below the vehicle threshold"
+               for r in imu)
+    assert baro[0]["median_factor"] == pytest.approx(0.5) and mag[0]["failed_slope"] == 5
+    imu, baro, mag = (_rows(tmp_path, out, p, v) for out, p, v in (
+        ("options", "imu", "Bmi088"), ("options", "baro", "Bmp388"), ("options", "mag", "Rm3100")))
+    assert all(r["proposed"] is not None and r["vehicles"] == 5 for r in imu)
+    assert baro[0]["median_factor"] == pytest.approx(0.5 ** 0.5)
+    assert (mag[0]["failed_slope"], mag[0]["vehicles"]) == (0, 5)
+
+
 def test_document_matches_the_tables():
     rules = RowRules()
     tables = build_part_tables(entries_of_12_vehicles())
@@ -228,13 +254,13 @@ def test_missing_catalog_spellings_file_exits_2(tmp_path):
 
 
 def test_catalog_spellings_reach_the_aliases(tmp_path):
+    # "Bosch BMI088" normalizes to an alias the log name alone does not give.
     write_input(tmp_path, entries_of_12_vehicles())
     path = tmp_path / "in" / "catalog.json"
-    path.write_text(json.dumps({"imu": {"BMI-088": "BMI088"}}))
+    path.write_text(json.dumps({"imu": {"Bosch BMI088": "BMI088"}}))
     assert run(tmp_path, entries_of_12_vehicles(), "--catalog-spellings", str(path)) == 0
-    aliases = (tmp_path / "out" / "rust" / "daemon_aliases.rs").read_text()
-    lines = [ln for ln in aliases.splitlines() if '"bmi088" =>' in ln]
-    assert len(lines) == 1 and lines[0].count('"bmi088"') == 1
+    aliases = (tmp_path / "out" / "rust" / "daemon_aliases.rs").read_text().splitlines()
+    assert '        "bmi088" | "boschbmi088" => ImuChip::Bmi088,' in aliases
 
 
 def test_non_empty_out_dir_is_refused(tmp_path):
