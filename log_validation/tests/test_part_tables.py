@@ -350,3 +350,9 @@ def test_padded_log_names_give_unpadded_rust_text(tmp_path, padded):
     assert "            // PX4 log names BMI088; new in run 2026-11-05" in rust.splitlines()
     aliases = (tmp_path / "out" / "rust" / "daemon_aliases.rs").read_text()
     assert '        "bmi088" => ImuChip::Bmi088,' in aliases.splitlines()
+
+
+def test_help_says_the_noise_results_may_be_gzipped(capsys):
+    with pytest.raises(SystemExit):
+        main(["--help"])
+    assert "gzipped (.json.gz)" in " ".join(capsys.readouterr().out.split())

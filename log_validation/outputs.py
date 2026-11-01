@@ -103,8 +103,10 @@ def write_json(path: Path, obj: Any, forbidden: Sequence[str]) -> None:
 
 
 def _deterministic_gzip(data: bytes) -> bytes:
-    """Gzip with a zero modification time, no file name and the fixed OS byte (255),
-    so the bytes do not depend on the Python version or the platform."""
+    """Gzip with a zero modification time, no file name and the fixed OS byte (255), so
+    the header is fixed and the same text gives the same bytes with the same zlib build.
+    Another zlib build may compress the same text differently; the decompressed text is
+    the same."""
     buffer = io.BytesIO()
     with gzip.GzipFile(fileobj=buffer, mode="wb", compresslevel=GZIP_LEVEL, mtime=0) as gz:
         gz.write(data)

@@ -5,9 +5,10 @@ Usage:
         [--min-vehicles 10] [--allan-slope-tolerance 0.15] [--sim-rate-baro 50] \\
         [--sim-rate-mag 50] [--catalog-spellings FILE]
 
-NOISE_JSON is the merged per-log noise results (a JSON list of entries). FILE maps a part
-type to {catalog string: log part name}; those spellings are emitted next to the log names
-of new variants.
+NOISE_JSON is the merged per-log noise results (a JSON list of entries), or the same list
+gzipped when the name ends in `.gz` (`noise-results.json.gz`). FILE maps a part type to
+{catalog string: log part name}; those spellings are emitted next to the log names of new
+variants.
 
 Outputs, in DIR (which must be new or empty): part-tables.json, board-table.json and
 rust/imu_chip.rs, rust/baro_chip.rs, rust/mag_chip.rs, rust/gps_chipset.rs and
@@ -153,7 +154,8 @@ def _build_parser() -> argparse.ArgumentParser:
         description="Write the per-part tables, the board table and the Rust text.",
         epilog="Exit status: 0 done, 2 error or private data refused.")
     parser.add_argument("noise", type=Path, metavar="NOISE_JSON",
-                        help="merged per-log noise results (a JSON list)")
+                        help="merged per-log noise results (a JSON list), or the same "
+                             "list gzipped (.json.gz)")
     parser.add_argument("--out-dir", type=Path, required=True, help="new or empty folder")
     parser.add_argument("--run-date", required=True, metavar="YYYY-MM-DD")
     parser.add_argument("--min-vehicles", type=int, default=DEFAULT_MIN_VEHICLES)
