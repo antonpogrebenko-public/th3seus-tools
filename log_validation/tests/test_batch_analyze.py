@@ -4,12 +4,20 @@ from __future__ import annotations
 
 import json
 import os
+from dataclasses import asdict
 from pathlib import Path
 
 import pytest
 
-from log_validation.batch_analyze import REQUIRED_TOPICS, _died_result, analyze_log, batch_analyze
+from log_validation import part_tables
+from log_validation.batch_analyze import (
+    REQUIRED_TOPICS, SIMULATION_ERROR, LogResult, _died_result, analyze_log, batch_analyze)
+from log_validation.outputs import json_text
+from log_validation.part_boards import board_table
 from log_validation.part_ids import empty_parts_json
+from log_validation.part_measures import DEFAULT_GPS_REST_MIN_S
+from log_validation.part_rows import build_part_tables
+from log_validation.part_tables import check_noise_entries
 from log_validation.tests.fakes import FakeULog
 from log_validation.tests.test_pipeline import _build_log
 
@@ -278,3 +286,33 @@ def test_died_result_unpacks_the_task():
     assert (result.log_id, result.vehicle_id, result.errors) == ("d1", "v7", ["worker process died"])
     assert result.measurements == {} and result.parts == empty_parts_json()
 
+
+def _shapes() -> list[LogResult]:
+    """One result of each shape the noise pass writes."""
+    return [
+        analyze_log(Path("a1.ulg"), "v1", loader=load_by_stem),  # measured
+        analyze_log(Path("bad.ulg"), loader=load_by_stem),  # load failed
+        analyze_log(Path("sitl1.ulg"), loader=load_by_stem),  # simulation skipped
+        analyze_log(Path("noparams.ulg"), loader=load_by_stem),  # no header attributes
+        _died_result((Path("die.ulg"), "v2", load_by_stem, DEFAULT_GPS_REST_MIN_S)),
+    ]
+
+
+def test_every_entry_shape_the_noise_pass_writes_passes_the_part_tables_check():
+    results = _shapes()
+    assert [r.errors[0] for r in results[1:3]] + [results[4].errors[0]] == [
+        "load failed: OSError", SIMULATION_ERROR, "worker process died"]
+    entries = json.loads(json_text([asdict(r) for r in results]))  # as write_json writes them
+    assert check_noise_entries(entries) == entries
+    tables = build_part_tables(entries)
+    assert any(r.logs for r in tables.rows) and board_table(entries)["boards"]
+
+
+def test_the_noise_file_feeds_the_part_tables_pass(tmp_path):
+    log_dir = _touch(tmp_path, ["a1", "bad", "sitl1", "noparams", "die"])
+    noise = tmp_path / "noise.json"
+    batch_analyze(log_dir, noise, jobs=2, loader=load_by_stem)
+    assert {e["log_id"] for e in _read(noise)} == {"a1", "bad", "sitl1", "noparams", "die"}
+    code = part_tables.main([str(noise), "--out-dir", str(tmp_path / "parts"),
+                             "--run-date", "2026-11-01"])
+    assert code == 0 and (tmp_path / "parts" / "part-tables.json").is_file()
