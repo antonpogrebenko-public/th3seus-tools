@@ -11,6 +11,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from . import arming
 from . import noise_stats as ns
 from . import reference as ref
 from . import ulog_loader as ul
@@ -31,6 +32,8 @@ TOPIC_ACCEL = "sensor_accel"
 TOPIC_GYRO = "sensor_gyro"
 TOPIC_COMBINED = "sensor_combined"
 TOPIC_AIR_DATA = "vehicle_air_data"
+
+NO_DISARMED_WINDOW_NOTE = "no disarmed quiet >=3s run"
 
 # A measured/model ratio inside this band counts as agreement. The band is wide
 # because real airframes, mounts, and GPS receivers vary a lot; the goal is
@@ -134,9 +137,15 @@ def analyze(
         return [Row("imu", "stationary_window", 0.0, None, "", "n/a", note), *whole_log]
     gt, gxyz, _topic = source
 
-    window = find_stationary_window(gt, gxyz)
+    mask = arming.disarmed_mask(ulog, gt)
+    if mask is None:
+        no_arming = Row("imu", "stationary_window", 0.0, None, "", "n/a", arming.NO_ARMING_NOTE)
+        return [no_arming, *whole_log]
+
+    window = find_stationary_window(gt, gxyz, eligible=mask)
     if window is None:
-        no_window = Row("imu", "stationary_window", 0.0, None, "s", "n/a", "no quiet >=3s run")
+        no_window = Row("imu", "stationary_window", 0.0, None, "s", "n/a",
+                        NO_DISARMED_WINDOW_NOTE)
         return [no_window, *whole_log]
 
     rows: list[Row] = []
