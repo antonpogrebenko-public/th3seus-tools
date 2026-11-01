@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import numbers
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict
 from pathlib import Path
@@ -246,36 +247,47 @@ def emit_rust_constants(r: BatteryFitResult) -> str:
     return rust_constants_text(result_to_dict(r))
 
 
+def _whole(record: Mapping[str, Any], key: str) -> int:
+    """`record[key]` as an int for the Rust text; ValueError unless it is a whole number (a
+    string or a fraction would otherwise be written into the Rust code or its comments)."""
+    value = record[key]
+    if (isinstance(value, bool) or not isinstance(value, numbers.Real)
+            or not float(value).is_integer()):
+        raise ValueError(f"battery fit: {key} is not a whole number")
+    return int(value)
+
+
+def _r_table_lines(battery: Mapping[str, Any]) -> list[str]:
+    lines = [
+        "// FITTED_R_TABLE: deployed per-cell R (mohm/cell), keyed by cell count.",
+        f"// Canonical run, split seed={_whole(battery, 'split_seed')}, "
+        f"{_whole(battery, 'real_log_count')} real logs, "
+        f"{_whole(battery, 'sim_log_count')} SIM excluded.",
+        "const FITTED_R_TABLE: &[(u8, f64)] = &[",
+    ]
+    for f in battery["r_fits"]:
+        n = _whole(f, "n_observations")
+        note = f"n={n} LOW-N -> pooled median" if f["low_n"] else f"n={n}"
+        lines.append(
+            f"    ({_whole(f, 'cell_count')}, {f['deployed_mohm_per_cell']:.4f}),  // {note}"
+        )
+    return lines + ["];"]
+
+
 def rust_constants_text(battery: Mapping[str, Any]) -> str:
     """Render the deployed R table + OCV table as Rust source constants.
 
     ``battery`` is the result's JSON dict.  The output is in the format
     ``hitl-physics/src/battery.rs`` uses, so the tables can be copied there as
-    they are; it holds nothing from the pack-capacity rows.
+    they are; it holds nothing from the pack-capacity rows.  The counts must be
+    whole numbers (ValueError otherwise).
     """
-    lines: list[str] = []
-    lines.append(
-        "// FITTED_R_TABLE: deployed per-cell R (mohm/cell), keyed by cell count."
-    )
-    lines.append(
-        f"// Canonical run, split seed={battery['split_seed']}, "
-        f"{battery['real_log_count']} real logs, {battery['sim_log_count']} SIM excluded."
-    )
-    lines.append("const FITTED_R_TABLE: &[(u8, f64)] = &[")
-    for f in battery["r_fits"]:
-        note = (
-            f"n={f['n_observations']} LOW-N -> pooled median"
-            if f["low_n"]
-            else f"n={f['n_observations']}"
-        )
-        lines.append(
-            f"    ({f['cell_count']}, {f['deployed_mohm_per_cell']:.4f}),  // {note}"
-        )
-    lines.append("];")
+    lines = _r_table_lines(battery)
     lines.append("")
     lines.append(
         f"const FITTED_R_DEFAULT_MOHM_PER_CELL: f64 = "
-        f"{battery['overall_r_median_mohm_per_cell']:.4f};  // pooled, n={battery['overall_r_n']}"
+        f"{battery['overall_r_median_mohm_per_cell']:.4f};  "
+        f"// pooled, n={_whole(battery, 'overall_r_n')}"
     )
     lines.append("")
     lines.append("const OCV_TABLE: &[(f64, f64)] = &[")

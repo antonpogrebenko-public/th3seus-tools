@@ -217,3 +217,22 @@ def test_json_names_why_a_class_falls_back():
     assert [f["fallback_reason"] for f in fits] == [
         None, "low-n (fewer than 200 step events)",
         "implausible (median below the 4 mohm/cell floor)"]
+
+
+@pytest.mark.parametrize("key, bad", [
+    ("split_seed", "42\nfn injected() {}"), ("real_log_count", 8.5), ("sim_log_count", None),
+    ("overall_r_n", True)])
+def test_rust_constants_refuse_a_count_that_is_not_a_whole_number(key, bad):
+    _, result = _corpus_result()
+    battery = {**result_to_dict(result), key: bad}
+    with pytest.raises(ValueError, match=f"{key} is not a whole number"):
+        battery_output.rust_constants_text(battery)
+
+
+@pytest.mark.parametrize("key, bad", [("cell_count", "4), (9"), ("n_observations", 3.5)])
+def test_rust_constants_refuse_a_row_count_that_is_not_a_whole_number(key, bad):
+    _, result = _corpus_result()
+    battery = result_to_dict(result)
+    battery["r_fits"] = [{**battery["r_fits"][0], key: bad}, *battery["r_fits"][1:]]
+    with pytest.raises(ValueError, match=f"{key} is not a whole number"):
+        battery_output.rust_constants_text(battery)

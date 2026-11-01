@@ -483,6 +483,20 @@ def test_malformed_nested_row_exits_2_without_writing(tmp_path, capsys, name, ch
     assert not out.exists()
 
 
+@pytest.mark.parametrize("change", [
+    lambda d: d.__setitem__("split_seed", "42\nfn injected() {}"),
+    lambda d: d["r_fits"][0].__setitem__("cell_count", "4), (9"),
+    lambda d: d.__setitem__("overall_r_n", 2.5),
+])
+def test_battery_count_that_is_not_a_whole_number_exits_2(tmp_path, capsys, change):
+    paths = write_inputs(tmp_path / "in")
+    _rewrite(paths["battery"], change)
+    out = tmp_path / "out"
+    assert main(_args(paths, out)) == 2
+    assert "is not a whole number" in capsys.readouterr().err
+    assert not out.exists()
+
+
 @pytest.mark.parametrize("name, text, message", [
     ("noise", "{not json", "noise results: noise.json is not valid JSON"),
     ("response", json.dumps({"log_id": "x"}), "response results must hold a JSON list"),
