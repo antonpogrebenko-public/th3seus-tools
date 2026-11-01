@@ -8,7 +8,8 @@ from pathlib import Path
 
 import pytest
 
-from log_validation.batch_analyze import REQUIRED_TOPICS, batch_analyze
+from log_validation.batch_analyze import REQUIRED_TOPICS, _died_result, analyze_log, batch_analyze
+from log_validation.part_ids import empty_parts_json
 from log_validation.tests.fakes import FakeULog
 from log_validation.tests.test_pipeline import _build_log
 
@@ -245,3 +246,35 @@ def test_parameters_failure_entry_has_the_exception_type_only(tmp_path, capsys):
     results = batch_analyze(log_dir, None, loader=load_by_stem)
     assert "parameters unavailable: AttributeError" in results[0].errors
     assert "noparams" in capsys.readouterr().err
+
+
+def _without_parameters(params=None) -> FakeULog:
+    """The default test log with `initial_parameters` set to `params`, or without it."""
+    base = _fake()
+    fake = FakeULog({d.name: d.data for d in base.data_list}, info={"ver_hw": "PX4_FMU_V5"})
+    if params is None:
+        del fake.initial_parameters
+    else:
+        fake.initial_parameters = params
+    return fake
+
+
+def test_log_without_initial_parameters_is_still_measured():
+    result = analyze_log(Path("np1.ulg"), loader=lambda p: _without_parameters())
+    assert "parameters unavailable: AttributeError" in result.errors
+    assert result.measurements["gyro.gyro_noise_density"] > 0
+    assert not any(k.startswith("param.") for k in result.measurements)
+    assert result.parts["imu"]["source"] == "sensors_status_imu"
+
+
+def test_parameters_that_are_not_a_mapping_do_not_stop_the_log():
+    result = analyze_log(Path("np2.ulg"), loader=lambda p: _without_parameters(["IMU", 1]))
+    assert "gyro rate parameters unavailable: AttributeError" in result.errors
+    assert result.measurements["gyro.gyro_noise_density"] > 0
+
+
+def test_died_result_unpacks_the_task():
+    result = _died_result((Path("d1.ulg"), "v7", load_by_stem, 30.0))
+    assert (result.log_id, result.vehicle_id, result.errors) == ("d1", "v7", ["worker process died"])
+    assert result.measurements == {} and result.parts == empty_parts_json()
+

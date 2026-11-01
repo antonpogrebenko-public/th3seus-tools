@@ -31,6 +31,7 @@ from .part_ids import (
     PART_TOPICS,
     TOPIC_GPS_POSITION,
     TOPIC_MAG,
+    LogParts,
     empty_parts,
     empty_parts_json,
     identify_parts,
@@ -97,6 +98,52 @@ def _failure(log_id: str, what: str, error: Exception) -> str:
     return f"{what}: {name}"
 
 
+def _header(ulog: Any, log_id: str) -> tuple[int | None, Any, dict[str, Any], list[str]]:
+    """Airframe ID, hardware info (None when it could not be read), its dict, and failures."""
+    errors: list[str] = []
+    try:
+        airframe_id = _airframe_id(ulog.initial_parameters)
+    except Exception as e:
+        airframe_id = None
+        errors.append(_failure(log_id, "parameters unavailable", e))
+    hw = None
+    try:
+        hw = extract_hardware_info(ulog.msg_info_dict, ulog.initial_parameters)
+        return airframe_id, hw, asdict(hw), errors
+    except Exception as e:
+        return airframe_id, hw, {}, [*errors, _failure(log_id, "hardware extraction failed", e)]
+
+
+def _parts(ulog: Any, params: Any, log_id: str) -> tuple[LogParts, list[str]]:
+    """The log's parts and the notes of their identification, or empty parts and the failure."""
+    try:
+        parts = identify_parts(ulog, params)
+        return parts, [f"parts: {note}" for note in parts.notes]
+    except Exception as e:
+        return empty_parts(), [_failure(log_id, "part identification failed", e)]
+
+
+def _measure(ulog: Any, parts: LogParts, params: Any, gps_rest_min_s: float,
+             log_id: str) -> tuple[dict[str, float | None], list[str]]:
+    """The noise measurements and gyro rate parameters, and the notes and failures."""
+    measurements: dict[str, float | None] = {}
+    errors: list[str] = []
+    try:
+        for row in report.analyze(ulog, parts, gps_rest_min_s):
+            key = f"{row.sensor}.{row.param}"
+            if row.measured is not None:
+                measurements[key] = row.measured
+            elif row.note:
+                errors.append(f"{key}: {row.note}")
+    except Exception as e:
+        errors.append(_failure(log_id, "analysis failed", e))
+    try:
+        measurements.update(gyro_rate_params(params))
+    except Exception as e:
+        errors.append(_failure(log_id, "gyro rate parameters unavailable", e))
+    return measurements, errors
+
+
 def analyze_log(
     path: Path,
     vehicle_id: str | None = None,
@@ -105,9 +152,6 @@ def analyze_log(
 ) -> LogResult:
     """Analyze a single log file, return structured result."""
     log_id = path.stem
-    errors: list[str] = []
-    measurements: dict[str, float | None] = {}
-
     try:
         ulog = loader(path)
     except Exception as e:
@@ -119,28 +163,9 @@ def analyze_log(
             vehicle_id=vehicle_id,
         )
 
-    try:
-        airframe_id = _airframe_id(ulog.initial_parameters)
-    except Exception as e:
-        airframe_id = None
-        errors.append(_failure(log_id, "parameters unavailable", e))
-
-    # Extract hardware info
-    hw = None
-    try:
-        hw = extract_hardware_info(ulog.msg_info_dict, ulog.initial_parameters)
-        hw_dict = asdict(hw)
-    except Exception as e:
-        hw_dict = {}
-        errors.append(_failure(log_id, "hardware extraction failed", e))
-
+    airframe_id, hw, hw_dict, header_errors = _header(ulog, log_id)
     params = getattr(ulog, "initial_parameters", None) or {}
-    try:
-        parts = identify_parts(ulog, params)
-        errors.extend(f"parts: {note}" for note in parts.notes)
-    except Exception as e:
-        parts = empty_parts()
-        errors.append(_failure(log_id, "part identification failed", e))
+    parts, part_errors = _parts(ulog, params, log_id)
 
     # Skip simulation logs: SITL/HIL report synthetic noise that does not
     # represent real hardware, so they must not pollute the noise profiles.
@@ -156,25 +181,12 @@ def analyze_log(
             parts=parts.to_json(),
         )
 
-    # Run noise analysis
-    try:
-        rows = report.analyze(ulog, parts, gps_rest_min_s)
-        for row in rows:
-            key = f"{row.sensor}.{row.param}"
-            if row.measured is not None:
-                measurements[key] = row.measured
-            elif row.note:
-                errors.append(f"{key}: {row.note}")
-    except Exception as e:
-        errors.append(_failure(log_id, "analysis failed", e))
-
-    measurements.update(gyro_rate_params(params))
-
+    measurements, measure_errors = _measure(ulog, parts, params, gps_rest_min_s, log_id)
     return LogResult(
         log_id=log_id,
         hardware=hw_dict,
         measurements=measurements,
-        errors=errors,
+        errors=[*header_errors, *part_errors, *measure_errors],
         vehicle_id=vehicle_id,
         airframe_id=airframe_id,
         parts=parts.to_json(),
