@@ -166,8 +166,8 @@ stops on any non-zero status must accept 1 there and go on.
 
 Write a `run-info.json` with `date`, `tool_commit`, `parameters` (caps, gates,
 cut-offs, seeds, N; also `--gps-rest-min-s`, `--capacity-bounds` and the `part_tables`
-options, whether or not they are the defaults, for provenance) and `commands`, and optionally `inputs`, the input counts, for
-example `{"manifest_rows": N, "rows_without_log": N, "logs_without_row": N,
+options, whether or not they are the defaults, for provenance) and `commands`, and
+optionally `inputs`, the input counts, for example `{"manifest_rows": N, "rows_without_log": N, "logs_without_row": N,
 "capped_out": N, "download_failed": N}`. The report's Counts section shows `inputs`
 as a table, or says that the input counts were not provided. Then build the
 directory:
@@ -210,8 +210,11 @@ The rules:
 
 - Each row gives logs, vehicles, and the median, p25 and p75 over vehicle medians (a
   vehicle's median is over its own logs; a log without a vehicle ID is its own vehicle).
-  A row gets a proposed value only with at least `--min-vehicles` vehicles, and says so
-  when it does not.
+  A row gets a proposed value only with at least `--min-vehicles` vehicles. A row
+  without one gives a reason, the first that applies: "no log measured it" (no eligible
+  log), "too few logs pass the white-noise check" (barometer and magnetometer: the
+  eligible logs' vehicles would reach the threshold), then "below the vehicle
+  threshold". The report shows it in its "No proposal because" column.
 - Parts map to TH3SEUS entries through a pinned mirror of the two repositories' tables
   and parsers (`th3seus_parts.py`). A part with no entry gets its own row as a candidate
   new variant, whose current value is the `Other` entry's.
@@ -227,7 +230,10 @@ The rules:
 - GPS rows use the receiver's own accuracy estimates and update rate. A log counts toward
   a GPS variant only when its `gps.fix_type_mode` is the fix class TH3SEUS models for
   it: RTK fixed for `UbloxF9P` and `SeptentrioMosaic`, standalone 3D for every other
-  variant. It counts toward `Other` only with a 3D fix.
+  variant. It counts toward `Other` only when its fix-type mode is 3 (standalone 3D).
+  A log whose mode is RTK fixed (6) therefore counts only toward a variant of the
+  rtk_fixed class (`UbloxF9P`, `SeptentrioMosaic`), and a log with any other mode (for
+  example 4 or 5, DGPS or RTK float) or no mode counts toward no GPS row.
 - `board-table.json` is `{"boards": {BOARD: {"logs", "vehicles", "imu", "baro", "mag",
   "imu_gyro_ratemax_median", "imu_gyro_cutoff_median"}}}`; the `imu`, `baro` and `mag`
   maps give each chip's share of the board's vehicles (each vehicle's most common chip).
