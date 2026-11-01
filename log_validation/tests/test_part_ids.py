@@ -9,7 +9,7 @@ import pytest
 
 from log_validation import report
 from log_validation.batch_analyze import analyze_log, batch_analyze
-from log_validation.part_ids import empty_parts_json, identify_parts
+from log_validation.part_ids import empty_parts_json, gps_topic, identify_parts
 from log_validation.response import ResponseGates, analyze_response
 from log_validation.tests.part_fakes import InstanceULog, device_id, topic
 from log_validation.tests.response_fakes import quad_log
@@ -190,6 +190,16 @@ def test_sensor_gps_when_vehicle_gps_position_is_absent():
     assert identify_parts(log, {}).gps_topic == "sensor_gps"
 
 
+def test_vehicle_gps_position_wins_when_both_topics_are_logged():
+    # sensor_gps is logged first; vehicle_gps_position is still the one read and named.
+    log = InstanceULog({"sensor_gps": topic(5, 1, device_id=device_id(0xA9)),
+                        "vehicle_gps_position": topic(5, 1, device_id=device_id(UBX_F9P))})
+    parts = identify_parts(log, {})
+    assert (parts.gps_topic, parts.gps.name, parts.gps.source) == (
+        "vehicle_gps_position", "UBX_F9P", "vehicle_gps_position")
+    assert gps_topic(log) == "vehicle_gps_position"
+
+
 def test_unknown_barometer_type():
     log = InstanceULog({"sensor_baro": topic(5, 1, device_id=device_id(0x99))})
     baro = identify_parts(log, {}).baro
@@ -262,6 +272,24 @@ def test_part_identification_failure_is_an_entry_error(tmp_path, monkeypatch):
     assert "part identification failed: RuntimeError" in entry["errors"]
     assert entry["parts"] == empty_parts_json()
     assert entry["measurements"]  # the noise analysis still ran
+
+
+def test_failed_identification_still_reads_the_sensor_gps_topic(tmp_path, monkeypatch):
+    import log_validation.batch_analyze as module
+
+    def broken(_ulog, _params):
+        raise RuntimeError("no parts")
+
+    base = _build_log()
+    log = InstanceULog({("sensor_gps" if d.name == "vehicle_gps_position" else d.name): d.data
+                        for d in base.data_list})
+    monkeypatch.setattr(module, "identify_parts", broken)
+    entry = analyze_log(tmp_path / "g1.ulg", loader=lambda p: log)
+    assert "part identification failed: RuntimeError" in entry.errors
+    m = entry.measurements
+    assert m["gps.eph_median_m"] == pytest.approx(1.0)
+    assert abs(m["gps.horizontal_noise_sigma"] - 1.2) / 1.2 < 0.25
+    assert "gps.rest_spread_horizontal_m" in m
 
 
 def test_no_header_results_do_not_share_a_parts_dict():

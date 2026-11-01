@@ -160,11 +160,17 @@ def _measured_instance(ulog: Any, topic: str, status_topic: str) -> int:
     return logged[0] if logged else 0
 
 
+def gps_topic(ulog: Any) -> str | None:
+    """The GPS topic the measurements read: `vehicle_gps_position`, else `sensor_gps`, else
+    None. Needs no part identification, so the GPS values survive a failed one."""
+    return next((t for t in (TOPIC_GPS_POSITION, TOPIC_SENSOR_GPS) if ul.instances(ulog, t)),
+                None)
+
+
 def _gps(ulog: Any) -> tuple[PartRecord, str | None]:
-    """The receiver of the first GPS topic logged, named from its lowest logged instance: with
-    two receivers on `sensor_gps`, that is instance 0, the one the GPS measurements read."""
-    topic = next((t for t in (TOPIC_GPS_POSITION, TOPIC_SENSOR_GPS)
-                  if ul.instances(ulog, t)), None)
+    """The receiver of the GPS topic the measurements read, named from its lowest logged
+    instance: with two receivers on `sensor_gps`, that is instance 0, the one they read."""
+    topic = gps_topic(ulog)
     if topic is None:
         return _EMPTY, None
     device_id = _common_id(ulog, topic, FIELD_DEVICE_ID, ul.instances(ulog, topic)[0])

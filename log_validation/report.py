@@ -14,7 +14,7 @@ import numpy as np
 from . import noise_stats as ns
 from . import reference as ref
 from . import ulog_loader as ul
-from .part_ids import TOPIC_GPS_POSITION, TOPIC_MAG, LogParts, identify_parts
+from .part_ids import TOPIC_GPS_POSITION, TOPIC_MAG, LogParts, gps_topic, identify_parts
 from .part_measures import (
     DEFAULT_GPS_REST_MIN_S,
     Value,
@@ -122,10 +122,12 @@ def analyze(
     """Run all sensor comparisons that the log supports.
 
     `parts` names the magnetometer instance and the GPS topic to measure; it is identified
-    from the log when not given. The receiver's accuracy estimates cover the whole log, so
-    they are recorded even when there is no still window."""
+    from the log when not given. Parts without a GPS topic (a failed identification gives
+    empty parts) read the log's own GPS topic. The receiver's accuracy estimates cover the
+    whole log, so they are recorded even when there is no still window."""
     parts = parts or identify_parts(ulog, getattr(ulog, "initial_parameters", None) or {})
-    whole_log = _value_rows(gps_accuracy_values(ulog, parts.gps_topic))
+    gps = parts.gps_topic or gps_topic(ulog)
+    whole_log = _value_rows(gps_accuracy_values(ulog, gps))
     source = _imu_source(ulog)
     if source is None:
         note = f"neither '{TOPIC_COMBINED}' nor '{TOPIC_GYRO}' in log"
@@ -143,9 +145,9 @@ def analyze(
     rows.extend(_mag_rows(ulog, window, parts.mag_instance))
     rows.extend(_value_rows(baro_chip_values(ulog, window, parts.baro_instance)))
     rows.extend(_value_rows(mag_evidence_values(ulog, window, parts.mag_instance)))
-    rows.extend(_gps_rows(ulog, window, parts.gps_topic or TOPIC_GPS_POSITION))
+    rows.extend(_gps_rows(ulog, window, gps or TOPIC_GPS_POSITION))
     rows.extend(whole_log)
-    rows.extend(_value_rows(gps_rest_spread_values(ulog, parts.gps_topic, window, gps_rest_min_s)))
+    rows.extend(_value_rows(gps_rest_spread_values(ulog, gps, window, gps_rest_min_s)))
     return rows
 
 
