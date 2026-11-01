@@ -224,7 +224,7 @@ def test_alias_function_matches_files():
 
 
 @pytest.mark.parametrize("bad", ["bad name", "lower", "Has-Dash", "1Abc", "Self", "Mpu6000", "None",
-                                 "Other", "Café", "Name\n"])
+                                 "Other", "Caf\u00e9", "Name\n"])
 def test_bad_variant_name_raises(bad):
     tables = _hand_candidate("imu", bad)
     with pytest.raises(ValueError, match="imu"):
