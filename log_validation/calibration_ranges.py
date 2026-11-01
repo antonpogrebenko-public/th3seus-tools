@@ -154,8 +154,9 @@ def contributes_to_noise(entry: Mapping[str, Any]) -> bool:
     and new densities (the report's before and after table) and the
     noise-profile parameters (`noise-profiles.json`). The profiles take every
     finite noise measurement of an entry (`aggregate.profiled_measurements`: the
-    logged parameters and the GPS fix type are not noise numbers), so an entry contributes
-    when it has at least one."""
+    logged parameters, the GPS fix type and accuracy estimates and the part tables'
+    white-noise evidence are not noise numbers), so an entry contributes when it has at
+    least one."""
     return bool(profiled_measurements(entry.get("measurements") or {}))
 
 

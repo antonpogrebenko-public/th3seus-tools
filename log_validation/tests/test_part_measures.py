@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import math
 import warnings
+from dataclasses import asdict
 from pathlib import Path
 
 import numpy as np
@@ -12,7 +13,7 @@ import pytest
 
 from log_validation.aggregate import aggregate_profiles, profiled_measurements
 from log_validation.batch_analyze import analyze_log
-from log_validation.calibration_ranges import contributes_to_noise
+from log_validation.calibration_ranges import contributes_to_noise, log_id_lists
 from log_validation.part_measures import (
     MIN_DISTINCT_SAMPLES,
     baro_chip_values,
@@ -214,6 +215,34 @@ def test_profiled_measurements_drop_parameters_and_the_fix_type_mode():
     assert profiled_measurements(m) == {"baro.noise_sigma": 0.2}
 
 
+NOT_NOISE = ("gps.eph_median_m", "gps.epv_median_m", "gps.speed_accuracy_median_m_s",
+             "baro.chip_rate_hz", "baro.chip_allan_slope", "baro.chip_resolution_m",
+             "mag.rate_hz", "mag.allan_slope", "mag.resolution_gauss", "gps.rest_window_s")
+STILL_NOISE = ("baro.chip_noise_sigma", "gps.rest_spread_horizontal_m",
+               "gps.rest_spread_altitude_m", "gps.update_rate_hz", "gps.horizontal_noise_sigma",
+               "mag.noise_sigma_gauss")
+
+
+def test_profiled_measurements_drop_the_listed_keys_only():
+    m = {k: 1.0 for k in NOT_NOISE + STILL_NOISE}
+    assert set(profiled_measurements(m)) == set(STILL_NOISE)
+
+
+def test_whole_log_gps_values_alone_do_not_contribute_to_noise():
+    entry = asdict(analyze_log(_stub_path("moving"), loader=lambda p: _moving_log()))
+    m = entry["measurements"]
+    assert {"gps.eph_median_m", "gps.epv_median_m", "gps.speed_accuracy_median_m_s"} <= set(m)
+    assert not contributes_to_noise(entry)
+    assert log_id_lists([entry], {}, [])["noise"] == []
+    assert aggregate_profiles([{**entry, "log_id": f"m{i}"} for i in range(3)]) == []
+
+
+def test_a_log_with_a_still_window_still_contributes_to_noise():
+    entry = asdict(analyze_log(_stub_path("still"), loader=lambda p: _fake()))
+    assert contributes_to_noise(entry) and log_id_lists([entry], {}, [])["noise"] == ["still"]
+    assert aggregate_profiles([{**entry, "log_id": f"s{i}"} for i in range(3)]) != []
+
+
 DEG_PER_M = 180.0 / (math.pi * 6371000.0)
 GPS = "vehicle_gps_position"
 
@@ -321,15 +350,19 @@ def test_accuracy_samples_of_another_fix_type_do_not_count():
     assert values(gps_accuracy_values(log, GPS))["gps.eph_median_m"] == pytest.approx(1.0)
 
 
-def test_accuracy_without_a_stationary_window():
+def _moving_log() -> FakeULog:
+    """The default test log, but the gyro never rests, so there is no still window."""
     base = _fake()
     moving = {d.name: dict(d.data) for d in base.data_list}
     n = len(moving["sensor_gyro"]["timestamp"])
     for axis in "xyz":
         moving["sensor_gyro"][axis] = np.full(n, 0.5)
         moving["sensor_combined"][f"gyro_rad[{'xyz'.index(axis)}]"] = np.full(n, 0.5)
-    log = FakeULog(moving, params=dict(base.initial_parameters), info=dict(base.msg_info_dict))
-    result = analyze_log(_stub_path("moving"), loader=lambda p: log)
+    return FakeULog(moving, params=dict(base.initial_parameters), info=dict(base.msg_info_dict))
+
+
+def test_accuracy_without_a_stationary_window():
+    result = analyze_log(_stub_path("moving"), loader=lambda p: _moving_log())
     assert result.measurements["gps.eph_median_m"] == pytest.approx(1.0)
     assert "gps.rest_spread_horizontal_m" not in result.measurements
 

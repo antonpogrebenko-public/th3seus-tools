@@ -63,7 +63,14 @@ GPS is read from `vehicle_gps_position`, or from `sensor_gps` when the log has n
 `vehicle_gps_position`; `parts.gps.source` names the topic. The GPS accuracy keys
 (`gps.fix_type_mode`, `gps.eph_median_m`, `gps.epv_median_m`,
 `gps.speed_accuracy_median_m_s`) cover the whole log, not the at-rest window, so a log
-without a still window can now appear in `log-ids/noise.txt`.
+without a still window still gets them.
+
+The noise profiles and `log-ids/noise.txt` keep holding only values measured at rest.
+These keys do not count toward them: the `param.*` keys, the GPS fix type and accuracy
+keys above, `gps.rest_window_s`, and the white-noise evidence of the part tables
+(`baro.chip_rate_hz`, `baro.chip_allan_slope`, `baro.chip_resolution_m`, `mag.rate_hz`,
+`mag.allan_slope`, `mag.resolution_gauss`). A log without a still window therefore
+stays out of `log-ids/noise.txt`, as before.
 
 ### Not yet validated
 

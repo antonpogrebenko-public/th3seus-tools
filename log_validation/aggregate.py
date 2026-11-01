@@ -106,10 +106,26 @@ def clean_measurements(measurements: dict[str, Any]) -> dict[str, float]:
     }
 
 
-# Measurements that describe a log but are not noise numbers: the logged parameters and the
-# GPS fix type. They are recorded per log and stay out of the noise profiles.
+# Measurements that describe a log but are not noise numbers measured at rest: the logged
+# parameters, the GPS fix type and the receiver's whole-log accuracy estimates, and the
+# evidence of the part tables' white-noise check (rates, Allan slopes, resolutions) and the GPS
+# rest window's length. They are recorded per log and stay out of the noise profiles and the
+# noise log-ID list. An explicit list, never a pattern: earlier keys such as
+# `gps.update_rate_hz` keep counting.
 NOT_PROFILED_PREFIXES = ("param.",)
-NOT_PROFILED_KEYS = frozenset({"gps.fix_type_mode"})
+NOT_PROFILED_KEYS = frozenset({
+    "gps.fix_type_mode",
+    "gps.eph_median_m",
+    "gps.epv_median_m",
+    "gps.speed_accuracy_median_m_s",
+    "baro.chip_rate_hz",
+    "baro.chip_allan_slope",
+    "baro.chip_resolution_m",
+    "mag.rate_hz",
+    "mag.allan_slope",
+    "mag.resolution_gauss",
+    "gps.rest_window_s",
+})
 
 
 def profiled_measurements(measurements: dict[str, Any]) -> dict[str, float]:
