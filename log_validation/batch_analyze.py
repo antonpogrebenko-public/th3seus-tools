@@ -137,6 +137,7 @@ def analyze_log(
     params = getattr(ulog, "initial_parameters", None) or {}
     try:
         parts = identify_parts(ulog, params)
+        errors.extend(f"parts: {note}" for note in parts.notes)
     except Exception as e:
         parts = empty_parts()
         errors.append(_failure(log_id, "part identification failed", e))

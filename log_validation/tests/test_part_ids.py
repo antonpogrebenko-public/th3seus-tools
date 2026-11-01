@@ -5,9 +5,10 @@ from __future__ import annotations
 import json
 
 import numpy as np
+import pytest
 
 from log_validation import report
-from log_validation.batch_analyze import batch_analyze
+from log_validation.batch_analyze import analyze_log, batch_analyze
 from log_validation.part_ids import empty_parts_json, identify_parts
 from log_validation.response import ResponseGates, analyze_response
 from log_validation.tests.part_fakes import InstanceULog, device_id, topic
@@ -46,6 +47,42 @@ def test_only_calibration_slots():
     imu = identify_parts(InstanceULog({}),
                          {"CAL_GYRO0_ID": 0, "CAL_GYRO1_ID": device_id(MPU6000)}).imu
     assert (imu.name, imu.source) == ("MPU6000", "CAL_GYRO1_ID")
+
+
+@pytest.mark.parametrize("bad", [float("nan"), float("inf"), -5, 2.5, "abc", True])
+def test_malformed_calibration_id_is_noted_and_skipped(bad):
+    parts = identify_parts(InstanceULog({}),
+                           {"CAL_GYRO0_ID": bad, "CAL_GYRO1_ID": device_id(MPU6000)})
+    assert (parts.imu.name, parts.imu.source) == ("MPU6000", "CAL_GYRO1_ID")
+    assert parts.notes == ("CAL_GYRO0_ID is not a device ID",)
+
+
+def test_a_numpy_calibration_id_is_read():
+    imu = identify_parts(InstanceULog({}), {"CAL_GYRO0_ID": np.int32(device_id(MPU6000))}).imu
+    assert (imu.name, imu.source) == ("MPU6000", "CAL_GYRO0_ID")
+
+
+def test_absent_or_zero_calibration_ids_give_no_note():
+    parts = identify_parts(InstanceULog({}), {"CAL_GYRO0_ID": 0, "CAL_BARO0_ID": 0.0})
+    assert parts.notes == () and parts.imu.name is None
+
+
+def test_malformed_barometer_calibration_id_is_noted():
+    parts = identify_parts(InstanceULog({"sensor_baro": topic(5, 1, pressure=95000.0)}),
+                           {"CAL_BARO0_ID": -1})
+    assert parts.baro.name is None and parts.notes == ("CAL_BARO0_ID is not a device ID",)
+
+
+def test_calibration_ids_not_read_give_no_note():
+    log = InstanceULog({"sensors_status_imu": topic(5, 1, gyro_device_id_primary=device_id(BMI088))})
+    assert identify_parts(log, {"CAL_GYRO0_ID": float("nan")}).notes == ()
+
+
+def test_malformed_calibration_id_is_an_entry_error(tmp_path):
+    log = InstanceULog({"sensor_baro": topic(5, 1, pressure=95000.0)},
+                       params={"CAL_BARO0_ID": float("inf")})
+    entry = analyze_log(tmp_path / "c1.ulg", loader=lambda p: log)
+    assert "parts: CAL_BARO0_ID is not a device ID" in entry.errors
 
 
 def test_imu_id_in_the_accelerometer_table_only():
@@ -134,6 +171,14 @@ def test_gps_topic_without_a_device_id():
     assert (parts.gps.name, parts.gps.devtype, parts.gps_topic) == (None, None,
                                                                     "vehicle_gps_position")
     assert parts.gps.source == "vehicle_gps_position"
+
+
+def test_two_receivers_name_the_instance_the_measurements_read():
+    # The GPS measurements read instance 0 of the topic; the part is named from it too.
+    log = InstanceULog({("sensor_gps", 0): topic(5, 1, device_id=device_id(UBX_F9P)),
+                        ("sensor_gps", 1): topic(5, 1, device_id=device_id(0xA9))})
+    parts = identify_parts(log, {})
+    assert (parts.gps.name, parts.gps_topic) == ("UBX_F9P", "sensor_gps")
 
 
 def test_sensor_gps_when_vehicle_gps_position_is_absent():

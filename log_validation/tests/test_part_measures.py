@@ -28,7 +28,6 @@ from log_validation.stationary import Window
 from log_validation.tests.part_fakes import InstanceULog, device_id, topic
 from log_validation.tests.fakes import FakeULog, ts_us
 from log_validation.tests.test_batch_analyze import _fake
-from log_validation.tests.test_pipeline import _build_log
 
 WINDOW_60S = Window(0, 2999, 0.0, 60.0)
 BASE_PA = 95000.0

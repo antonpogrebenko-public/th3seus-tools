@@ -40,7 +40,8 @@ noise pass adds, for the tables below:
 - `parts.imu`, `parts.baro`, `parts.mag`, `parts.gps`: which part produced the samples
   each value was measured on, each with `name`, `devtype`, `device_id` and `source`
   (the board stays in `hardware.fc_board`). An unknown device type keeps its number and
-  a name that marks it unknown.
+  a name that marks it unknown. A calibration parameter that is read but holds no
+  device ID adds an error such as `parts: CAL_GYRO0_ID is not a device ID`.
 - `baro.chip_noise_sigma`, `baro.chip_rate_hz`, `baro.chip_allan_slope`,
   `baro.chip_resolution_m`: the raw barometer's own noise, rate, Allan slope and
   resolution. `baro.noise_sigma` still measures the fused altitude.

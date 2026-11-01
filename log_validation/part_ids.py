@@ -8,8 +8,9 @@ device type that no table names stays `UNKNOWN_0x..`; it is never mapped to a kn
 from __future__ import annotations
 
 import math
+import numbers
 from collections import Counter
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass
 from typing import Any
 
@@ -63,6 +64,8 @@ class LogParts:
     baro_instance: int
     mag_instance: int
     gps_topic: str | None
+    # Why a calibration parameter that was read gave no part, such as a malformed ID.
+    notes: tuple[str, ...] = ()
 
     def to_json(self) -> dict[str, dict[str, Any]]:
         return {key: asdict(getattr(self, key)) for key in PART_KEYS}
@@ -91,11 +94,16 @@ def _common_id(ulog: Any, topic: str, field: str, instance: int = 0) -> int | No
     return counts.most_common(1)[0][0] if counts else None
 
 
-def _param_id(params: Mapping[str, Any], name: str) -> int | None:
-    try:
-        return int(params.get(name, 0) or 0) or None
-    except (TypeError, ValueError):
-        return None
+def _param_id(params: Mapping[str, Any], name: str) -> tuple[int | None, str | None]:
+    """(device ID, None) from a calibration parameter; (None, None) when it is absent or 0;
+    (None, note) when it is not a whole number above 0, which no device ID is."""
+    value = params.get(name)
+    number = isinstance(value, numbers.Real) and not isinstance(value, bool)
+    if value is None or (number and value == 0):
+        return None, None
+    if not number or not math.isfinite(value) or value < 0 or value != int(value):
+        return None, f"{name} is not a device ID"
+    return int(value), None
 
 
 def _record(decoded: DecodedDevice | None, device_id: int | None, source: str) -> PartRecord:
@@ -104,31 +112,40 @@ def _record(decoded: DecodedDevice | None, device_id: int | None, source: str) -
     return PartRecord(decoded.name, decoded.devtype, device_id, source)
 
 
-def _imu(ulog: Any, params: Mapping[str, Any]) -> PartRecord:
+def _from_params(params: Mapping[str, Any], names: Sequence[str],
+                 decode: Callable[[int], DecodedDevice | None]) -> tuple[PartRecord, tuple[str, ...]]:
+    """The first of the calibration parameters that holds a device ID, and a note for each
+    malformed one read before it."""
+    notes: list[str] = []
+    for name in names:
+        device_id, note = _param_id(params, name)
+        if note is not None:
+            notes.append(note)
+        elif device_id is not None:
+            return _record(decode(device_id), device_id, name), tuple(notes)
+    return _EMPTY, tuple(notes)
+
+
+def _imu(ulog: Any, params: Mapping[str, Any]) -> tuple[PartRecord, tuple[str, ...]]:
     candidates: list[tuple[int | None, str]] = [
         (_common_id(ulog, TOPIC_STATUS_IMU, FIELD_STATUS_GYRO_ID), TOPIC_STATUS_IMU)]
     imu_instances = ul.instances(ulog, TOPIC_VEHICLE_IMU)
     if imu_instances:
         candidates.append((_common_id(ulog, TOPIC_VEHICLE_IMU, FIELD_VEHICLE_GYRO_ID,
                                       imu_instances[0]), TOPIC_VEHICLE_IMU))
-    candidates.extend((_param_id(params, f"CAL_GYRO{i}_ID"), f"CAL_GYRO{i}_ID")
-                      for i in range(CAL_SLOTS))
     for device_id, source in candidates:
         if device_id is not None:
-            return _record(decode_imu_id(device_id), device_id, source)
-    return _EMPTY
+            return _record(decode_imu_id(device_id), device_id, source), ()
+    return _from_params(params, [f"CAL_GYRO{i}_ID" for i in range(CAL_SLOTS)], decode_imu_id)
 
 
 def _instance_id(ulog: Any, params: Mapping[str, Any], topic: str, instance: int,
-                 cal_prefix: str, table: dict[int, str]) -> PartRecord:
+                 cal_prefix: str, table: dict[int, str]) -> tuple[PartRecord, tuple[str, ...]]:
     device_id = _common_id(ulog, topic, FIELD_DEVICE_ID, instance)
     if device_id is not None:
-        return _record(decode_device_id(device_id, table), device_id, topic)
-    name = f"{cal_prefix}{instance}_ID"
-    device_id = _param_id(params, name)
-    if device_id is None:
-        return _EMPTY
-    return _record(decode_device_id(device_id, table), device_id, name)
+        return _record(decode_device_id(device_id, table), device_id, topic), ()
+    return _from_params(params, [f"{cal_prefix}{instance}_ID"],
+                        lambda d: decode_device_id(d, table))
 
 
 def _measured_instance(ulog: Any, topic: str, status_topic: str) -> int:
@@ -143,6 +160,8 @@ def _measured_instance(ulog: Any, topic: str, status_topic: str) -> int:
 
 
 def _gps(ulog: Any) -> tuple[PartRecord, str | None]:
+    """The receiver of the first GPS topic logged, named from its lowest logged instance: with
+    two receivers on `sensor_gps`, that is instance 0, the one the GPS measurements read."""
     topic = next((t for t in (TOPIC_GPS_POSITION, TOPIC_SENSOR_GPS)
                   if ul.instances(ulog, t)), None)
     if topic is None:
@@ -158,12 +177,17 @@ def identify_parts(ulog: Any, params: Mapping[str, Any]) -> LogParts:
     baro_instance = _measured_instance(ulog, TOPIC_BARO, TOPIC_STATUS_BARO)
     mag_instance = _measured_instance(ulog, TOPIC_MAG, TOPIC_STATUS_MAG)
     gps, gps_topic = _gps(ulog)
+    imu, imu_notes = _imu(ulog, params)
+    baro, baro_notes = _instance_id(ulog, params, TOPIC_BARO, baro_instance, "CAL_BARO",
+                                    BARO_DEVTYPES)
+    mag, mag_notes = _instance_id(ulog, params, TOPIC_MAG, mag_instance, "CAL_MAG", MAG_DEVTYPES)
     return LogParts(
-        imu=_imu(ulog, params),
-        baro=_instance_id(ulog, params, TOPIC_BARO, baro_instance, "CAL_BARO", BARO_DEVTYPES),
-        mag=_instance_id(ulog, params, TOPIC_MAG, mag_instance, "CAL_MAG", MAG_DEVTYPES),
+        imu=imu,
+        baro=baro,
+        mag=mag,
         gps=gps,
         baro_instance=baro_instance,
         mag_instance=mag_instance,
         gps_topic=gps_topic,
+        notes=imu_notes + baro_notes + mag_notes,
     )
