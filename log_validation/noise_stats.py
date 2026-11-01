@@ -79,6 +79,10 @@ def noise_density(samples: np.ndarray, dt_s: float) -> float:
     return white_noise_std(samples) * math.sqrt(dt_s)
 
 
+# The shortest series `allan_deviation` accepts.
+ALLAN_MIN_SAMPLES = 16
+
+
 @dataclass(frozen=True)
 class AllanResult:
     """Allan-deviation summary for a bias process."""
@@ -101,8 +105,8 @@ def allan_deviation(samples: np.ndarray, dt_s: float, n_taus: int = 30) -> Allan
     """
     x = np.asarray(samples, dtype=float)
     n = x.size
-    if n < 16:
-        raise ValueError("need at least 16 samples for Allan deviation")
+    if n < ALLAN_MIN_SAMPLES:
+        raise ValueError(f"need at least {ALLAN_MIN_SAMPLES} samples for Allan deviation")
 
     theta = np.cumsum(x) * dt_s  # integrated signal
     max_m = (n - 1) // 2

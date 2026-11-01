@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import math
 import warnings
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -13,7 +14,7 @@ from log_validation.aggregate import aggregate_profiles, profiled_measurements
 from log_validation.batch_analyze import analyze_log
 from log_validation.calibration_ranges import contributes_to_noise
 from log_validation.part_measures import (
-    GYRO_RATE_PARAMS,
+    MIN_DISTINCT_SAMPLES,
     baro_chip_values,
     gps_accuracy_values,
     gps_position,
@@ -40,7 +41,8 @@ def _baro_log(sigma_m, rate_hz=50.0, seconds=60.0, scale=1.0, repeat=1, pressure
     """sensor_baro at rate_hz: 95000 Pa plus white noise of sigma_m altitude per reading,
     each reading logged `repeat` times, pressure multiplied by `scale` (0.01 for hPa)."""
     n = int(rate_hz * seconds)
-    dh_dp = abs(isa_altitude_m(np.array([BASE_PA + 1.0])) - isa_altitude_m(np.array([BASE_PA - 1.0]))) / 2.0
+    above, below = (isa_altitude_m(np.array([BASE_PA + d])) for d in (1.0, -1.0))
+    dh_dp = abs(above - below) / 2.0
     sigma_p = sigma_m / float(dh_dp[0])
     readings = BASE_PA + np.random.default_rng(11).normal(0, sigma_p, n // repeat)
     p = np.repeat(readings, repeat) * scale if pressure is None else pressure
@@ -91,7 +93,29 @@ def test_bad_pressure_samples_are_ignored():
 def test_constant_baro_gives_an_error_not_a_value():
     out = baro_chip_values(_baro_log(0.1, pressure=np.full(3000, BASE_PA)), WINDOW_60S, 0)
     assert len(out) == 1 and out[0].key == "baro.chip_noise_sigma"
-    assert out[0].value is None and out[0].unit == "m" and out[0].note
+    assert out[0].value is None and out[0].unit == "m" and "constant" in out[0].note
+
+
+def _steps(levels: np.ndarray, n: int = 3000) -> np.ndarray:
+    """n readings that hold each level in turn: len(levels) distinct samples."""
+    return np.repeat(levels, n // levels.size + 1)[:n]
+
+
+@pytest.mark.parametrize("steps", [2, MIN_DISTINCT_SAMPLES - 1])
+def test_few_distinct_baro_samples_give_an_error_and_no_warning(steps):
+    pressure = _steps(BASE_PA + np.arange(steps, dtype=float))
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        out = baro_chip_values(_baro_log(0.1, pressure=pressure), WINDOW_60S, 0)
+    assert [(v.key, v.value) for v in out] == [("baro.chip_noise_sigma", None)]
+    assert out[0].note == (f"only {steps} distinct barometer samples in the still window "
+                           f"(need {MIN_DISTINCT_SAMPLES})")
+
+
+def test_the_minimum_of_distinct_baro_samples_gives_values():
+    levels = BASE_PA + np.random.default_rng(3).normal(0, 1.0, MIN_DISTINCT_SAMPLES)
+    out = baro_chip_values(_baro_log(0.1, pressure=_steps(levels)), WINDOW_60S, 0)
+    assert len(values(out)) == 4
 
 
 def test_missing_baro_topic_gives_one_error_value():
@@ -110,7 +134,6 @@ def test_no_raw_barometer_topic():
 
 
 def _stub_path(stem):
-    from pathlib import Path
     return Path(f"{stem}.ulg")
 
 
@@ -131,6 +154,37 @@ def test_missing_mag_topic_gives_one_error_value():
     assert out[0].unit == "Hz" and out[0].note
 
 
+def test_constant_mag_axis_keeps_the_rate():
+    log = _mag_log(0.004)
+    data = {k: np.array(v) for k, v in log.get_dataset("sensor_mag").data.items()}
+    data["z"] = np.full(data["z"].size, 0.49)
+    out = mag_evidence_values(FakeULog({"sensor_mag": data}), WINDOW_60S, 0)
+    assert abs(values(out)["mag.rate_hz"] - 50.0) / 50.0 < 0.01
+    assert [(v.key, v.value, v.note) for v in out if v.value is None] == [
+        ("mag.allan_slope", None, "magnetometer axis z is constant in the still window")]
+
+
+def test_few_distinct_mag_samples_keep_the_rate_and_give_no_warning():
+    n = 3000
+    data = {"timestamp": ts_us(n, 50.0), "x": _steps(np.array([0.2, 0.21, 0.22, 0.23]), n),
+            "y": np.full(n, 0.03), "z": np.full(n, 0.49)}
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        out = mag_evidence_values(FakeULog({"sensor_mag": data}), WINDOW_60S, 0)
+    assert "mag.rate_hz" in values(out)
+    assert [(v.key, v.note) for v in out if v.value is None] == [(
+        "mag.allan_slope",
+        f"only 4 distinct magnetometer samples in the still window (need {MIN_DISTINCT_SAMPLES})")]
+
+
+def test_one_distinct_mag_sample_is_constant():
+    n = 3000
+    data = {"timestamp": ts_us(n, 50.0), **{a: np.full(n, 0.2) for a in "xyz"}}
+    out = mag_evidence_values(FakeULog({"sensor_mag": data}), WINDOW_60S, 0)
+    assert [(v.key, v.value) for v in out] == [("mag.rate_hz", None), ("mag.allan_slope", None)]
+    assert all("constant magnetometer reading" in v.note for v in out)
+
+
 def test_gyro_rate_parameters_recorded():
     log = _fake(IMU_GYRO_RATEMAX=800, IMU_GYRO_CUTOFF=40)
     m = analyze_log(_stub_path("g1"), loader=lambda p: log).measurements
@@ -138,7 +192,6 @@ def test_gyro_rate_parameters_recorded():
 
 
 def test_absent_gyro_rate_parameters_give_no_values():
-    assert GYRO_RATE_PARAMS == ("IMU_GYRO_RATEMAX", "IMU_GYRO_CUTOFF")
     assert gyro_rate_params({}) == {}
     assert gyro_rate_params({"IMU_GYRO_RATEMAX": float("nan"), "IMU_GYRO_CUTOFF": 30}) == {
         "param.IMU_GYRO_CUTOFF": 30.0}
@@ -294,20 +347,44 @@ def test_rest_window_too_short():
     assert [v.value for v in vs] == [None] and "30 s" in vs[0].note
 
 
+REST_120S = Window(0, 599, 0.0, 120.0)
+
+
+def _wander_with(fill: dict[str, float], fix: np.ndarray | None = None) -> InstanceULog:
+    """The default wander log with samples 100-104 of each named field set to its value."""
+    base = _wander_log(extra=None if fix is None else {"fix_type": fix})
+    data = {k: np.array(v, dtype=float) for k, v in base.get_dataset(GPS).data.items()}
+    for name, value in fill.items():
+        data[name][100:105] = value
+    return InstanceULog({GPS: data})
+
+
 def test_rest_spread_ignores_samples_without_a_fix():
-    window = Window(0, 599, 0.0, 120.0)
-    clean = values(gps_rest_spread_values(_wander_log(), GPS, window, 60.0))
+    clean = values(gps_rest_spread_values(_wander_log(), GPS, REST_120S, 60.0))
     fix = np.full(600, 3)
     fix[100:105] = 0
-    log = _wander_log(extra={"fix_type": fix})
-    data = log.get_dataset(GPS).data
-    data["latitude_deg"] = data["latitude_deg"].copy()
-    data["longitude_deg"] = data["longitude_deg"].copy()
-    data["latitude_deg"][100:105] = 0.0
-    data["longitude_deg"][100:105] = 0.0
-    got = values(gps_rest_spread_values(log, GPS, window, 60.0))
+    log = _wander_with({"latitude_deg": 0.0, "longitude_deg": 0.0}, fix)
+    got = values(gps_rest_spread_values(log, GPS, REST_120S, 60.0))
     assert got["gps.rest_spread_horizontal_m"] == pytest.approx(
         clean["gps.rest_spread_horizontal_m"], rel=0.01)
+
+
+@pytest.mark.parametrize("field", ["latitude_deg", "longitude_deg", "altitude_msl_m"])
+def test_rest_spread_ignores_non_finite_positions(field):
+    clean = values(gps_rest_spread_values(_wander_log(), GPS, REST_120S, 60.0))
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        got = values(gps_rest_spread_values(_wander_with({field: np.nan}), GPS, REST_120S, 60.0))
+    for key in ("gps.rest_spread_horizontal_m", "gps.rest_spread_altitude_m"):
+        assert math.isfinite(got[key]) and got[key] == pytest.approx(clean[key], rel=0.02)
+
+
+def test_rest_spread_needs_four_samples_with_a_fix():
+    fix = np.zeros(600)
+    fix[:3] = 3
+    vs = gps_rest_spread_values(_wander_log(extra={"fix_type": fix}), GPS, REST_120S, 60.0)
+    assert [v.value for v in vs] == [None]
+    assert vs[0].note == "too few GPS samples with a fix in the at-rest window"
 
 
 def test_rest_spread_without_a_topic():

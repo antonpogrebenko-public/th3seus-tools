@@ -37,6 +37,9 @@ FIX_RTK_FIXED = 6
 FIX_EXTRAPOLATED = 8
 DEFAULT_GPS_REST_MIN_S = 60.0
 MIN_GPS_REST_SAMPLES = 4
+# Distinct samples the barometer and magnetometer white-noise statistics need (the Allan slope's
+# minimum); fewer give an error value instead.
+MIN_DISTINCT_SAMPLES = ns.ALLAN_MIN_SAMPLES
 TOPIC_GPS_HINT = "vehicle_gps_position or sensor_gps"
 GPS_FIELDS_OLD = ("lat", "lon", "alt")
 GPS_FIELDS_NEW = ("latitude_deg", "longitude_deg", "altitude_msl_m")
@@ -81,10 +84,21 @@ def _baro_series(ulog: Any, window: Window, instance: int) -> tuple[np.ndarray, 
     return t, isa_altitude_m(p) - isa_altitude_m(np.mean(p))
 
 
+def _require_distinct(count: int, sensor: str) -> None:
+    """Raise ValueError, with a note saying why, when there are too few distinct samples for
+    the white-noise statistics (fewer would give NaN with a RuntimeWarning, not a value)."""
+    if count == 1:
+        raise ValueError(f"constant {sensor} reading in the still window")
+    if count < MIN_DISTINCT_SAMPLES:
+        raise ValueError(f"only {count} distinct {sensor} samples in the still window "
+                         f"(need {MIN_DISTINCT_SAMPLES})")
+
+
 def baro_chip_values(ulog: Any, window: Window, instance: int) -> list[Value]:
     """Noise, rate, Allan slope and resolution of the barometer chip in the still window."""
     try:
         t, alt = _baro_series(ulog, window, instance)
+        _require_distinct(alt.size, "barometer")
         return [
             Value("baro.chip_noise_sigma", ns.white_noise_std(alt), "m"),
             Value("baro.chip_rate_hz", ns.sample_rate_hz(t), "Hz"),
@@ -95,21 +109,44 @@ def baro_chip_values(ulog: Any, window: Window, instance: int) -> list[Value]:
         return [Value("baro.chip_noise_sigma", None, "m", str(exc))]
 
 
+def _mag_rate(t: np.ndarray) -> Value:
+    try:
+        if t.size == 1:
+            raise ValueError("constant magnetometer reading in the still window")
+        return Value("mag.rate_hz", ns.sample_rate_hz(t), "Hz")
+    except ValueError as exc:
+        return Value("mag.rate_hz", None, "Hz", str(exc))
+
+
+def _mag_white_noise(xyz: np.ndarray) -> list[Value]:
+    """Allan slope (mean over the axes) and resolution (smallest over the axes)."""
+    try:
+        _require_distinct(xyz.shape[0], "magnetometer")
+        for a in range(AXES):
+            if np.ptp(xyz[:, a]) == 0:
+                raise ValueError(f"magnetometer axis {'xyz'[a]} is constant in the still window")
+        slope = float(np.mean([ns.allan_slope(xyz[:, a]) for a in range(AXES)]))
+        resolution = float(min(ns.resolution(xyz[:, a]) for a in range(AXES)))
+        return [Value("mag.allan_slope", slope, ""),
+                Value("mag.resolution_gauss", resolution, "gauss")]
+    except ValueError as exc:
+        return [Value("mag.allan_slope", None, "", str(exc))]
+
+
 def mag_evidence_values(ulog: Any, window: Window, instance: int) -> list[Value]:
-    """Rate, white-noise Allan slope and resolution of the magnetometer in the still window."""
+    """Rate, white-noise Allan slope and resolution of the magnetometer in the still window.
+
+    The rate needs only two distinct samples, so a short window or a constant axis that
+    loses the slope and resolution keeps it."""
     try:
         t, xyz = ul.xyz(ulog, TOPIC_MAG, instance)
         mask = slice_to_window(t, window)
         t, xyz = ns.distinct_samples(t[mask], xyz[mask])
-        slope = float(np.mean([ns.allan_slope(xyz[:, a]) for a in range(AXES)]))
-        resolution = float(min(ns.resolution(xyz[:, a]) for a in range(AXES)))
-        return [
-            Value("mag.rate_hz", ns.sample_rate_hz(t), "Hz"),
-            Value("mag.allan_slope", slope, ""),
-            Value("mag.resolution_gauss", resolution, "gauss"),
-        ]
+        if t.size == 0:
+            raise ValueError("no magnetometer sample in the still window")
     except (KeyError, ValueError) as exc:
         return [Value("mag.rate_hz", None, "Hz", str(exc))]
+    return [_mag_rate(t), *_mag_white_noise(xyz)]
 
 
 def gyro_rate_params(params: Mapping[str, Any]) -> dict[str, float]:
@@ -203,6 +240,7 @@ def gps_rest_spread_values(
             mask &= _valid_fix_mask(ul.series(ulog, topic, "fix_type").values)
         except KeyError:
             pass
+        mask &= np.isfinite(lat) & np.isfinite(lon) & np.isfinite(alt)
         lat, lon, alt = lat[mask], lon[mask], alt[mask]
         if lat.size < MIN_GPS_REST_SAMPLES:
             raise ValueError("too few GPS samples with a fix in the at-rest window")

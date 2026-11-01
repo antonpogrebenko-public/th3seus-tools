@@ -134,7 +134,8 @@ def analyze(
 
     window = find_stationary_window(gt, gxyz)
     if window is None:
-        return [Row("imu", "stationary_window", 0.0, None, "s", "n/a", "no quiet >=3s run"), *whole_log]
+        no_window = Row("imu", "stationary_window", 0.0, None, "s", "n/a", "no quiet >=3s run")
+        return [no_window, *whole_log]
 
     rows: list[Row] = []
     rows.extend(_imu_rows(ulog, window, gt, gxyz))
