@@ -24,7 +24,9 @@ ALL_MEASUREMENTS = SEED_MEASUREMENTS | {
     "gyro.integration_interval_s", "accel.integration_interval_s",
     "gyro.legacy_noise_density", "accel.legacy_noise_density",
     "baro.chip_noise_sigma", "baro.chip_rate_hz", "baro.chip_allan_slope",
-    "baro.chip_resolution_m", "mag.rate_hz", "mag.allan_slope", "mag.resolution_gauss"}
+    "baro.chip_resolution_m", "mag.rate_hz", "mag.allan_slope", "mag.resolution_gauss",
+    "gps.fix_type_mode", "gps.eph_median_m", "gps.epv_median_m", "gps.speed_accuracy_median_m_s",
+    "gps.rest_spread_horizontal_m", "gps.rest_spread_altitude_m", "gps.rest_window_s"}
 SPI_ICM20689_GYRO_ID = 0x3C000A
 AIRFRAME = 4001
 

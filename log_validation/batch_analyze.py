@@ -35,7 +35,7 @@ from .part_ids import (
     empty_parts_json,
     identify_parts,
 )
-from .part_measures import gyro_rate_params
+from .part_measures import DEFAULT_GPS_REST_MIN_S, gyro_rate_params
 from .report import TOPIC_ACCEL, TOPIC_AIR_DATA, TOPIC_COMBINED, TOPIC_GYRO
 
 # The only topics any of the measurements below read. Kept next to the parse so
@@ -99,6 +99,7 @@ def analyze_log(
     path: Path,
     vehicle_id: str | None = None,
     loader: Callable[[Path], Any] = load_filtered,
+    gps_rest_min_s: float = DEFAULT_GPS_REST_MIN_S,
 ) -> LogResult:
     """Analyze a single log file, return structured result."""
     log_id = path.stem
@@ -154,7 +155,7 @@ def analyze_log(
 
     # Run noise analysis
     try:
-        rows = report.analyze(ulog, parts)
+        rows = report.analyze(ulog, parts, gps_rest_min_s)
         for row in rows:
             key = f"{row.sensor}.{row.param}"
             if row.measured is not None:
@@ -185,6 +186,7 @@ def batch_analyze(
     max_per_vehicle: int = DEFAULT_MAX_PER_VEHICLE,
     jobs: int = 1,
     loader: Callable[[Path], Any] = load_filtered,
+    gps_rest_min_s: float = DEFAULT_GPS_REST_MIN_S,
 ) -> list[LogResult]:
     """Analyze the selected logs of a directory; results are sorted by log ID."""
     selection = select_logs(log_dir, manifest_path, max_per_vehicle)
@@ -194,7 +196,7 @@ def batch_analyze(
         paths = paths[:limit]
     vehicles = [selection.vehicle_of.get(p.stem) for p in paths]
 
-    tasks = [(p, v, loader) for p, v in zip(paths, vehicles)]
+    tasks = [(p, v, loader, gps_rest_min_s) for p, v in zip(paths, vehicles)]
     results = run_per_log(_analyze_task, tasks, jobs, _died_result)
     for i, path in enumerate(paths, 1):
         _progress(i, len(paths), path)
@@ -209,13 +211,16 @@ def batch_analyze(
     return results
 
 
-def _analyze_task(task: tuple[Path, str | None, Callable[[Path], Any]]) -> LogResult:
-    path, vehicle_id, loader = task
-    return analyze_log(path, vehicle_id, loader)
+_Task = tuple[Path, str | None, Callable[[Path], Any], float]
 
 
-def _died_result(task: tuple[Path, str | None, Callable[[Path], Any]]) -> LogResult:
-    path, vehicle_id, _ = task
+def _analyze_task(task: _Task) -> LogResult:
+    path, vehicle_id, loader, gps_rest_min_s = task
+    return analyze_log(path, vehicle_id, loader, gps_rest_min_s)
+
+
+def _died_result(task: _Task) -> LogResult:
+    path, vehicle_id, _, _ = task
     return LogResult(
         log_id=path.stem,
         hardware={},
@@ -229,13 +234,27 @@ def _progress(done: int, total: int, path: Path) -> None:
     print(f"\r[{done}/{total}] {path.name[:40]:<40}", end="", flush=True)
 
 
-def main() -> None:
+def _non_negative(text: str) -> float:
+    value = float(text)
+    if not value >= 0:
+        raise argparse.ArgumentTypeError("must not be negative")
+    return value
+
+
+def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Batch analyze PX4 logs")
     parser.add_argument("log_dir", type=Path, help="Directory containing .ulg files")
     parser.add_argument("-o", "--output", type=Path, help="Output JSON file")
     parser.add_argument("-n", "--limit", type=int, help="Limit number of logs")
+    parser.add_argument(
+        "--gps-rest-min-s",
+        type=_non_negative,
+        default=DEFAULT_GPS_REST_MIN_S,
+        metavar="S",
+        help="shortest at-rest window (s) that gets a GPS spread (default %(default)s)",
+    )
     add_selection_args(parser)
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     if not args.log_dir.is_dir():
         print(f"Error: {args.log_dir} is not a directory", file=sys.stderr)
@@ -249,6 +268,7 @@ def main() -> None:
             manifest_path=args.manifest,
             max_per_vehicle=args.max_per_vehicle,
             jobs=args.jobs,
+            gps_rest_min_s=args.gps_rest_min_s,
         )
     except (ManifestError, PrivateDataError) as e:
         print(f"Error: {e}", file=sys.stderr)

@@ -15,7 +15,15 @@ from . import noise_stats as ns
 from . import reference as ref
 from . import ulog_loader as ul
 from .part_ids import TOPIC_GPS_POSITION, TOPIC_MAG, LogParts, identify_parts
-from .part_measures import Value, baro_chip_values, mag_evidence_values
+from .part_measures import (
+    DEFAULT_GPS_REST_MIN_S,
+    Value,
+    baro_chip_values,
+    gps_accuracy_values,
+    gps_position,
+    gps_rest_spread_values,
+    mag_evidence_values,
+)
 from .stationary import find_stationary_window, slice_to_window
 
 # Topic names (modern PX4). Override here if a log uses different names.
@@ -106,21 +114,27 @@ def _imu_source(ulog) -> tuple[np.ndarray, np.ndarray, str] | None:
         return None
 
 
-def analyze(ulog: ul.ULog, parts: LogParts | None = None) -> list[Row]:
+def analyze(
+    ulog: ul.ULog,
+    parts: LogParts | None = None,
+    gps_rest_min_s: float = DEFAULT_GPS_REST_MIN_S,
+) -> list[Row]:
     """Run all sensor comparisons that the log supports.
 
     `parts` names the magnetometer instance and the GPS topic to measure; it is identified
-    from the log when not given."""
+    from the log when not given. The receiver's accuracy estimates cover the whole log, so
+    they are recorded even when there is no still window."""
     parts = parts or identify_parts(ulog, getattr(ulog, "initial_parameters", None) or {})
+    whole_log = _value_rows(gps_accuracy_values(ulog, parts.gps_topic))
     source = _imu_source(ulog)
     if source is None:
         note = f"neither '{TOPIC_COMBINED}' nor '{TOPIC_GYRO}' in log"
-        return [Row("imu", "stationary_window", 0.0, None, "", "n/a", note)]
+        return [Row("imu", "stationary_window", 0.0, None, "", "n/a", note), *whole_log]
     gt, gxyz, _topic = source
 
     window = find_stationary_window(gt, gxyz)
     if window is None:
-        return [Row("imu", "stationary_window", 0.0, None, "s", "n/a", "no quiet >=3s run")]
+        return [Row("imu", "stationary_window", 0.0, None, "s", "n/a", "no quiet >=3s run"), *whole_log]
 
     rows: list[Row] = []
     rows.extend(_imu_rows(ulog, window, gt, gxyz))
@@ -129,6 +143,8 @@ def analyze(ulog: ul.ULog, parts: LogParts | None = None) -> list[Row]:
     rows.extend(_value_rows(baro_chip_values(ulog, window, parts.baro_instance)))
     rows.extend(_value_rows(mag_evidence_values(ulog, window, parts.mag_instance)))
     rows.extend(_gps_rows(ulog, window, parts.gps_topic or TOPIC_GPS_POSITION))
+    rows.extend(whole_log)
+    rows.extend(_value_rows(gps_rest_spread_values(ulog, parts.gps_topic, window, gps_rest_min_s)))
     return rows
 
 
@@ -225,35 +241,16 @@ def _mag_rows(ulog, window, instance: int) -> list[Row]:
 def _gps_rows(ulog, window, topic: str) -> list[Row]:
     rows: list[Row] = []
 
-    # PX4 changed GPS field names across versions:
-    #   Old (pre-v1.14): lat/lon (int32, 1e-7 deg), alt (int32, mm)
-    #   New (v1.14+):    latitude_deg/longitude_deg (float64 deg), altitude_msl_m (float m)
     try:
-        lat = ul.series(ulog, topic, "lat")
-        lon = ul.series(ulog, topic, "lon")
-        alt = ul.series(ulog, topic, "alt")
-        is_new_format = False
-    except KeyError:
-        try:
-            lat = ul.series(ulog, topic, "latitude_deg")
-            lon = ul.series(ulog, topic, "longitude_deg")
-            alt = ul.series(ulog, topic, "altitude_msl_m")
-            is_new_format = True
-        except KeyError as exc:
-            return [_row("gps", "horizontal_noise_sigma", ref.GPS, None, str(exc))]
+        t_s, lat_deg, lon_deg, alt_m = gps_position(ulog, topic)
+    except KeyError as exc:
+        return [_row("gps", "horizontal_noise_sigma", ref.GPS, None, str(exc))]
 
-    mask = slice_to_window(lat.t_s, window)
+    mask = slice_to_window(t_s, window)
     if mask.sum() < 4:
         return [_row("gps", "horizontal_noise_sigma", ref.GPS, None, "too few GPS samples on ground")]
 
-    if is_new_format:
-        lat_deg = lat.values[mask]
-        lon_deg = lon.values[mask]
-        alt_m = alt.values[mask]
-    else:
-        lat_deg = lat.values[mask] * ul.GPS_LATLON_SCALE
-        lon_deg = lon.values[mask] * ul.GPS_LATLON_SCALE
-        alt_m = alt.values[mask] * ul.GPS_ALT_SCALE
+    lat_deg, lon_deg, alt_m = lat_deg[mask], lon_deg[mask], alt_m[mask]
     north, east = ns.latlon_to_local_m(
         lat_deg, lon_deg, float(np.mean(lat_deg)), float(np.mean(lon_deg))
     )
@@ -262,7 +259,7 @@ def _gps_rows(ulog, window, topic: str) -> list[Row]:
         _row("gps", "horizontal_noise_sigma", ref.GPS, ns.horizontal_position_noise(north, east))
     )
     rows.append(_row("gps", "altitude_noise_sigma", ref.GPS, ns.white_noise_std(alt_m)))
-    rows.append(_row("gps", "update_rate_hz", ref.GPS, ns.sample_rate_hz(lat.t_s)))
+    rows.append(_row("gps", "update_rate_hz", ref.GPS, ns.sample_rate_hz(t_s)))
 
     try:
         vn = ul.series(ulog, topic, "vel_n_m_s").values[mask]

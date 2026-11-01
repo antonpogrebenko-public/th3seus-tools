@@ -48,9 +48,9 @@ def _ts_us(n: int, rate_hz: float) -> np.ndarray:
 def _build_log() -> FakeULog:
     rng = np.random.default_rng(7)
 
-    # IMU at 200 Hz, 60 s, stationary (true rate 0, gravity on z).
+    # IMU at 200 Hz, 70 s, stationary (true rate 0, gravity on z).
     rate = 200.0
-    n = int(60 * rate)
+    n = int(70 * rate)
     dt = 1.0 / rate
     gyro_density = 0.001  # rad/s/sqrt(Hz)
     accel_density = 0.008  # m/s^2/sqrt(Hz)
@@ -81,7 +81,7 @@ def _build_log() -> FakeULog:
         combined[f"accelerometer_m_s2[{i}]"] = accel["xyz"[i]]
 
     # Baro at 50 Hz: 0.2 m noise on a constant altitude.
-    bn = int(60 * 50)
+    bn = int(70 * 50)
     baro = {
         "timestamp": _ts_us(bn, 50.0),
         "baro_alt_meter": 1655.0 + rng.normal(0, 0.2, bn),
@@ -104,7 +104,7 @@ def _build_log() -> FakeULog:
     }
 
     # GPS at 5 Hz: constant position with 1.2 m horizontal noise.
-    gn = 60 * 5
+    gn = 70 * 5
     h_sigma = 1.2
     deg_per_m = 180.0 / (math.pi * 6371000.0)
     gps = {
@@ -115,6 +115,10 @@ def _build_log() -> FakeULog:
         "vel_n_m_s": rng.normal(0, 0.08, gn),
         "vel_e_m_s": rng.normal(0, 0.08, gn),
         "vel_d_m_s": rng.normal(0, 0.08, gn),
+        "fix_type": np.full(gn, 3),
+        "eph": np.full(gn, 1.0),
+        "epv": np.full(gn, 1.5),
+        "s_variance_m_s": np.full(gn, 0.2),
         "device_id": np.full(gn, device_id(0xA8)),  # UBX_8
     }
     status_imu = {
