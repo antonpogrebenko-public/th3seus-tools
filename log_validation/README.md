@@ -64,16 +64,18 @@ noise pass adds, for the tables below:
   estimate sends 0); when no sample is left, that key is missing and the entry's errors
   say the receiver reports no such accuracy.
 - `gps.rest_spread_horizontal_m`, `gps.rest_spread_altitude_m`, `gps.rest_window_s`: the
-  total spread of the GPS position over the at-rest window, a cross-check of the
-  receiver's estimates. They are recorded only when the window is at least
-  `--gps-rest-min-s` seconds (default 60). They stay in the per-log results only: the
-  part tables have no column for them, as few logs rest that long.
+  total spread of the GPS position over the still window, a cross-check of the
+  receiver's estimates, and the window's length. They are recorded only when the still
+  window lasts at least `--gps-rest-min-s` seconds (default 60). The two spreads are
+  measured at rest, so they count toward the noise profiles and `log-ids/noise.txt`
+  like the other values measured at rest; `gps.rest_window_s` does not. None of the
+  three is a part-table column, as few logs rest that long.
 - `param.IMU_GYRO_RATEMAX` and `param.IMU_GYRO_CUTOFF`, when the log has them.
 
 GPS is read from `vehicle_gps_position`, or from `sensor_gps` when the log has no
 `vehicle_gps_position`; `parts.gps.source` names the topic. The GPS accuracy keys
 (`gps.fix_type_mode`, `gps.eph_median_m`, `gps.epv_median_m`,
-`gps.speed_accuracy_median_m_s`) cover the whole log, not the at-rest window, so a log
+`gps.speed_accuracy_median_m_s`) cover the whole log, not the still window, so a log
 without a still window still gets them.
 
 The noise profiles and `log-ids/noise.txt` keep holding only values measured at rest.
@@ -250,9 +252,11 @@ The rules:
   with all three white-noise evidence values, the Allan slope, the resolution and a
   rate above 0), "too few logs pass the white-noise check" (barometer and magnetometer:
   the eligible logs' vehicles would reach the threshold), then "below the vehicle
-  threshold". The report shows it in its "No proposal because" column, with the
-  white-noise failure counts on every barometer and magnetometer row whose logs were
-  checked.
+  threshold". The report shows it in its "No proposal because" column; on a barometer
+  or magnetometer row without a proposal whose logs were checked, the white-noise
+  failure counts follow the reason. A row with a proposal shows no counts there, but
+  `part-tables.json` carries `checked`, `failed_slope` and `failed_resolution` on every
+  row (0 on the IMU and GPS rows, which are not checked).
 - Parts map to TH3SEUS entries through a pinned mirror of the two repositories' tables
   and parsers (`th3seus_parts.py`). A part with no entry gets its own row as a candidate
   new variant, whose current value is the `Other` entry's. Its name is the log name split
