@@ -230,7 +230,7 @@ BAD_PARTS = [
     ("board-table.json", '{"boards": []}', "boards"),
     ("board-table.json", "{}", "boards"),
     ("rust/imu_chip.rs", None, "imu_chip.rs"),
-    ("rust/imu_chip.rs", "// café\n", "ASCII"),
+    ("rust/imu_chip.rs", "// caf\u00e9\n", "ASCII"),
 ]
 
 
@@ -298,7 +298,7 @@ def test_directory_without_parts_has_the_battery_rust_only(tmp_path):
 
 @pytest.mark.parametrize("name,text", [
     ("part-tables.json", "[]"), ("part-tables.json", None), ("board-table.json", "{}"),
-    ("rust/mag_chip.rs", "// café\n")])
+    ("rust/mag_chip.rs", "// caf\u00e9\n")])
 def test_malformed_parts_dir_exits_2_without_writing(tmp_path, capsys, name, text):
     parts = make_parts(tmp_path)
     _break(parts, name, text)
