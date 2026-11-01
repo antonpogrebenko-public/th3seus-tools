@@ -7,6 +7,7 @@ import json
 import os
 import shutil
 import stat
+import zlib
 from pathlib import Path
 
 import numpy as np
@@ -391,6 +392,22 @@ def test_read_json_reads_both(tmp_path):
     plain = write_json_or_gz(tmp_path / "a.json", BIG, ())
     packed = write_json_or_gz(tmp_path / "b.json", BIG, (), over_bytes=10)
     assert read_json(plain) == read_json(packed) == BIG
+
+
+def corrupt_deflate_body() -> bytes:
+    """A gzip file whose header is valid but whose deflate data is not (a zlib.error)."""
+    packed = bytearray(gzip.compress(json.dumps([{"a": i} for i in range(200)]).encode()))
+    packed[10:20] = b"\xff" * 10
+    return bytes(packed)
+
+
+def test_read_json_maps_a_corrupt_deflate_body_to_value_error(tmp_path):
+    path = tmp_path / "x.json.gz"
+    path.write_bytes(corrupt_deflate_body())
+    with pytest.raises(zlib.error):
+        gzip.decompress(path.read_bytes())
+    with pytest.raises(ValueError, match=r"x\.json\.gz is not a readable gzip file \(error\)"):
+        read_json(path)
 
 
 @pytest.mark.parametrize("make", [

@@ -15,6 +15,7 @@ from log_validation.part_tables import (
     check_noise_entries, load_catalog_spellings, main, part_tables_document)
 from log_validation.part_rows import RowRules, build_part_tables
 from log_validation.tests.part_fakes import BARO_OK, MAG_OK, noise_entry
+from log_validation.tests.test_outputs import corrupt_deflate_body
 
 OUTPUTS = {"part-tables.json", "board-table.json", "rust/imu_chip.rs", "rust/baro_chip.rs",
            "rust/mag_chip.rs", "rust/gps_chipset.rs", "rust/daemon_aliases.rs"}
@@ -353,7 +354,8 @@ def test_part_tables_reads_a_gzip_input(tmp_path):
 
 
 @pytest.mark.parametrize("data", [
-    gzip.compress(json.dumps([1] * 500).encode())[:-15], b"plain text, not gzip"])
+    gzip.compress(json.dumps([1] * 500).encode())[:-15], b"plain text, not gzip",
+    corrupt_deflate_body()])
 def test_corrupt_gzip_input_exits_2_and_writes_nothing(tmp_path, data, capsys):
     bad = tmp_path / "in" / "noise.json.gz"
     bad.parent.mkdir()

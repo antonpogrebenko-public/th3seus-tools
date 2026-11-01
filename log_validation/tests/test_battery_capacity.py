@@ -32,6 +32,7 @@ from log_validation.battery_output import (
 from log_validation.battery_extract import extract_dir
 from log_validation.tests.battery_fakes import (
     CORPUS, R_3S_MOHM, load_by_stem, make_data, make_log_dir)
+from log_validation.tests.fakes import FakeULog
 
 CAPACITY_MAH = 5200.0
 CLASS_5000 = "5000-10000"
@@ -243,3 +244,26 @@ def test_bad_capacity_bounds_exit_2(tmp_path):
     with pytest.raises(SystemExit) as e:
         battery_fit.main(["--capacity-bounds", "5,1", "--log-dir", str(tmp_path)])
     assert e.value.code == 2
+
+
+def load_with_capacity(path: Path) -> FakeULog:
+    """A fake battery log whose pack capacity parameter is CAPACITY_MAH."""
+    log = load_by_stem(path)
+    return FakeULog({d.name: d.data for d in log.data_list},
+                    params={**log.initial_parameters, "BAT1_CAPACITY": CAPACITY_MAH},
+                    info=log.msg_info_dict)
+
+
+def test_capacity_bounds_option_reaches_the_log_dir_fit(tmp_path, monkeypatch):
+    # The --log-dir path fits through analyze_logs; read the fake logs there.
+    real = battery_fit.analyze_logs
+    monkeypatch.setattr(battery_fit, "analyze_logs",
+                        lambda *args, **kwargs: real(*args, **kwargs, loader=load_with_capacity))
+    out_json, out_md = tmp_path / "fit.json", tmp_path / "fit.md"
+    code = battery_fit.main(["--log-dir", str(make_log_dir(tmp_path, CORPUS)),
+                             "--out-json", str(out_json), "--out-md", str(out_md),
+                             "--capacity-bounds", "6000,12000"])
+    assert code in (0, 1)  # 1: the held-out target was missed, both files written
+    fit = json.loads(out_json.read_text())
+    assert fit["capacity_bounds_mah"] == [6000.0, 12000.0]
+    assert [row["capacity_class"] for row in fit["r_fits_by_capacity"]] == ["<6000", "<6000"]

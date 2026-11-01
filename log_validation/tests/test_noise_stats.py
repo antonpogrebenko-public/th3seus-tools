@@ -114,6 +114,10 @@ def test_resolution_is_the_smallest_step():
     assert ns.resolution(np.array([0.0, 0.5, 0.5, 1.5, 1.0])) == 0.5
 
 
+def test_resolution_counts_a_falling_step():
+    assert ns.resolution(np.array([0.0, 1.0, 0.75])) == 0.25
+
+
 def test_resolution_without_a_step_raises():
     with pytest.raises(ValueError):
         ns.resolution(np.full(10, 1.0))

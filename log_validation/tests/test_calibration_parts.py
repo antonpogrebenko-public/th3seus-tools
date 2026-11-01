@@ -381,7 +381,14 @@ def test_malformed_parts_dir_exits_2_without_writing(tmp_path, capsys, name, tex
     assert not out.exists() or not any(out.iterdir())
 
 
-def test_a_private_string_in_a_parts_file_is_refused_without_writing(tmp_path, capsys):
+def test_a_private_string_in_a_parts_file_is_refused_without_writing(tmp_path, capsys,
+                                                                     monkeypatch):
+    # A user and host name no temporary path holds, so only the parts-folder rule can refuse
+    # (the folder sits under pytest's per-user temporary folder).
+    from log_validation import outputs
+
+    monkeypatch.setattr(outputs.getpass, "getuser", lambda: "zz-test-user-zz")
+    monkeypatch.setattr(outputs.socket, "gethostname", lambda: "zz-test-host-zz")
     parts, paths = parts_and_inputs(tmp_path)
     leaky = parts / "rust" / "imu_chip.rs"
     leaky.write_text(f"// built in {parts.resolve()}\n", encoding="utf-8")
