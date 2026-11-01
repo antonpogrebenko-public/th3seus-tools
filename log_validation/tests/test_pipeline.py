@@ -13,6 +13,7 @@ import math
 import numpy as np
 
 from log_validation import report
+from log_validation.tests.fakes import disarmed_topic
 from log_validation.tests.part_fakes import device_id
 
 
@@ -136,6 +137,7 @@ def _build_log() -> FakeULog:
             "sensor_mag": mag,
             "vehicle_gps_position": gps,
             "sensors_status_imu": status_imu,
+            "actuator_armed": disarmed_topic(),
         }
     )
 

@@ -7,7 +7,7 @@ import math
 import numpy as np
 
 from log_validation import report
-from log_validation.tests.fakes import FakeULog, ts_us
+from log_validation.tests.fakes import FakeULog, disarmed_topic, ts_us
 
 GYRO_DENSITY = 0.0003  # rad/s/sqrt(Hz)
 ACCEL_DENSITY = 0.002  # m/s^2/sqrt(Hz)
@@ -34,7 +34,7 @@ def _combined(n, rate_hz, seed=3, interval_us=INTERVAL_US, with_gyro_dt=True, ze
 
 
 def _log(combined):
-    return FakeULog({"sensor_combined": combined})
+    return FakeULog({"sensor_combined": combined, "actuator_armed": disarmed_topic()})
 
 
 def _row(rows, sensor, param):
@@ -83,7 +83,7 @@ def test_log_without_sensor_combined_names_the_missing_interval():
     rng = np.random.default_rng(5)
     t = ts_us(DURATION_S, 1.0)
     gyro = {"timestamp": t, **{a: rng.normal(0, 0.0047, DURATION_S) for a in "xyz"}}
-    rows = report.analyze(FakeULog({"sensor_gyro": gyro}))
+    rows = report.analyze(FakeULog({"sensor_gyro": gyro, "actuator_armed": disarmed_topic()}))
     for sensor, dt_field in (("gyro", "gyro_integral_dt"), ("accel", "accelerometer_integral_dt")):
         density = _row(rows, sensor, f"{sensor}_noise_density")
         assert density.measured is None
@@ -110,7 +110,9 @@ def test_legacy_row_reads_logged_spacing_of_sensor_gyro():
     gyro = {"timestamp": combined["timestamp"]}
     for a in "xyz":
         gyro[a] = rng.normal(0, 0.0047, DURATION_S)
-    rows = report.analyze(FakeULog({"sensor_combined": combined, "sensor_gyro": gyro}))
+    rows = report.analyze(FakeULog(
+        {"sensor_combined": combined, "sensor_gyro": gyro, "actuator_armed": disarmed_topic()}
+    ))
     legacy = measured(rows, "gyro", "legacy_noise_density")
     assert abs(legacy - 0.0047) / 0.0047 < 0.10  # 1 s spacing: sigma * sqrt(1 s)
     assert measured(rows, "accel", "legacy_noise_density") is None

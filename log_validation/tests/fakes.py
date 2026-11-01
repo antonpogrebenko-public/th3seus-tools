@@ -36,3 +36,8 @@ def ts_us(n: int, rate_hz: float, start_s: float = 0.0) -> np.ndarray:
     """n timestamps in microseconds at rate_hz, starting at start_s seconds."""
     dt_us = 1e6 / rate_hz
     return start_s * 1e6 + (np.arange(n) * dt_us).astype(np.float64)
+
+
+def disarmed_topic() -> dict[str, np.ndarray]:
+    """An `actuator_armed` dataset that stays disarmed for the whole log."""
+    return {"timestamp": np.array([0.0]), "armed": np.array([0])}
