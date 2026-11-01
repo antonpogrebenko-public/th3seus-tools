@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import statistics
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -32,6 +33,14 @@ REASON_NO_LOGS = "no log measured it"
 GPS = "gps"
 FIX_MODE_KEY = "gps.fix_type_mode"
 STANDALONE_FIX_TYPE = FIX_TYPE_OF_CLASS[FIX_CLASS_STANDALONE_3D]
+
+WHITE_NOISE_SLOPE = -0.5
+FACTOR_FLAG = 3.0
+# Per part type: the per-log evidence for the white-noise check (Allan slope, resolution, rate).
+EVIDENCE_KEYS = {
+    "baro": ("baro.chip_allan_slope", "baro.chip_resolution_m", "baro.chip_rate_hz"),
+    "mag": ("mag.allan_slope", "mag.resolution_gauss", "mag.rate_hz"),
+}
 
 Sample = tuple[str, str | None, float]
 
@@ -75,11 +84,65 @@ class PartTables:
     log_ids: tuple[str, ...]
 
 
+def white_noise_failures(slope: float, value: float, resolution: float, tolerance: float
+                         ) -> tuple[bool, bool]:
+    """(slope is off -1/2 by more than the tolerance, value is below the resolution)."""
+    return abs(slope - WHITE_NOISE_SLOPE) > tolerance, value < resolution
+
+
+def rate_factor(log_rate_hz: float, sim_rate_hz: float) -> float:
+    return math.sqrt(sim_rate_hz / log_rate_hz)
+
+
+@dataclass(frozen=True)
+class _Obs:
+    """One eligible log: its value at the simulator rate and the outcome of the check."""
+    log_id: str
+    vehicle_id: str | None
+    value: float
+    failed_slope: bool = False
+    failed_resolution: bool = False
+    rate_hz: float | None = None
+    factor: float | None = None
+
+    @property
+    def passed(self) -> bool:
+        return not (self.failed_slope or self.failed_resolution)
+
+    @property
+    def sample(self) -> Sample:
+        return self.log_id, self.vehicle_id, self.value
+
+
 @dataclass(frozen=True)
 class _Pool:
-    """The samples of one row: (log, vehicle, value) plus the log names behind them."""
-    samples: tuple[Sample, ...] = ()
+    """The eligible logs of one row plus the log names behind them."""
+    obs: tuple[_Obs, ...] = ()
     names: frozenset[str] = frozenset()
+
+    @property
+    def samples(self) -> tuple[Sample, ...]:
+        """The samples that count toward the row: the logs that pass the check."""
+        return tuple(o.sample for o in self.obs if o.passed)
+
+
+def _sim_rate(part_type: str, rules: RowRules) -> float:
+    return rules.sim_rate_baro_hz if part_type == "baro" else rules.sim_rate_mag_hz
+
+
+def _observe(part_type: str, entry: Mapping[str, Any], value: float, rules: RowRules) -> _Obs | None:
+    """None when the log is not eligible (it lacks the evidence for the check)."""
+    log_id, vehicle_id = entry["log_id"], entry.get("vehicle_id")
+    if part_type not in EVIDENCE_KEYS:
+        return _Obs(log_id, vehicle_id, value)
+    measurements = entry.get("measurements") or {}
+    evidence = [finite_number(measurements, key) for key in EVIDENCE_KEYS[part_type]]
+    if any(v is None for v in evidence) or evidence[2] <= 0:
+        return None
+    slope, res, rate = evidence
+    factor = rate_factor(rate, _sim_rate(part_type, rules))
+    failed_slope, failed_res = white_noise_failures(slope, value, res, rules.allan_slope_tolerance)
+    return _Obs(log_id, vehicle_id, value * factor, failed_slope, failed_res, rate, factor)
 
 
 def _log_name(entry: Mapping[str, Any], part_type: str) -> str | None:
@@ -117,22 +180,22 @@ def _targets(part_type: str, entry: Mapping[str, Any]) -> tuple[tuple[str, str] 
     return (classified.entry, status), to_other, name
 
 
-def _collect(part_type: str, measurement: str, entries: Sequence[Mapping[str, Any]]
-             ) -> tuple[dict[tuple[str, str], _Pool], _Pool]:
-    own: dict[tuple[str, str], list[Sample]] = defaultdict(list)
+def _collect(part_type: str, measurement: str, entries: Sequence[Mapping[str, Any]],
+             rules: RowRules) -> tuple[dict[tuple[str, str], _Pool], _Pool]:
+    own: dict[tuple[str, str], list[_Obs]] = defaultdict(list)
     own_names: dict[tuple[str, str], set[str]] = defaultdict(set)
-    other: list[Sample] = []
+    other: list[_Obs] = []
     for entry in entries:
         value = finite_number(entry.get("measurements") or {}, measurement)
-        if value is None:
+        obs = None if value is None else _observe(part_type, entry, value, rules)
+        if obs is None:
             continue
         target, to_other, name = _targets(part_type, entry)
-        sample = (entry["log_id"], entry.get("vehicle_id"), value)
         if target is not None:
-            own[target].append(sample)
+            own[target].append(obs)
             own_names[target].add(name)
         if to_other:
-            other.append(sample)
+            other.append(obs)
     pools = {k: _Pool(tuple(v), frozenset(own_names[k])) for k, v in own.items()}
     return pools, _Pool(tuple(other))
 
@@ -147,12 +210,26 @@ def _row_fix_class(part_type: str, variant: str, status: str) -> str | None:
     return FIX_CLASS_STANDALONE_3D if status == STATUS_OTHER else fix_class(variant)
 
 
+def _median_of(values: Sequence[float]) -> float | None:
+    return statistics.median(values) if values else None
+
+
+def _no_proposal_reason(pool: _Pool, rules: RowRules) -> str:
+    """Why a row has no proposed value: no eligible log, white-noise failures, or too few."""
+    if not pool.obs:
+        return REASON_NO_LOGS
+    _, eligible_vehicles, _ = vehicle_percentiles([o.sample for o in pool.obs])
+    return REASON_WHITE_NOISE if eligible_vehicles >= rules.min_vehicles else REASON_BELOW_THRESHOLD
+
+
 def _make_row(part_type: str, variant: str, status: str, parameter: str, measurement: str,
               pool: _Pool, rules: RowRules) -> PartRow:
     logs, vehicles, pct = vehicle_percentiles(pool.samples)
     median, p25, p75 = (_none_if_nan(pct[p]) for p in (50, 25, 75))
     enough = median is not None and vehicles >= rules.min_vehicles
-    reason = None if enough else (REASON_BELOW_THRESHOLD if median is not None else REASON_NO_LOGS)
+    checked = len(pool.obs) if part_type in EVIDENCE_KEYS else 0
+    passing = [o for o in pool.obs if o.passed and o.rate_hz is not None]
+    factor = _median_of([o.factor for o in passing])
     return PartRow(
         part=part_type, variant=variant, status=status,
         log_names=tuple(sorted(pool.names)) if status != STATUS_OTHER else (),
@@ -160,9 +237,13 @@ def _make_row(part_type: str, variant: str, status: str, parameter: str, measure
         fix_class=_row_fix_class(part_type, variant, status),
         logs=logs, vehicles=vehicles, median=median, p25=p25, p75=p75,
         current=current_value(part_type, variant, parameter),
-        proposed=median if enough else None, reason=reason,
-        checked=0, failed_slope=0, failed_resolution=0,
-        median_rate_hz=None, median_factor=None, factor_flagged=False,
+        proposed=median if enough else None,
+        reason=None if enough else _no_proposal_reason(pool, rules),
+        checked=checked,
+        failed_slope=sum(o.failed_slope for o in pool.obs),
+        failed_resolution=sum(o.failed_resolution for o in pool.obs),
+        median_rate_hz=_median_of([o.rate_hz for o in passing]), median_factor=factor,
+        factor_flagged=factor is not None and (factor > FACTOR_FLAG or factor < 1 / FACTOR_FLAG),
     )
 
 
@@ -184,7 +265,7 @@ def _part_rows(part_type: str, entries: Sequence[Mapping[str, Any]], rules: RowR
                ) -> tuple[list[tuple[str, str, PartRow, tuple[str, ...]]], ...]:
     """Per parameter, the (variant, status, row, log IDs) list in table order."""
     spec = PARTS[part_type]
-    collected = {m: _collect(part_type, m[1], entries) for m in spec.measured}
+    collected = {m: _collect(part_type, m[1], entries, rules) for m in spec.measured}
     merged: dict[tuple[str, str], _Pool] = {}
     for pools, _ in collected.values():
         merged.update(pools)

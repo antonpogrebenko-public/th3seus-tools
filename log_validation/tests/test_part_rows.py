@@ -5,7 +5,7 @@ import pytest
 from log_validation.part_rows import (
     DEFAULT_MIN_VEHICLES, REASON_BELOW_THRESHOLD, REASON_NO_LOGS, PartRow, RowRules, build_part_tables)
 
-from .part_fakes import BARO_OK, noise_entry
+from .part_fakes import BARO_OK, MAG_OK, noise_entry
 
 G = "gyro.gyro_noise_density"
 GPS_H = "gps.eph_median_m"
@@ -158,7 +158,7 @@ def test_rows_are_ordered_by_part_then_variant_then_parameter():
 
 
 def test_mag_none_has_no_row():
-    t = build_part_tables([noise_entry("a", "v1", {"mag.noise_sigma_gauss": 1e-3}, mag="None")])
+    t = build_part_tables([noise_entry("a", "v1", {"mag.noise_sigma_gauss": 1e-3, **MAG_OK}, mag="None")])
     mag = rows(t, "mag", "noise_sigma_gauss")
     assert "None" not in mag and mag["Other"].logs == 1
 
