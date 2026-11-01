@@ -15,9 +15,7 @@ from __future__ import annotations
 
 import argparse
 import json
-import shutil
 import sys
-import tempfile
 from pathlib import Path
 from typing import Any, Sequence
 
@@ -33,10 +31,11 @@ from .calibration_ranges import (
 )
 from .calibration_render import render_report
 from .outputs import (
-    MIN_FORBIDDEN_LEN,
     PrivateDataError,
-    forbidden_strings,
+    check_out_dir,
+    input_forbidden,
     write_json,
+    write_staged,
     write_text,
 )
 
@@ -82,20 +81,6 @@ def _by_log_id(entries: list) -> list[dict]:
     return sorted(entries, key=lambda e: e["log_id"])
 
 
-def _forbidden(inputs: Sequence[Path], extra: Sequence[str]) -> tuple[str, ...]:
-    """Home, user, host and the input folders, plus each extra as a literal string.
-
-    Each input's folder is forbidden both as given (made absolute, symlinks kept)
-    and resolved, so a folder reached through a symlink is caught either way.
-    An extra is a cloud account ID or a bucket name, not a path, so it is not
-    resolved the way `forbidden_strings` resolves its arguments."""
-    if any(len(s) < MIN_FORBIDDEN_LEN for s in extra):
-        raise ValueError(f"a --forbid string needs at least {MIN_FORBIDDEN_LEN} characters")
-    folders = sorted({folder for p in inputs
-                      for folder in (Path(p).absolute().parent, Path(p).resolve().parent)})
-    return (*forbidden_strings(*folders), *extra)
-
-
 def _stage(stage: Path, forbidden: Sequence[str], noise: list[dict], battery: dict,
            response: list[dict], airframes: dict, run_info: dict) -> None:
     ranges = ranges_table(noise, battery, response)
@@ -121,9 +106,7 @@ def write_calibration_dir(
     Raises ValueError for an input of the wrong shape (a nested row included) or an
     `out_dir` that is not empty. Raises PrivateDataError when any output would hold
     a private string; then nothing is written to `out_dir`."""
-    out = Path(out_dir)
-    if out.exists() and (not out.is_dir() or any(out.iterdir())):
-        raise ValueError("the output directory exists and is not empty; use a new or empty one")
+    check_out_dir(out_dir)
     inputs = (noise_path, battery_path, response_path, airframes_path, run_info_path)
     noise = _by_log_id(_load(noise_path, list, "noise results"))
     battery = _load(battery_path, dict, "battery fit")
@@ -132,16 +115,17 @@ def write_calibration_dir(
     run_info = _load(run_info_path, dict, "run-info")
     _check_airframes(airframes)
     _check_run_info(run_info)
-    forbidden = _forbidden(inputs, extra_forbidden)
-    with tempfile.TemporaryDirectory() as tmp:
-        stage = Path(tmp) / "calibration"
+    forbidden = input_forbidden(inputs, extra_forbidden)
+
+    def stage_files(stage: Path) -> None:
         try:
             _stage(stage, forbidden, noise, battery, response, airframes, run_info)
         except (KeyError, TypeError, AttributeError) as e:
             # The top-level shapes are checked above; a nested row of the wrong shape
             # shows up only while rendering. Nothing has reached out_dir yet.
             raise ValueError(f"an input holds a malformed row ({type(e).__name__}: {e})") from e
-        shutil.copytree(stage, out, dirs_exist_ok=True)
+
+    write_staged(out_dir, stage_files)
 
 
 def _build_parser() -> argparse.ArgumentParser:

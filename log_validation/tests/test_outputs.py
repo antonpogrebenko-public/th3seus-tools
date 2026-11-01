@@ -199,3 +199,43 @@ def test_merge_command_refuses_private_data(tmp_path, capsys):
     assert outputs.main(_merge_args(tmp_path, part)) == 2
     assert "private data" in capsys.readouterr().err
     assert not (tmp_path / "out" / "merged.json").exists()
+
+
+def test_input_forbidden_holds_the_input_folders_and_extras(tmp_path):
+    folder = tmp_path / "in"
+    folder.mkdir()
+    got = outputs.input_forbidden([folder / "a.json"], ["acct-123"])
+    assert str(folder.absolute()) in got and str(folder.resolve()) in got
+    assert "acct-123" in got and str(Path.home()) in got
+
+
+def test_input_forbidden_refuses_a_short_extra(tmp_path):
+    with pytest.raises(ValueError):
+        outputs.input_forbidden([tmp_path / "a.json"], ["ab"])
+
+
+def test_write_staged_copies_into_a_new_folder(tmp_path):
+    out = tmp_path / "out"
+    outputs.write_staged(out, lambda stage: write_text(stage / "d" / "a.txt", "x\n", []))
+    assert (out / "d" / "a.txt").read_text() == "x\n"
+
+
+def test_write_staged_leaves_the_folder_alone_when_a_write_fails(tmp_path):
+    out = tmp_path / "out"
+
+    def stage_files(stage):
+        write_text(stage / "a.txt", "fine\n", ["secret"])
+        write_text(stage / "b.txt", "secret\n", ["secret"])
+
+    with pytest.raises(PrivateDataError):
+        outputs.write_staged(out, stage_files)
+    assert not out.exists()
+
+
+def test_write_staged_refuses_a_non_empty_folder(tmp_path):
+    out = tmp_path / "out"
+    out.mkdir()
+    (out / "old.txt").write_text("keep")
+    with pytest.raises(ValueError):
+        outputs.write_staged(out, lambda stage: write_text(stage / "a.txt", "x", []))
+    assert [p.name for p in out.iterdir()] == ["old.txt"]

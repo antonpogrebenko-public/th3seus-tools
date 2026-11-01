@@ -7,10 +7,12 @@ import getpass
 import json
 import math
 import os
+import shutil
 import socket
 import sys
+import tempfile
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any, Callable, Mapping, Sequence
 
 from .manifest import DEFAULT_MAX_PER_VEHICLE, cap_per_vehicle, read_manifest
 
@@ -74,6 +76,41 @@ def write_json(path: Path, obj: Any, forbidden: Sequence[str]) -> None:
     text = json.dumps(_clean(obj), indent=1, sort_keys=True, allow_nan=False,
                       ensure_ascii=False) + "\n"
     write_text(path, text, forbidden)
+
+
+def input_forbidden(inputs: Sequence[Path], extra: Sequence[str] = ()) -> tuple[str, ...]:
+    """Home, user, host and the input folders, plus each extra as a literal string.
+
+    Each input's folder is forbidden both as given (made absolute, symlinks kept)
+    and resolved, so a folder reached through a symlink is caught either way.
+    An extra is a cloud account ID or a bucket name, not a path, so it is not
+    resolved the way `forbidden_strings` resolves its arguments."""
+    if any(len(s) < MIN_FORBIDDEN_LEN for s in extra):
+        raise ValueError(f"a --forbid string needs at least {MIN_FORBIDDEN_LEN} characters")
+    folders = sorted({folder for p in inputs
+                      for folder in (Path(p).absolute().parent, Path(p).resolve().parent)})
+    return (*forbidden_strings(*folders), *extra)
+
+
+def check_out_dir(out_dir: Path) -> None:
+    """ValueError unless `out_dir` is absent or an empty folder."""
+    out = Path(out_dir)
+    if out.exists() and (not out.is_dir() or any(out.iterdir())):
+        raise ValueError("the output directory exists and is not empty; use a new or empty one")
+
+
+def write_staged(out_dir: Path, stage_files: Callable[[Path], None]) -> None:
+    """Run `stage_files(stage)` on a temporary folder, then copy it into `out_dir`.
+
+    `stage_files` writes every file with `write_text` / `write_json`, so a refused
+    write (PrivateDataError) or any other error leaves `out_dir` as it was.
+    `out_dir` must be new or empty (ValueError otherwise)."""
+    out = Path(out_dir)
+    check_out_dir(out)
+    with tempfile.TemporaryDirectory() as tmp:
+        stage = Path(tmp) / "staged"
+        stage_files(stage)
+        shutil.copytree(stage, out, dirs_exist_ok=True)
 
 
 def merge_per_log(paths: Sequence[Path]) -> list[dict]:
