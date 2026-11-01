@@ -25,9 +25,9 @@ table from the noise results, and writes the proposed values as Rust text for th
 | Gyro   | `gyro_bias_sigma` | Allan-deviation floor (approximate) |
 | Baro   | `noise_sigma` | first-diff std of `baro_alt_meter`, disarmed still window |
 | Mag    | `noise_sigma_gauss` | first-diff std per axis, disarmed still window |
-| GPS    | `horizontal_noise_sigma` | std of on-ground local N/E position |
-| GPS    | `altitude_noise_sigma` | std of on-ground GPS altitude |
-| GPS    | `velocity_noise_sigma` | std of on-ground GPS velocity |
+| GPS    | `horizontal_noise_sigma` | std of local N/E position, disarmed still window |
+| GPS    | `altitude_noise_sigma` | std of GPS altitude, disarmed still window |
+| GPS    | `velocity_noise_sigma` | std of GPS velocity, disarmed still window |
 | GPS    | `update_rate_hz` | 1 / median timestamp interval |
 
 Model defaults are mirrored from the Rust crate in `reference.py` (kept in sync
@@ -392,7 +392,8 @@ measured propeller vibration instead of sensor noise. A log without arming topic
 no at-rest values and its entry has the error `imu.stationary_window: no arming state:
 neither 'actuator_armed' nor 'vehicle_status' in log`. A log with no disarmed still
 window gives none either, with the error `imu.stationary_window: no disarmed quiet >=3s
-run`. Fewer logs therefore give at-rest values than before.
+run`. The first 10 s after a disarm are left out, because the propellers are still
+spinning down. Fewer logs therefore give at-rest values than before.
 
 The kit table `reference_kits.json` gives each build value with the public page it
 came from. A required value that no maker publishes is `null` with no source, and that
@@ -403,7 +404,8 @@ The committed run is in [`calibration/2026-10-31/`](calibration/2026-10-31/repor
 8,671 public Flight Review quadrotor logs for IMU noise and the battery, and 953 logs
 for the response pass (the pass refuses the 90 of them not logged at the rate
 controller's rate), at most 3 logs per vehicle in each set. Its `run-info.json` gives
-the parameters and commands.
+the parameters and commands. That run was made before the disarmed still window, so its
+at-rest values include armed windows; the next calibration run replaces it.
 
 ## Tests
 
@@ -421,6 +423,6 @@ signals with known parameters (no real logs required).
 - Logs do not carry airframe specs. The noise validation covers **sensor noise**
   only; the calibration passes measure the battery and the vehicle response, and
   check TH3SEUS's flight dynamics only against reference kits with a published build.
-- A clean noise floor needs an on-ground / pre-arm segment; logs that start
-  mid-air are skipped with a note.
+- At-rest values need a disarmed quiet run of at least 3 s that starts at least 10 s
+  after any disarm; a log recorded only while armed (PX4's default logging) gets none.
 - Bias rows are order-of-magnitude (Gauss-Markov vs Allan signatures differ).
