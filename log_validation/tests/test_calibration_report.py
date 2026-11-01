@@ -600,9 +600,13 @@ def test_battery_table_shows_why_a_class_falls_back():
              "fallback_reason": "implausible (median below the 4 mohm/cell floor)"}
     older = {**own, "cell_count": 6, "low_n": True}  # a JSON written before the reason
     battery["r_fits"] = [own, floor, older]
-    battery["r_fits_by_capacity"] = []  # its rows would share the "| 4S" key below
     text = render_report([], battery, [], airframes_dict(), [], run_info())
-    rows = {line.split(" | ")[0]: line for line in text.splitlines() if line.startswith("| ")}
+    section = text.split("## Battery")[1].splitlines()
+    start = next(i for i, line in enumerate(section) if line.startswith("| "))
+    end = next(i for i in range(start, len(section)) if not section[i].startswith("|"))
+    rows = {line.split(" | ")[0]: line for line in section[start:end]}
+    # The capacity table below the first one has a "| 4S" row too.
+    assert any(line.startswith("| 4S | 5000-10000") for line in section[end:])
     assert rows["| 4S"].endswith("| own fit |")
     assert rows["| 8S"].endswith(
         "| pooled median: implausible (median below the 4 mohm/cell floor) |")

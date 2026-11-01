@@ -227,7 +227,9 @@ The rules:
   without one gives a reason, the first that applies: "no log measured it" (no eligible
   log), "too few logs pass the white-noise check" (barometer and magnetometer: the
   eligible logs' vehicles would reach the threshold), then "below the vehicle
-  threshold". The report shows it in its "No proposal because" column.
+  threshold". The report shows it in its "No proposal because" column, with the
+  white-noise failure counts on every barometer and magnetometer row whose logs were
+  checked.
 - Parts map to TH3SEUS entries through a pinned mirror of the two repositories' tables
   and parsers (`th3seus_parts.py`). A part with no entry gets its own row as a candidate
   new variant, whose current value is the `Other` entry's. Its name is the log name split

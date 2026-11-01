@@ -14,7 +14,6 @@ from typing import Any, Collection, Mapping, Sequence
 
 from .calibration_markdown import NA, _num, _table
 from .outputs import write_json, write_text
-from .part_rows import REASON_WHITE_NOISE
 from .part_rust import ALIASES_FILE, RUST_FILES
 from .part_tables import BOARD_TABLE_FILE, PART_TABLES_FILE, RUST_DIR
 
@@ -132,14 +131,23 @@ def _part_cell(row: Mapping[str, Any]) -> str:
     return f"{row.get('variant', NA)} ({names})" if names else str(row.get("variant", NA))
 
 
+def _count(value: Any) -> str:
+    """A count cell: the integer, or n/a for a missing or null one."""
+    return str(value) if isinstance(value, int) and not isinstance(value, bool) else NA
+
+
 def _reason_cell(row: Mapping[str, Any]) -> str:
+    """The reason; on a barometer or magnetometer row whose logs were checked, with the
+    white-noise failure counts (whatever the reason: a row whose few logs all failed reads
+    "below the vehicle threshold" and still shows them)."""
     reason = row.get("reason")
     if not reason:
         return ""
-    if row.get("part") in RATE_TYPES and reason == REASON_WHITE_NOISE:
-        return (f"{reason} ({row.get('failed_slope', NA)} failed the slope, "
-                f"{row.get('failed_resolution', NA)} the resolution, "
-                f"of {row.get('checked', NA)} checked)")
+    checked = row.get("checked")
+    if row.get("part") in RATE_TYPES and isinstance(checked, int) and checked > 0:
+        return (f"{reason} ({_count(row.get('failed_slope'))} failed the slope, "
+                f"{_count(row.get('failed_resolution'))} the resolution, "
+                f"of {checked} checked)")
     return str(reason)
 
 
@@ -149,8 +157,8 @@ def _row_cells(row: Mapping[str, Any]) -> list[str]:
         parameter = f"{parameter} ({row['fix_class']})"
     entry = str(row.get("status", NA))
     cells = [_part_cell(row), parameter, ENTRY_LABELS.get(entry, entry),
-             _num(row.get("current")), _num(row.get("proposed")), str(row.get("logs", NA)),
-             str(row.get("vehicles", NA)), _num(row.get("p25")), _num(row.get("p75")),
+             _num(row.get("current")), _num(row.get("proposed")), _count(row.get("logs")),
+             _count(row.get("vehicles")), _num(row.get("p25")), _num(row.get("p75")),
              _reason_cell(row)]
     if row.get("part") in RATE_TYPES:
         cells += [_num(row.get("median_rate_hz")), _num(row.get("median_factor")),

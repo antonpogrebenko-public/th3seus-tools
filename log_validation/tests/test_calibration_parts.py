@@ -112,6 +112,15 @@ def test_a_reason_without_a_white_noise_check_has_no_counts():
     assert "| below the vehicle threshold |" in text and "failed the slope" not in text
 
 
+def test_failure_counts_show_with_any_reason_when_logs_were_checked():
+    # Three vehicles whose logs all failed: the reason is the threshold, the counts still show.
+    below = {**MAG_ROW, "reason": "below the vehicle threshold", "checked": 3,
+             "failed_slope": 3, "failed_resolution": 1}
+    text = render([below])
+    assert ("| below the vehicle threshold (3 failed the slope, 1 the resolution, "
+            "of 3 checked) |") in text
+
+
 def test_conversion_factor_flag_is_shown():
     # 800 Hz logged, 50 Hz simulator: factor sqrt(50 / 800) = 0.25, below 1/3.
     flagged = {**MAG_ROW, "reason": None, "proposed": 1e-3, "median_rate_hz": 800.0,
@@ -145,6 +154,31 @@ def test_entry_column_names_candidates_and_other():
 def test_a_pipe_in_a_part_name_does_not_split_the_row():
     text = render([{**ROW, "variant": "A|B"}])
     assert "| A\\|B (ICM42688P) |" in text
+
+
+def test_a_line_break_in_a_part_name_does_not_split_the_row():
+    text = render([{**ROW, "log_names": ["ICM\r\n42688P", "X\rY\nZ"]}])
+    assert "| Icm42688p (ICM 42688P, X Y Z) | gyro_noise_density |" in text
+
+
+def test_a_null_count_reads_as_not_available():
+    text = render([{**ROW, "logs": None, "vehicles": None}])
+    assert "None" not in text and "| 6.1e-05 | n/a | n/a | 5e-05 |" in text
+
+
+def test_nan_values_in_a_row_read_as_not_available():
+    nan = float("nan")
+    text = render([{**MAG_ROW, "median": nan, "p25": nan, "p75": nan, "proposed": nan,
+                    "median_rate_hz": nan, "median_factor": nan}])
+    assert "nan" not in text.lower()
+    assert "| 4.88e-05 | n/a | 900 | 300 | n/a | n/a |" in text
+
+
+def test_part_type_sections_are_in_order_whatever_the_row_order():
+    rows = [{**ROW, "part": part} for part in ("gps", "mag", "baro", "imu")]
+    headings = [line for line in render(rows).splitlines() if line.startswith("### ")]
+    assert headings == ["### IMU", "### Barometer", "### Magnetometer", "### GPS receiver",
+                        "### Boards"]
 
 
 def test_the_parameters_line_and_the_missing_versions():

@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import math
+import re
 from typing import Any, Sequence
 
 NA = "n/a"
+_LINE_BREAKS = re.compile(r"[\r\n]+")
 
 
 def _num(value: Any, spec: str = ".4g") -> str:
@@ -14,8 +16,9 @@ def _num(value: Any, spec: str = ".4g") -> str:
 
 
 def _cell(text: str) -> str:
-    """A table cell: a "|" in the text (a log-controlled reason may hold one) is escaped."""
-    return str(text).replace("|", "\\|")
+    """A table cell: a "|" in the text (a log-controlled reason may hold one) is escaped and
+    a line break becomes a space, so the row stays one line."""
+    return _LINE_BREAKS.sub(" ", str(text)).replace("|", "\\|")
 
 
 def _table(headers: Sequence[str], rows: Sequence[Sequence[str]]) -> list[str]:
