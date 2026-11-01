@@ -35,7 +35,12 @@ class CapacityClassRFit:
 
 
 def pack_capacity_mah(params: Mapping[str, Any]) -> float | None:
-    """BAT1_CAPACITY, else BAT_CAPACITY, as logged (-1 included); None when absent."""
+    """BAT1_CAPACITY, else BAT_CAPACITY, as logged (-1 included); None when absent.
+
+    By design (BAT1, or BAT in older logs): a logged BAT1_CAPACITY wins even when it is
+    unset (-1) or 0 and BAT_CAPACITY holds a value, so that log falls in the unknown
+    capacity class. BAT_CAPACITY is read only when BAT1_CAPACITY is absent or not a
+    finite number."""
     for name in CAPACITY_PARAMS:
         value = _finite_float(params.get(name))
         if value is not None:

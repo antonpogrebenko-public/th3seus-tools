@@ -29,7 +29,9 @@ from log_validation.battery_output import (
     rust_constants_text,
     write_markdown_summary,
 )
-from log_validation.tests.battery_fakes import R_3S_MOHM, make_data
+from log_validation.battery_extract import extract_dir
+from log_validation.tests.battery_fakes import (
+    CORPUS, R_3S_MOHM, load_by_stem, make_data, make_log_dir)
 
 CAPACITY_MAH = 5200.0
 CLASS_5000 = "5000-10000"
@@ -123,6 +125,13 @@ def test_pack_capacity_prefers_bat1():
     assert pack_capacity_mah({"BAT1_CAPACITY": "x"}) is None
 
 
+@pytest.mark.parametrize("unset", [-1, 0])
+def test_a_logged_unset_bat1_capacity_wins_over_bat_capacity(unset):
+    capacity = pack_capacity_mah({"BAT1_CAPACITY": unset, "BAT_CAPACITY": 5000})
+    assert capacity == float(unset)
+    assert capacity_class(capacity, DEFAULT_CAPACITY_BOUNDS_MAH) == UNKNOWN_CAPACITY
+
+
 def test_extract_keeps_the_capacity(tmp_path):
     data = dataclasses.replace(make_data("a1"), capacity_mah=CAPACITY_MAH)
     assert load_extracted(save_extracted(data, tmp_path / "x")).capacity_mah == CAPACITY_MAH
@@ -160,7 +169,7 @@ def test_extract_reads_the_parameter():
     assert status == "ok" and data.capacity_mah == 5200.0
 
 
-def fitted(capacity=CAPACITY_MAH):
+def fitted(capacity=CAPACITY_MAH, capacity_bounds=DEFAULT_CAPACITY_BOUNDS_MAH):
     r_of = {"a1": 8.0, "a2": 8.5, "b1": 9.0, "c1": 10.0, "d1": 11.0, "e1": 12.0, "f1": 9.5}
     vehicle_of = {"a1": "v1", "a2": "v1", "b1": "v2", "c1": "v3", "d1": "v4",
                   "e1": "v5", "f1": "v6", "h1": "vh"}
@@ -169,7 +178,7 @@ def fitted(capacity=CAPACITY_MAH):
     datas.append(make_data("h1", 3, R_3S_MOHM))
     seed = next(s for s in range(100)
                 if split_logs(list(vehicle_of), vehicle_of, 0.2, s)[1] == ["h1"])
-    return fit_extracted(datas, vehicle_of, 0.2, seed)
+    return fit_extracted(datas, vehicle_of, 0.2, seed, capacity_bounds=capacity_bounds)
 
 
 def test_fit_reports_capacity_rows():
@@ -185,18 +194,20 @@ def test_fit_reports_capacity_rows():
 
 
 def test_fit_with_other_bounds():
-    datas_result = fitted()
-    assert datas_result.r_fits_by_capacity[0].capacity_class == CLASS_5000
-    # the bounds option reaches the class names
-    r_of = {f"a{i}": 9.0 + i / 10 for i in range(6)}
-    datas = [dataclasses.replace(make_data(i, 4, r), capacity_mah=CAPACITY_MAH) for i, r in r_of.items()]
-    datas.append(make_data("h1", 3, R_3S_MOHM))
-    vehicle_of = {**{i: f"v{i}" for i in r_of}, "h1": "vh"}
-    seed = next(s for s in range(100)
-                if split_logs(list(vehicle_of), vehicle_of, 0.2, s)[1] == ["h1"])
-    result = fit_extracted(datas, vehicle_of, 0.2, seed, capacity_bounds=(6000.0,))
+    result = fitted(capacity_bounds=(6000.0,))
     assert result.capacity_bounds_mah == (6000.0,)
     assert result.r_fits_by_capacity[0].capacity_class == "<6000"
+
+
+def test_capacity_bounds_option_reaches_the_outputs(tmp_path):
+    obs = tmp_path / "obs"
+    extract_dir(make_log_dir(tmp_path, CORPUS), obs, loader=load_by_stem)
+    out_json, out_md = tmp_path / "fit.json", tmp_path / "fit.md"
+    code = battery_fit.main(["--obs-dir", str(obs), "--out-json", str(out_json),
+                             "--out-md", str(out_md), "--capacity-bounds", "6000,12000"])
+    assert code in (0, 1)  # 1: the held-out target was missed, both files written
+    assert json.loads(out_json.read_text())["capacity_bounds_mah"] == [6000.0, 12000.0]
+    assert "class bounds (mAh): 6000, 12000." in out_md.read_text()
 
 
 def test_markdown_has_the_capacity_table(tmp_path):
@@ -205,8 +216,11 @@ def test_markdown_has_the_capacity_table(tmp_path):
     text = out.read_text()
     assert "## Internal Resistance by Pack Capacity" in text
     assert "| 4S | 5000-10000 |" in text
-    assert "| Cell count | Capacity (mAh) | Median (mohm/cell) | p10 | p90 | n step events | Vehicles |" in text
-    assert "1000, 2500, 5000, 10000, 20000" in text and "5 vehicles" in text
+    assert ("| Cell count | Capacity (mAh) | Median (mohm/cell) | p10 | p90 | n step events "
+            "| Vehicles |") in text
+    assert ("Pack capacity is the log's battery capacity parameter; class bounds (mAh): "
+            "1000, 2500, 5000, 10000, 20000.  A class with fewer than 5 vehicles is left out.  "
+            "Spread only: the Rust constants stay per cell count.") in text
     text.encode("ascii")
 
 
