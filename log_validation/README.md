@@ -46,7 +46,10 @@ noise pass adds, for the tables below:
   `baro.chip_resolution_m`: the raw barometer's own noise, rate, Allan slope and
   resolution. `baro.noise_sigma` still measures the fused altitude.
 - `mag.rate_hz`, `mag.allan_slope`, `mag.resolution_gauss`, next to
-  `mag.noise_sigma_gauss`.
+  `mag.noise_sigma_gauss`. The barometer's four values and the magnetometer's slope
+  and resolution need 16 distinct samples in the still window; with fewer, the entry
+  gets an error giving the count (or saying the reading is constant). `mag.rate_hz`
+  needs only two.
 - `gps.fix_type_mode` (the most common fix type among samples with a 3D fix or better,
   extrapolated samples not counted) and, as medians over the samples with that fix
   type, `gps.eph_median_m`, `gps.epv_median_m`, `gps.speed_accuracy_median_m_s`: the
@@ -57,7 +60,8 @@ noise pass adds, for the tables below:
 - `gps.rest_spread_horizontal_m`, `gps.rest_spread_altitude_m`, `gps.rest_window_s`: the
   total spread of the GPS position over the at-rest window, a cross-check of the
   receiver's estimates. They are recorded only when the window is at least
-  `--gps-rest-min-s` seconds (default 60).
+  `--gps-rest-min-s` seconds (default 60). They stay in the per-log results only: the
+  part tables have no column for them, as few logs rest that long.
 - `param.IMU_GYRO_RATEMAX` and `param.IMU_GYRO_CUTOFF`, when the log has them.
 
 GPS is read from `vehicle_gps_position`, or from `sensor_gps` when the log has no
@@ -134,7 +138,8 @@ python -m log_validation.batch_analyze LOGS --manifest manifest.csv -o noise.jso
 
 # 2. Battery resistance and open-circuit curve, with two held-out checks
 python -m log_validation.battery_fit --log-dir LOGS --manifest manifest.csv \
-    --out-json battery.json --out-md battery.md [--capacity-bounds 1000,2500,5000,10000,20000]
+    --out-json battery.json --out-md battery.md \
+    [--capacity-bounds 1000,2500,5000,10000,20000]
 
 # 3. Vehicle response: control effectiveness, lag, hover, motor lag, in-flight noise
 python -m log_validation.response LOGS --manifest manifest.csv -o response.json
@@ -151,7 +156,8 @@ python -m log_validation.part_tables noise.json --out-dir parts --run-date YYYY-
 `1000,2500,5000,10000,20000`). Next to the spread per cell count, the fit reports the
 internal resistance per cell for each cell count and pack-capacity class: the capacity
 is `BAT1_CAPACITY`, else `BAT_CAPACITY`, and a log with an unset or non-positive
-capacity falls in the "unknown capacity" class. A class with fewer than 5 vehicles is
+capacity falls in the "unknown capacity" class (a logged `BAT1_CAPACITY` of -1 or 0
+wins over a `BAT_CAPACITY` value). A class with fewer than 5 vehicles is
 left out. The emitted Rust constants stay per cell count.
 
 `batch_analyze`, `response` and `battery_fit` take `--jobs N` to run the logs in N
@@ -178,10 +184,15 @@ stops on any non-zero status must accept 1 there and go on.
 Write a `run-info.json` with `date`, `tool_commit`, `parameters` (caps, gates,
 cut-offs, seeds, N; also `--gps-rest-min-s`, `--capacity-bounds` and the `part_tables`
 options, whether or not they are the defaults, for provenance) and `commands`, and
-optionally `inputs`, the input counts, for example `{"manifest_rows": N, "rows_without_log": N, "logs_without_row": N,
-"capped_out": N, "download_failed": N}`. The report's Counts section shows `inputs`
-as a table, or says that the input counts were not provided. Then build the
-directory:
+optionally `inputs`, the input counts, for example (each N a count):
+
+```
+{"manifest_rows": N, "rows_without_log": N, "logs_without_row": N, "capped_out": N,
+ "download_failed": N}
+```
+
+The report's Counts section shows `inputs` as a table, or says that the input counts
+were not provided. Then build the directory:
 
 ```bash
 python -m log_validation.calibration_report --noise noise.json --battery battery.json \
@@ -189,11 +200,12 @@ python -m log_validation.calibration_report --noise noise.json --battery battery
     --parts parts --out-dir calibration --forbid SOME_PRIVATE_STRING
 ```
 
-`--noise` and `--response` may also be gzipped (a name ending in `.gz`), as a committed
-calibration directory holds them. `--parts` is optional: the `part_tables` output folder. Without it the directory has no
-part tables and no `log-ids/parts.txt`. The folder must have been built from these noise
-results: when its `part-tables.json` names a log ID that `--noise` does not hold, the
-command exits with 2 and writes nothing.
+`--noise` and `--response` may also be gzipped (a name ending in `.gz`), as a
+committed calibration directory holds them. `--parts` is optional: the `part_tables`
+output folder. Without it the directory has no part tables and no
+`log-ids/parts.txt`. The folder must have been built from these noise results: when
+its `part-tables.json` names a log ID that `--noise` does not hold, the command exits
+with 2 and writes nothing.
 
 ### Part tables
 
@@ -204,9 +216,9 @@ when the name ends in `.gz`), not raw logs. Options and defaults:
 |---|---|---|
 | `--out-dir DIR` | required | must be new or empty |
 | `--run-date YYYY-MM-DD` | required | written into the tables and the Rust comments |
-| `--min-vehicles` | 10 | a value is proposed only when at least this many vehicles contribute |
+| `--min-vehicles` | 10 | a value needs at least this many contributing vehicles |
 | `--allan-slope-tolerance` | 0.15 | allowed distance of the Allan slope from -0.5 |
-| `--sim-rate-baro`, `--sim-rate-mag` | 50, 50 | the simulator's output rate (Hz) for each sensor |
+| `--sim-rate-baro`, `--sim-rate-mag` | 50, 50 | simulator output rate (Hz) per sensor |
 | `--catalog-spellings FILE` | none | extra spellings for new variants (below) |
 
 It writes, into `--out-dir`: `part-tables.json`, `board-table.json`, and
