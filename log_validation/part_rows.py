@@ -173,9 +173,16 @@ def _variant_order(spec: PartType, pools: Mapping[tuple[str, str], _Pool]) -> li
     return existing + candidates + [(OTHER, STATUS_OTHER)]
 
 
+def _row_with_ids(part_type: str, name: str, status: str, parameter: str, measurement: str,
+                  pool: _Pool, rules: RowRules) -> tuple[str, str, PartRow, tuple[str, ...]]:
+    row = _make_row(part_type, name, status, parameter, measurement, pool, rules)
+    ids = tuple(sorted({s[0] for s in pool.samples})) if row.proposed is not None else ()
+    return name, status, row, ids
+
+
 def _part_rows(part_type: str, entries: Sequence[Mapping[str, Any]], rules: RowRules
-               ) -> tuple[list[tuple[str, str, PartRow]], ...]:
-    """Per parameter, the (variant, status, row) list in table order."""
+               ) -> tuple[list[tuple[str, str, PartRow, tuple[str, ...]]], ...]:
+    """Per parameter, the (variant, status, row, log IDs) list in table order."""
     spec = PARTS[part_type]
     collected = {m: _collect(part_type, m[1], entries) for m in spec.measured}
     merged: dict[tuple[str, str], _Pool] = {}
@@ -186,42 +193,23 @@ def _part_rows(part_type: str, entries: Sequence[Mapping[str, Any]], rules: RowR
     for parameter, measurement in spec.measured:
         pools, other = collected[(parameter, measurement)]
         result.append([
-            (name, status, _make_row(part_type, name, status, parameter, measurement,
-                                     other if status == STATUS_OTHER else
-                                     pools.get((name, status), _Pool()), rules))
+            _row_with_ids(part_type, name, status, parameter, measurement,
+                          other if status == STATUS_OTHER else pools.get((name, status), _Pool()),
+                          rules)
             for name, status in order])
     return tuple(result)
 
 
 def _ordered_rows(part_type: str, entries: Sequence[Mapping[str, Any]], rules: RowRules
-                  ) -> list[PartRow]:
+                  ) -> list[tuple[PartRow, tuple[str, ...]]]:
+    """(row, log IDs behind its proposed value) in table order."""
     per_parameter = _part_rows(part_type, entries, rules)
     count = len(per_parameter[0])
-    return [per_parameter[p][i][2] for i in range(count) for p in range(len(per_parameter))]
-
-
-def _log_ids_of(rows: Sequence[PartRow], entries: Sequence[Mapping[str, Any]]) -> tuple[str, ...]:
-    ids: set[str] = set()
-    for part_type in PARTS:
-        wanted = {(r.variant, r.measurement) for r in rows if r.part == part_type and r.proposed is not None}
-        for variant_name, measurement in wanted:
-            ids.update(_logs_behind(part_type, variant_name, measurement, entries))
-    return tuple(sorted(ids))
-
-
-def _logs_behind(part_type: str, variant_name: str, measurement: str,
-                 entries: Sequence[Mapping[str, Any]]) -> set[str]:
-    found = set()
-    for entry in entries:
-        if finite_number(entry.get("measurements") or {}, measurement) is None:
-            continue
-        target, to_other, _ = _targets(part_type, entry)
-        if (variant_name == OTHER and to_other) or (target is not None and target[0] == variant_name):
-            found.add(entry["log_id"])
-    return found
+    return [per_parameter[p][i][2:] for i in range(count) for p in range(len(per_parameter))]
 
 
 def build_part_tables(entries: Sequence[Mapping[str, Any]], rules: RowRules = RowRules()
                       ) -> PartTables:
-    rows = tuple(r for part_type in PARTS for r in _ordered_rows(part_type, entries, rules))
-    return PartTables(rows=rows, log_ids=_log_ids_of(rows, entries))
+    ordered = [pair for part_type in PARTS for pair in _ordered_rows(part_type, entries, rules)]
+    ids = {i for _, row_ids in ordered for i in row_ids}
+    return PartTables(rows=tuple(r for r, _ in ordered), log_ids=tuple(sorted(ids)))

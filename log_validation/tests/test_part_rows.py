@@ -3,7 +3,7 @@ import math
 import pytest
 
 from log_validation.part_rows import (
-    DEFAULT_MIN_VEHICLES, REASON_BELOW_THRESHOLD, PartRow, RowRules, build_part_tables)
+    DEFAULT_MIN_VEHICLES, REASON_BELOW_THRESHOLD, REASON_NO_LOGS, PartRow, RowRules, build_part_tables)
 
 from .part_fakes import BARO_OK, noise_entry
 
@@ -137,7 +137,7 @@ def test_row_without_samples_has_no_nan():
     for r in build_part_tables([]).rows:
         for v in (r.median, r.p25, r.p75, r.proposed):
             assert v is None or not math.isnan(v)
-        assert r.reason is not None
+        assert r.reason == REASON_NO_LOGS
 
 
 def test_row_order():
