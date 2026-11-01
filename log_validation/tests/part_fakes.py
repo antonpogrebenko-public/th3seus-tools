@@ -51,3 +51,23 @@ def topic(n: int, rate_hz: float, **fields: Any) -> dict[str, np.ndarray]:
     for name, value in fields.items():
         data[name] = np.full(n, value) if np.isscalar(value) else np.asarray(value)
     return data
+
+
+BARO_OK = {"baro.chip_allan_slope": -0.5, "baro.chip_resolution_m": 1e-3, "baro.chip_rate_hz": 50.0}
+MAG_OK = {"mag.allan_slope": -0.5, "mag.resolution_gauss": 1e-6, "mag.rate_hz": 50.0}
+PART_TYPES = ("imu", "baro", "mag", "gps")
+
+
+def noise_entry(log_id: str, vehicle: str | None, m: Mapping[str, float],
+                board: str = "PX4_FMU_V5", **names: str | None) -> dict[str, Any]:
+    """A merged noise entry with the named parts; a part not named has name None."""
+    return {
+        "log_id": log_id,
+        "vehicle_id": vehicle,
+        "airframe_id": None,
+        "hardware": {"fc_board": board},
+        "measurements": dict(m),
+        "errors": [],
+        "parts": {t: {"name": names.get(t), "devtype": None, "device_id": None, "source": None}
+                  for t in PART_TYPES},
+    }
