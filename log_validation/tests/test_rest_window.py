@@ -22,7 +22,11 @@ AT_REST_KEYS = ("gyro.gyro_noise_density", "accel.accel_noise_density",
                 "gyro.gyro_bias_sigma", "baro.noise_sigma", "baro.chip_noise_sigma",
                 "mag.noise_sigma_gauss", "mag.rate_hz", "gps.horizontal_noise_sigma",
                 "gps.altitude_noise_sigma", "gps.velocity_noise_sigma",
-                "gps.rest_spread_horizontal_m")
+                "gps.rest_spread_horizontal_m", "mag.allan_slope", "mag.resolution_gauss",
+                "baro.chip_rate_hz", "baro.chip_allan_slope", "baro.chip_resolution_m",
+                "gps.rest_spread_altitude_m", "gps.rest_window_s")
+BARO_MAG_RATE_HZ = 50.0
+RAW_BARO_PA_PER_M = 11.4
 
 
 def _armed(times_s, values):
@@ -61,6 +65,23 @@ def _gps(rng, n):
     }
 
 
+def _baro_mag(rng, seconds):
+    n = int(seconds * BARO_MAG_RATE_HZ)
+    ts = ts_us(n, BARO_MAG_RATE_HZ)
+    return {
+        "vehicle_air_data": {"timestamp": ts,
+                             "baro_alt_meter": 1655.0 + rng.normal(0, 0.2, n)},
+        "sensor_baro": {"timestamp": ts,
+                        "pressure": 95000.0 + rng.normal(0, 0.2 * RAW_BARO_PA_PER_M, n),
+                        "device_id": np.full(n, device_id(0x3D))},
+        "sensor_mag": {"timestamp": ts,
+                       "x": 0.21 + rng.normal(0, 0.004, n),
+                       "y": 0.03 + rng.normal(0, 0.004, n),
+                       "z": 0.49 + rng.normal(0, 0.004, n),
+                       "device_id": np.full(n, device_id(0x06))},
+    }
+
+
 def _log(segments, arming, gps=True, **kwargs):
     rng = np.random.default_rng(11)
     n = int(sum(seconds for seconds, _ in segments) * RATE_HZ)
@@ -71,7 +92,7 @@ def _log(segments, arming, gps=True, **kwargs):
         combined[f"gyro_rad[{i}]"] = _noise(rng, segments)
         combined[f"accelerometer_m_s2[{i}]"] = (9.81 if i == 2 else 0.0) + _noise(
             rng, segments, scale=10.0)
-    datasets = {"sensor_combined": combined, **arming}
+    datasets = {"sensor_combined": combined, **_baro_mag(rng, n / RATE_HZ), **arming}
     if gps:
         datasets["vehicle_gps_position"] = _gps(rng, int(n / RATE_HZ * GPS_RATE_HZ))
     return FakeULog(datasets, **kwargs)
@@ -124,6 +145,7 @@ def test_arming_state_from_vehicle_status():
 def test_error_arming_states_count_as_armed():
     rows = report.analyze(_log([(60, 1e-4)], _status([0], [3])))
     assert _value(rows, "gyro.gyro_noise_density") is None
+    assert _note(rows, "imu.stationary_window") == "no disarmed quiet >=3s run"
 
 
 def test_no_arming_information():
