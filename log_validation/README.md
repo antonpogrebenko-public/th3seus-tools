@@ -229,7 +229,10 @@ The rules:
   threshold". The report shows it in its "No proposal because" column.
 - Parts map to TH3SEUS entries through a pinned mirror of the two repositories' tables
   and parsers (`th3seus_parts.py`). A part with no entry gets its own row as a candidate
-  new variant, whose current value is the `Other` entry's.
+  new variant, whose current value is the `Other` entry's. Its name is the log name split
+  at each run of characters other than letters and digits, each piece capitalized
+  (`EMLID_REACH` gives `EmlidReach`); the pass refuses (exit 2) a proposed variant whose
+  name is not a usable Rust variant, such as one from a log name `OTHER` or `1ABC`.
 - Barometer and magnetometer: a log counts toward a row only when its Allan slope is
   within `--allan-slope-tolerance` of -0.5 and its per-sample value is at least its
   resolution (the white-noise check). The row says how many logs failed each condition.

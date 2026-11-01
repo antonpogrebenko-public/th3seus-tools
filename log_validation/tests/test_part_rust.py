@@ -283,6 +283,13 @@ def test_bad_variant_name_error_names_part_and_variant():
     assert "baro" in str(err.value) and "bad name" in str(err.value)
 
 
+@pytest.mark.parametrize("log_name", ["OTHER", "1ABC", "SELF"])
+def test_a_log_name_that_gives_an_unusable_variant_is_refused(log_name):
+    entries = [noise_entry(f"l{i}", f"v{i}", IMU_M, imu=log_name) for i in range(10)]
+    with pytest.raises(ValueError, match="imu"):
+        emit_rust_files(build_part_tables(entries), RUN)
+
+
 def test_unproposed_bad_name_does_not_raise():
     other = next(r for r in EMPTY.rows if r.part == "imu" and r.variant == "Other")
     row = dataclasses.replace(other, variant="bad name", status=STATUS_CANDIDATE, proposed=None)

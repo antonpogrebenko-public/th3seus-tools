@@ -32,7 +32,10 @@ are matched by substring rules tried in order.
 
 from __future__ import annotations
 
+import re
+from collections.abc import Mapping
 from dataclasses import dataclass
+from types import MappingProxyType
 
 from log_validation.th3seus_model import HITL_PHYSICS_VERSION
 
@@ -63,7 +66,7 @@ OTHER = "Other"
 # gives the PX4 `fix_type` of each (3 = 3D fix, 6 = RTK fixed).
 FIX_CLASS_STANDALONE_3D = "standalone_3d"
 FIX_CLASS_RTK_FIXED = "rtk_fixed"
-FIX_TYPE_OF_CLASS = {FIX_CLASS_STANDALONE_3D: 3, FIX_CLASS_RTK_FIXED: 6}
+FIX_TYPE_OF_CLASS = MappingProxyType({FIX_CLASS_STANDALONE_3D: 3, FIX_CLASS_RTK_FIXED: 6})
 RTK_ENTRIES = frozenset({"UbloxF9P", "SeptentrioMosaic"})
 
 KIND_EXISTING = "existing"
@@ -71,52 +74,56 @@ KIND_CANDIDATE = "candidate"
 KIND_OTHER_ONLY = "other_only"
 KIND_EXCLUDED = "excluded"
 
+# The tables below are read-only (MappingProxyType): they mirror pinned sources.
 # PX4 GPS names the daemon's substring rules miss (UBX_8 has no "m8").
-LOG_NAME_VARIANTS = {
-    "gps": {
+LOG_NAME_VARIANTS = MappingProxyType({
+    "gps": MappingProxyType({
         "UBX_8": "UbloxM8N",
         "UBX_9": "UbloxM9N",
         "UBX_10": "UbloxM10",
         "UBX_F9P": "UbloxF9P",
         "SBF": "SeptentrioMosaic",
-    },
-}
+    }),
+})
 # Names that identify a protocol or bus, not a part.
-GENERIC_LOG_NAMES = {
+GENERIC_LOG_NAMES = MappingProxyType({
     "imu": frozenset({"UAVCAN"}),
     "baro": frozenset({"UAVCAN"}),
     "mag": frozenset({"UAVCAN"}),
     "gps": frozenset({"UAVCAN", "UBX", "NMEA"}),
-}
-SIMULATED_LOG_NAMES = {"imu": "SIM", "baro": "BAROSIM", "mag": "MAGSIM", "gps": "SIM"}
+})
+SIMULATED_LOG_NAMES = MappingProxyType(
+    {"imu": "SIM", "baro": "BAROSIM", "mag": "MAGSIM", "gps": "SIM"})
 UNKNOWN_PREFIX = "UNKNOWN_"
+# A candidate variant name splits a log name on every run of these.
+_NAME_SEPARATORS = re.compile(r"[^A-Za-z0-9]+")
 
 # hitl-daemon 0.27.0 exact aliases (after normalize) for the three exact parsers.
-_ALIASES = {
-    "imu": {
+_ALIASES = MappingProxyType({
+    "imu": MappingProxyType({
         "mpu6000": "Mpu6000", "mpu6000p": "Mpu6000",
         "mpu6500": "Mpu6500", "mpu6500p": "Mpu6500",
         "icm20689": "Icm20689", "icm20689p": "Icm20689",
         "icm42688p": "Icm42688p", "icm42688": "Icm42688p",
         "bmi270": "Bmi270",
         "lsm6dso": "Lsm6dso", "lsm6dso32": "Lsm6dso",
-    },
-    "baro": {
+    }),
+    "baro": MappingProxyType({
         "bmp280": "Bmp280",
         "bmp388": "Bmp388", "bmp390": "Bmp388",
         "dps310": "Dps310",
         "spl06": "Spl06", "spl06001": "Spl06",
         "ms5611": "Ms5611", "ms561101ba03": "Ms5611",
-    },
-    "mag": {
+    }),
+    "mag": MappingProxyType({
         "hmc5883": "Hmc5883", "hmc5883l": "Hmc5883",
         "qmc5883": "Qmc5883", "qmc5883l": "Qmc5883",
         "ist8310": "Ist8310",
         "rm3100": "Rm3100",
         "lis3mdl": "Lis3mdl",
         "none": "None", "": "None",
-    },
-}
+    }),
+})
 # parse_gps_chipset: (substrings, variant), first rule with a hit wins.
 _GPS_RULES = (
     (("f9p", "zedf9p"), "UbloxF9P"),
@@ -301,7 +308,7 @@ _GPS = PartType(
     ),
 )
 
-PARTS: dict[str, PartType] = {p.key: p for p in (_IMU, _BARO, _MAG, _GPS)}
+PARTS: Mapping[str, PartType] = MappingProxyType({p.key: p for p in (_IMU, _BARO, _MAG, _GPS)})
 
 
 def normalize(text: str) -> str:
@@ -326,8 +333,13 @@ def variant(part_type: str, name: str) -> Variant | None:
 
 
 def candidate_variant_name(log_name: str) -> str:
-    """Split on `_`, capitalize each piece: "EMLID_REACH" -> "EmlidReach"."""
-    return "".join(piece[:1].upper() + piece[1:].lower() for piece in log_name.split("_"))
+    """Split on every run of characters other than ASCII letters and digits, capitalize each
+    piece: "EMLID_REACH" -> "EmlidReach", "EMLID-REACH M2" -> "EmlidReachM2".
+
+    The result is not always a usable Rust variant ("1ABC" -> "1abc", "OTHER" -> "Other");
+    the Rust emitter checks every name it writes and refuses those."""
+    pieces = _NAME_SEPARATORS.split(log_name)
+    return "".join(piece[:1].upper() + piece[1:].lower() for piece in pieces)
 
 
 def classify_log_part(part_type: str, log_name: str | None) -> Classified:
@@ -337,7 +349,8 @@ def classify_log_part(part_type: str, log_name: str | None) -> Classified:
     generic name that counts only toward Other; "existing" maps to a table
     variant; "candidate" is a real part with no entry yet.
     """
-    if log_name is None or not log_name.strip():
+    log_name = (log_name or "").strip()
+    if not log_name:
         return Classified(KIND_OTHER_ONLY, OTHER)
     if log_name.startswith(UNKNOWN_PREFIX) or log_name in GENERIC_LOG_NAMES[part_type]:
         return Classified(KIND_OTHER_ONLY, OTHER)
@@ -355,7 +368,11 @@ def classify_log_part(part_type: str, log_name: str | None) -> Classified:
 
 
 def current_literal(part_type: str, entry: str, field: str) -> str:
-    """The 0.13.1 literal; any entry that is not an existing variant gets Other's."""
+    """The 0.13.1 literal; any entry that is not an existing variant gets Other's.
+
+    ValueError for a variant without a profile (MagChip::None): it has no value."""
+    if entry in PARTS[part_type].no_profile_variants:
+        raise ValueError(f"{part_type}: {entry} has no profile, so no current value")
     found = variant(part_type, entry) or variant(part_type, OTHER)
     return dict(found.fields)[field]
 

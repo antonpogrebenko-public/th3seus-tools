@@ -57,12 +57,14 @@ def _has_proposal(rows: Mapping[str, PartRow] | None) -> bool:
 
 
 def _new_variants(tables: PartTables, part: str) -> tuple[str, ...]:
-    """Candidate variants with a proposal, sorted by name; names checked before any emit."""
+    """Candidate variants with a proposal, sorted by name; names checked before any emit.
+
+    Read from the candidate rows themselves, not grouped by name: a candidate that shares
+    its name with Other or an existing variant (a log named "OTHER") would hide there."""
     spec = PARTS[part]
     existing = {v.name for v in spec.variants} | set(spec.no_profile_variants)
-    names = sorted(
-        name for name, rows in _rows_by_variant(tables, part).items()
-        if _has_proposal(rows) and any(r.status == STATUS_CANDIDATE for r in rows.values()))
+    names = sorted({r.variant for r in tables.rows
+                    if r.part == part and r.status == STATUS_CANDIDATE and r.proposed is not None})
     for name in names:
         if not IDENTIFIER.fullmatch(name) or name in RESERVED_VARIANTS:
             raise ValueError(f"{part}: variant name {name!r} is not a usable Rust identifier")

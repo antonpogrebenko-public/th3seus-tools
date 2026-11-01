@@ -163,6 +163,13 @@ def test_parsers_pinned_to_build_config_rs(part, text, expected):
     assert daemon_parse(part, text) == expected
 
 
+@pytest.mark.parametrize("text,expected", [  # parse_gps_chipset tries its rules in this order
+    ("zed-f9p-m9", "UbloxF9P"), ("m10-m8", "UbloxM10"), ("m9-m8", "UbloxM9N"),
+    ("mosaic-m8", "UbloxM8N"), ("here3-m9", "UbloxM9N"), ("septentrio-here3", "SeptentrioMosaic")])
+def test_gps_substring_rules_are_tried_in_order(text, expected):
+    assert daemon_parse("gps", text) == expected
+
+
 def test_two_names_one_entry():
     assert classify_log_part("baro", "BMP388") == classify_log_part("baro", "BMP390") == Classified("existing", "Bmp388")
 
@@ -172,6 +179,24 @@ def test_part_without_an_entry():
     assert current_value("imu", "Bmi088", "gyro_noise_density") == 8.726646e-4
     assert current_literal("gps", "Ubx20", "max_satellites") == "22"
     assert current_literal("gps", "Here3", "update_rate_hz") == "8.0"
+
+
+def test_a_variant_without_a_profile_has_no_current_value():
+    with pytest.raises(ValueError, match="None"):
+        current_literal("mag", "None", "noise_sigma_gauss")
+
+
+@pytest.mark.parametrize("part,name,expected", [
+    ("gps", " UBX ", Classified("other_only", "Other")),
+    ("baro", " UNKNOWN_0x99", Classified("other_only", "Other")),
+    ("gps", "UBX_F9P ", Classified("existing", "UbloxF9P")),
+    ("imu", " BMI088\t", Classified("candidate", "Bmi088"))])
+def test_surrounding_whitespace_is_ignored(part, name, expected):
+    assert classify_log_part(part, name) == expected
+
+
+def test_surrounding_whitespace_on_a_simulated_name_is_ignored():
+    assert classify_log_part("imu", " SIM ").kind == "excluded"
 
 
 def test_px4_gps_names_where_the_substring_rules_do_not_apply():
@@ -208,7 +233,25 @@ def test_gps_variants_carry_their_fix_class():
 
 
 def test_candidate_variant_names():
-    assert [candidate_variant_name(n) for n in ("BMI088", "EMLID_REACH", "LSM9DS1_M")] == ["Bmi088", "EmlidReach", "Lsm9ds1M"]
+    names = ("BMI088", "EMLID_REACH", "LSM9DS1_M")
+    assert [candidate_variant_name(n) for n in names] == ["Bmi088", "EmlidReach", "Lsm9ds1M"]
+
+
+@pytest.mark.parametrize("name,expected", [
+    ("EMLID-REACH M2", "EmlidReachM2"), ("LSM9DS1--M", "Lsm9ds1M"), ("_BMI088_", "Bmi088"),
+    ("ICP.201XX", "Icp201xx"), ("1ABC", "1abc"), ("OTHER", "Other")])
+def test_candidate_variant_name_splits_on_any_non_alphanumeric_run(name, expected):
+    # "1abc" and "Other" are not usable variants; the Rust emitter refuses them.
+    assert candidate_variant_name(name) == expected
+
+
+@pytest.mark.parametrize("table", [
+    PARTS, th3seus_parts.FIX_TYPE_OF_CLASS, th3seus_parts.LOG_NAME_VARIANTS,
+    th3seus_parts.LOG_NAME_VARIANTS["gps"], th3seus_parts.GENERIC_LOG_NAMES,
+    th3seus_parts.SIMULATED_LOG_NAMES, th3seus_parts._ALIASES, th3seus_parts._ALIASES["imu"]])
+def test_public_tables_are_read_only(table):
+    with pytest.raises(TypeError):
+        table["new"] = None
 
 
 def test_mirror_text_is_ascii():
