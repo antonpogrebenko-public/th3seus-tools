@@ -14,10 +14,11 @@ from log_validation.response import ResponseGates, analyze_response
 from log_validation.tests.part_fakes import InstanceULog, device_id, topic
 from log_validation.tests.response_fakes import quad_log
 from log_validation.tests.test_batch_analyze import _fake, _touch, load_by_stem
-from log_validation.tests.test_pipeline import _build_log
+from log_validation.tests.test_pipeline import RAW_BARO_PA_PER_M, _build_log
 
 BMI088, ICM20602, MPU6000, ICM42688P = 0x66, 0x38, 0x21, 0x26
 MS5611, RM3100, IST8310, UBX_F9P = 0x3D, 0x07, 0x06, 0xAA
+BMP280 = 0x3F
 
 
 def _primary_gyro(devtype: int) -> dict:
@@ -146,10 +147,12 @@ def test_most_common_primary_after_a_failover():
     assert (parts.mag.name, parts.mag_instance) == ("RM3100", 1)
 
 
-def test_tie_goes_to_the_value_logged_first():
-    ids = [device_id(RM3100)] * 2 + [device_id(IST8310)] * 2
+@pytest.mark.parametrize("first, second, name", [(RM3100, IST8310, "RM3100"),
+                                                 (IST8310, RM3100, "IST8310")])
+def test_tie_goes_to_the_value_logged_first(first, second, name):
+    ids = [device_id(first)] * 2 + [device_id(second)] * 2
     parts = identify_parts(_two_mags(topic(4, 1, device_id_primary=ids)), {})
-    assert parts.mag.name == "RM3100"
+    assert parts.mag.name == name
 
 
 def test_zero_device_ids_are_ignored():
@@ -162,6 +165,17 @@ def test_instance_without_a_device_id_uses_its_calibration_parameter():
     baro = identify_parts(InstanceULog({"sensor_baro": topic(5, 1, pressure=95000.0)}),
                           {"CAL_BARO0_ID": device_id(MS5611)}).baro
     assert (baro.name, baro.source) == ("MS5611", "CAL_BARO0_ID")
+
+
+def test_instance_1_without_a_device_id_uses_its_own_calibration_parameter():
+    params = {"CAL_MAG0_ID": device_id(IST8310), "CAL_MAG1_ID": device_id(RM3100),
+              "CAL_BARO0_ID": device_id(MS5611), "CAL_BARO1_ID": device_id(BMP280)}
+    log = InstanceULog({("sensor_mag", 1): topic(5, 1, x=0.2),
+                        ("sensor_baro", 1): topic(5, 1, pressure=95000.0)})
+    parts = identify_parts(log, params)
+    assert (parts.mag_instance, parts.mag.name, parts.mag.source) == (1, "RM3100", "CAL_MAG1_ID")
+    assert (parts.baro_instance, parts.baro.name, parts.baro.source) == (
+        1, "BMP280", "CAL_BARO1_ID")
 
 
 def test_ublox_f9p():
@@ -231,9 +245,24 @@ def test_failed_load_entry_has_empty_parts(tmp_path):
     assert json.loads(out.read_text())[0]["parts"] == empty_parts_json()
 
 
-def test_response_entry_has_parts():
+def test_response_entry_carries_the_identified_parts():
+    # quad_log has no sensor selection or IMU topic with device IDs: CAL_GYRO0_ID names it.
     result = analyze_response(quad_log(), "r1", None, ResponseGates())
+    assert result.parts["imu"] == {"name": "ICM20689", "devtype": 0x3C, "device_id": 0x3C000A,
+                                   "source": "CAL_GYRO0_ID"}
     assert set(result.parts) == {"imu", "baro", "mag", "gps"}
+
+
+def test_failed_part_identification_in_the_response_pass(monkeypatch):
+    import log_validation.response as module
+
+    def broken(_ulog, _params):
+        raise RuntimeError("secret detail at /some/private/path")
+
+    monkeypatch.setattr(module, "identify_parts", broken)
+    result = analyze_response(quad_log(), "r1", None, ResponseGates())
+    assert "part identification failed: RuntimeError" in result.errors
+    assert result.parts == empty_parts_json()
 
 
 def _measured(rows, sensor, param):
@@ -296,3 +325,42 @@ def test_no_header_results_do_not_share_a_parts_dict():
     from log_validation.response import _no_header
 
     assert _no_header().parts is not _no_header().parts
+
+
+def _baro(n: int, rate_hz: float, sigma_m: float, devtype: int, seed: int) -> dict:
+    """Raw barometer at rate_hz: 95000 Pa plus white noise of sigma_m of altitude."""
+    rng = np.random.default_rng(seed)
+    return topic(n, rate_hz, device_id=device_id(devtype),
+                 pressure=95000.0 + rng.normal(0, sigma_m * RAW_BARO_PA_PER_M, n))
+
+
+def _mag(t_us: np.ndarray, sigma: float, devtype: int, seed: int, quantum=None) -> dict:
+    rng = np.random.default_rng(seed)
+    data = {"timestamp": t_us, "device_id": np.full(t_us.size, device_id(devtype))}
+    for axis, base in zip("xyz", (0.21, 0.03, 0.49)):
+        x = base + rng.normal(0, sigma, t_us.size)
+        data[axis] = x if quantum is None else np.round(x / quantum) * quantum
+    return data
+
+
+def test_chip_and_evidence_values_come_from_the_primary_instances():
+    datasets = {d.name: d.data for d in _build_log().data_list
+                if d.name not in ("sensor_baro", "sensor_mag")}
+    n50, n25, n100 = 70 * 50, 70 * 25, 70 * 100
+    log = InstanceULog({
+        **datasets,
+        ("sensor_baro", 0): _baro(n50, 50.0, 0.2, MS5611, 4),
+        ("sensor_baro", 1): _baro(n25, 25.0, 0.05, BMP280, 5),
+        "sensors_status_baro": topic(10, 1, device_id_primary=device_id(BMP280)),
+        ("sensor_mag", 0): _mag(topic(n50, 50.0)["timestamp"], 0.004, IST8310, 6),
+        ("sensor_mag", 1): _mag(topic(n100, 100.0)["timestamp"], 0.004, RM3100, 7,
+                                quantum=0.001),
+        "sensors_status_mag": topic(10, 1, device_id_primary=device_id(RM3100)),
+    })
+    parts = identify_parts(log, {})
+    assert (parts.baro_instance, parts.baro.name, parts.mag_instance) == (1, "BMP280", 1)
+    rows = report.analyze(log, parts)
+    assert abs(_measured(rows, "baro", "chip_noise_sigma") - 0.05) / 0.05 < 0.15
+    assert abs(_measured(rows, "baro", "chip_rate_hz") - 25.0) / 25.0 < 0.01
+    assert abs(_measured(rows, "mag", "rate_hz") - 100.0) / 100.0 < 0.01
+    assert _measured(rows, "mag", "resolution_gauss") == pytest.approx(0.001)

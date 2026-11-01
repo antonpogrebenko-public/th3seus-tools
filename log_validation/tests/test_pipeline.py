@@ -36,8 +36,8 @@ class FakeULog:
         return self._datasets[name]  # raises KeyError if absent (loader wraps it)
 
 
-# Pressure change per meter of altitude near 95000 Pa (ISA), about 11.7 Pa/m.
-RAW_BARO_PA_PER_M = 11.7
+# Pressure change per meter of altitude near 95000 Pa (ISA), about 11.4 Pa/m.
+RAW_BARO_PA_PER_M = 11.4
 
 
 def _ts_us(n: int, rate_hz: float) -> np.ndarray:
@@ -87,7 +87,7 @@ def _build_log() -> FakeULog:
         "baro_alt_meter": 1655.0 + rng.normal(0, 0.2, bn),
     }
 
-    # Raw barometer at 50 Hz: 95000 Pa plus 0.2 m equivalent white noise (about 2.4 Pa).
+    # Raw barometer at 50 Hz: 95000 Pa plus 0.2 m equivalent white noise (about 2.3 Pa).
     baro_raw = {
         "timestamp": _ts_us(bn, 50.0),
         "pressure": 95000.0 + rng.normal(0, 0.2 * RAW_BARO_PA_PER_M, bn),
@@ -153,9 +153,11 @@ def test_pipeline_recovers_injected_noise():
     assert abs(_measured(rows, "gyro", "gyro_noise_density") - 0.001) / 0.001 < 0.1
     assert abs(_measured(rows, "accel", "accel_noise_density") - 0.008) / 0.008 < 0.1
     assert abs(_measured(rows, "baro", "noise_sigma") - 0.2) / 0.2 < 0.15
+    assert abs(_measured(rows, "baro", "chip_noise_sigma") - 0.2) / 0.2 < 0.15
     assert abs(_measured(rows, "mag", "noise_sigma_gauss") - 0.004) / 0.004 < 0.15
     assert abs(_measured(rows, "gps", "horizontal_noise_sigma") - 1.2) / 1.2 < 0.25
     assert abs(_measured(rows, "gps", "update_rate_hz") - 5.0) < 0.5
+    assert _measured(rows, "gps", "eph_median_m") == 1.0
 
 
 def test_pipeline_without_sensor_combined_falls_back_to_sensor_gyro():

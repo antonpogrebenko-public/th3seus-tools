@@ -422,6 +422,16 @@ def test_accuracy_samples_of_another_fix_type_do_not_count():
     assert values(gps_accuracy_values(log, GPS))["gps.eph_median_m"] == pytest.approx(1.0)
 
 
+@pytest.mark.parametrize("fix, eph", [
+    ([3] * 40 + [5] * 30 + [6] * 30, [1.0] * 40 + [0.5] * 30 + [0.02] * 30),
+    ([0] * 60 + [3] * 40, [99.0] * 60 + [1.0] * 40)])
+def test_accuracy_medians_use_only_samples_of_the_mode_fix_type(fix, eph):
+    # Over every 3D-fix sample the first median would be 0.5; over all samples the second 99.
+    log = _gps_log(fix_type=fix, eph=eph, epv=2.0, s_variance_m_s=0.3)
+    v = values(gps_accuracy_values(log, GPS))
+    assert v["gps.fix_type_mode"] == 3 and v["gps.eph_median_m"] == pytest.approx(1.0)
+
+
 def _moving_log() -> FakeULog:
     """The default test log, but the gyro never rests, so there is no still window."""
     base = _fake()
