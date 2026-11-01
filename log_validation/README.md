@@ -5,7 +5,8 @@ calibrate the TH3SEUS simulator from them.
 
 The HITL sim ships synthetic IMU/GPS/baro/mag noise (`hitl-sensors`). This tool
 downloads public `.ulg` logs from PX4 flight-review, measures the real sensor
-noise from each log's on-ground (stationary) segment, and compares it against
+noise from each log's disarmed still window (the longest run of at least 3 s where the
+vehicle is disarmed and the gyro is quiet), and compares it against
 the model defaults so you can tell whether the simulated noise is realistic.
 The calibration run (below) adds passes for the battery (internal resistance and
 open-circuit curve), the vehicle response (control effectiveness, lag, hover command,
@@ -19,11 +20,11 @@ table from the noise results, and writes the proposed values as Rust text for th
 
 | Sensor | Model param | How it's measured |
 |--------|-------------|-------------------|
-| Gyro   | `gyro_noise_density` | first-diff white-noise std x sqrt(dt), stationary |
-| Accel  | `accel_noise_density` | first-diff white-noise std x sqrt(dt), stationary |
+| Gyro   | `gyro_noise_density` | first-diff white-noise std x sqrt(dt), disarmed still window |
+| Accel  | `accel_noise_density` | first-diff white-noise std x sqrt(dt), disarmed still window |
 | Gyro   | `gyro_bias_sigma` | Allan-deviation floor (approximate) |
-| Baro   | `noise_sigma` | first-diff std of `baro_alt_meter`, stationary |
-| Mag    | `noise_sigma_gauss` | first-diff std per axis, stationary |
+| Baro   | `noise_sigma` | first-diff std of `baro_alt_meter`, disarmed still window |
+| Mag    | `noise_sigma_gauss` | first-diff std per axis, disarmed still window |
 | GPS    | `horizontal_noise_sigma` | std of on-ground local N/E position |
 | GPS    | `altitude_noise_sigma` | std of on-ground GPS altitude |
 | GPS    | `velocity_noise_sigma` | std of on-ground GPS velocity |
@@ -384,6 +385,14 @@ and new columns, per MCU family; check them before deploying. Re-seeding also ch
 the gyro bias sigma and the baro, mag and GPS parameters measured in the still window,
 because the still window and the Allan fit now use `sensor_combined` (when the log has
 it) rather than `sensor_gyro`; compare those profile values with the deployed ones too.
+
+The at-rest values (the noise densities, the gyro bias sigma, and the baro, mag and GPS
+values measured in the still window) now exclude armed and hover windows, which
+measured propeller vibration instead of sensor noise. A log without arming topics gives
+no at-rest values and its entry has the error `imu.stationary_window: no arming state:
+neither 'actuator_armed' nor 'vehicle_status' in log`. A log with no disarmed still
+window gives none either, with the error `imu.stationary_window: no disarmed quiet >=3s
+run`. Fewer logs therefore give at-rest values than before.
 
 The kit table `reference_kits.json` gives each build value with the public page it
 came from. A required value that no maker publishes is `null` with no source, and that
