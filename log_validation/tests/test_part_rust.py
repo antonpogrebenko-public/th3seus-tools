@@ -41,6 +41,12 @@ def test_rust_f64():
     assert [rust_f64(x) for x in (0.0, 1e-5, 1e20, -2.5e-6)] == ["0.0", "1e-5", "1e20", "-2.5e-6"]
 
 
+def test_rust_f64_rounding_and_extremes():
+    assert rust_f64(9.9996) == "10.0"
+    assert rust_f64(1.23456e-300) == "1.235e-300"
+    assert rust_f64(-0.0) == "-0.0"
+
+
 @pytest.mark.parametrize("bad", [float("nan"), float("inf"), float("-inf")])
 def test_rust_f64_rejects_non_finite(bad):
     with pytest.raises(ValueError):
@@ -132,6 +138,30 @@ def test_other_with_a_proposal_gets_explicit_literals():
             "            },\n") in imu
 
 
+OTHER_POOLED = "median over all vehicles of this part type"
+FALLBACK = "(TH3SEUS's fallback entry)"
+
+
+def test_other_with_a_proposal_says_it_pools_every_part():
+    chips = ["BMI088", "ICM42688P", None]
+    entries = [noise_entry(f"l{i}", f"v{i}", IMU_M, imu=chips[i % 3]) for i in range(12)]
+    imu = emit_part_source("imu", build_part_tables(entries), RUN)
+    assert (f"            // Unknown part - {OTHER_POOLED} {FALLBACK}\n"
+            "            ImuChip::Other => ImuProfile {\n") in imu
+
+
+def test_gps_other_with_a_proposal_names_the_standalone_fix():
+    gps = emit_part_source("gps", build_part_tables(_gps_entries("UBX", 10)), RUN)
+    assert (f"            // Unknown part - {OTHER_POOLED}, standalone 3D fix only {FALLBACK}\n"
+            "            GpsChipset::Other => GpsProfile {\n") in gps
+
+
+def test_other_without_a_proposal_keeps_the_0_13_1_comment():
+    imu = emit_part_source("imu", EMPTY, RUN)
+    assert ("            // Unknown chip - fall back to legacy reference\n"
+            "            ImuChip::Other => ImuChip::Mpu6000.imu_profile(),\n") in imu
+
+
 def test_mag_structure():
     mag = emit_rust_files(build_part_tables([]), RUN)["mag_chip.rs"]
     assert "pub fn mag_profile(&self) -> Option<MagProfile> {" in mag
@@ -203,6 +233,22 @@ def test_duplicate_alias_across_new_variants_is_marked_used():
     aliases = emit_rust_files(both, RUN, {"imu": {"bmi_088": "ZZZ"}})[ALIASES_FILE]
     assert '// skipped "bmi088": already used by ImuChip::Bmi088' in aliases
     assert '"zzz" => ImuChip::Zzz,' in aliases
+
+
+def test_catalog_log_name_matches_after_normalizing():
+    catalog = {"baro": {"ICP20100": "icp-201xx"}}
+    aliases = emit_rust_files(_baro_icp(), RUN, catalog)[ALIASES_FILE]
+    assert '        "icp20100" | "icp201xx" => BaroChip::Icp201xx,\n' in aliases
+    assert "not emitted" not in aliases
+
+
+@pytest.mark.parametrize("part, spelling, log_name, tables", [
+    ("imu", "-", "BMI088", bmi088_tables()), ("baro", " _ ", "ICP201XX", _baro_icp()),
+    ("gps", "_", "UBX_20", build_part_tables(_gps_entries("UBX_20", 12)))])
+def test_empty_catalog_spelling_is_skipped(part, spelling, log_name, tables):
+    aliases = emit_rust_files(tables, RUN, {part: {spelling: log_name}})[ALIASES_FILE]
+    assert f'// skipped catalog spelling "{spelling}": empty after normalizing' in aliases
+    assert '""' not in aliases.replace(f'"{spelling}"', "")
 
 
 def test_unused_catalog_spelling_is_noted():

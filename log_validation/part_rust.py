@@ -101,10 +101,15 @@ def _arm(spec: PartType, name: str, base: Variant, comment: str, rows: Mapping[s
             + [f"{I3}{closer}"])
 
 
-def _other_comment(base: Variant, rows: Mapping[str, PartRow]) -> str:
-    if _has_proposal(rows):
-        return "Unknown part - median over vehicles whose part has no table entry"
-    return base.comment
+def _other_comment(spec: PartType, base: Variant, rows: Mapping[str, PartRow]) -> str:
+    """With a proposal, Other is TH3SEUS's fallback entry: the median over every vehicle of
+    the part type, whatever its part (GPS: the logs with a standalone 3D fix)."""
+    if not _has_proposal(rows):
+        return base.comment
+    scope = "all vehicles of this part type"
+    if spec.key == GPS:
+        scope += ", standalone 3D fix only"
+    return f"Unknown part - median over {scope} (TH3SEUS's fallback entry)"
 
 
 def _arms(spec: PartType, tables: PartTables, run_date: str) -> list[str]:
@@ -124,7 +129,7 @@ def _arms(spec: PartType, tables: PartTables, run_date: str) -> list[str]:
     if spec.no_profile_variants:
         lines += [f"{I3}{spec.enum}::None => None,"]
     other_rows = rows.get(OTHER, {})
-    lines += _arm(spec, OTHER, other, _other_comment(other, other_rows), other_rows,
+    lines += _arm(spec, OTHER, other, _other_comment(spec, other, other_rows), other_rows,
                   old_existing, run_date)
     return lines
 
@@ -158,7 +163,21 @@ def emit_part_source(part_type: str, tables: PartTables, run_date: str) -> str:
 
 
 def _catalog_aliases(catalog: Mapping[str, str], log_names: Sequence[str]) -> list[str]:
-    return [normalize(spelling) for spelling, log_name in catalog.items() if log_name in log_names]
+    """The catalog spellings of these log names; log names compare after `normalize`."""
+    wanted = {normalize(n) for n in log_names}
+    return [normalize(spelling) for spelling, log_name in catalog.items()
+            if normalize(log_name) in wanted]
+
+
+def _usable_catalog(catalog: Mapping[str, str], indent: str) -> tuple[dict[str, str], list[str]]:
+    """The spellings that are not empty after `normalize`, and a comment for each that is
+    (an empty alias would match an empty name). Such a spelling holds only `-`, `_` and
+    spaces, so it is safe in a comment. Log names cannot be empty here: an emitted variant
+    has a valid identifier, so its log name has a letter or digit."""
+    usable = {s: n for s, n in catalog.items() if normalize(s)}
+    skipped = [f'{indent}// skipped catalog spelling "{s}": empty after normalizing'
+               for s in sorted(catalog) if not normalize(s)]
+    return usable, skipped
 
 
 def _check_alias(part: str, alias: str) -> None:
@@ -182,6 +201,8 @@ def _block(spec: PartType, tables: PartTables, catalog: Mapping[str, str]) -> li
              if spec.key == GPS else "paste these arms above the `_ =>` arm")
     lines = [f"// {spec.parser}", f"// {where}"]
     lines += [f"{indent}// no new variant"] if not new else []
+    catalog, skipped = _usable_catalog(catalog, indent)
+    lines += skipped
     claimed: dict[str, str] = {}
     for name in new:
         names = _log_names(rows[name])
@@ -202,9 +223,9 @@ def _block(spec: PartType, tables: PartTables, catalog: Mapping[str, str]) -> li
                 emit.append(alias)
         if emit:
             lines.append(_alias_line(spec, name, emit))
-    known = {n for name in new for n in _log_names(rows[name])}
+    known = {normalize(n) for name in new for n in _log_names(rows[name])}
     for spelling, log_name in sorted(catalog.items(), key=lambda kv: normalize(kv[0])):
-        if log_name not in known:
+        if normalize(log_name) not in known:
             _check_alias(spec.key, normalize(spelling))
             lines.append(f"{indent}// not emitted: \"{normalize(spelling)}\" "
                          f"({log_name} has no new variant)")

@@ -256,7 +256,9 @@ The rules:
 
 The catalog spellings file is `{"imu": {"<spelling>": "<PX4 log name>"}, "baro": {...},
 "mag": {...}, "gps": {...}}`; the spellings are emitted, normalized, next to the log names
-of the new variants. The pass exits with 2 and writes nothing for a bad option, an
+of the new variants. Log names are compared after normalizing (so `icp-201xx` matches
+`ICP201XX`), and a spelling that is empty after normalizing (such as `-`) is skipped with
+a comment. The pass exits with 2 and writes nothing for a bad option, an
 unreadable, corrupt or malformed input, or private data in an output. It guards against
 the home directory, user and host name and the input folders; there is no `--forbid`
 option, so run `calibration_report --forbid` over the result for other private strings.
