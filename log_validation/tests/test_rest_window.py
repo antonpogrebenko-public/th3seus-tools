@@ -101,6 +101,14 @@ def test_hover_longer_than_the_rest_before_arming():
     assert abs(_value(rows, "gps.rest_window_s") - 90.0) <= 1.0
 
 
+def test_rest_right_after_landing():
+    segments = [(60, 1e-4), (5, 1.5e-3), (115, 1e-4)]
+    log = _log(segments, _armed([0, 60], [1, 0]))
+    rows = report.analyze(log)
+    assert abs(_value(rows, "gyro.gyro_noise_density") - 1e-4) / 1e-4 < 0.10
+    assert _value(rows, "gps.rest_window_s") <= 110.0
+
+
 def test_logged_from_arming_on():
     rows = report.analyze(_log([(120, 1e-4)], _armed([0], [1])))
     assert _note(rows, "imu.stationary_window") == "no disarmed quiet >=3s run"

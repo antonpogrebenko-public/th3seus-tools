@@ -6,7 +6,7 @@ import pytest
 from log_validation import arming
 from log_validation.tests.fakes import FakeULog
 
-T = np.array([0.0, 5.0, 10.0, 15.0, 25.0])
+T = np.array([0.0, 5.0, 10.0, 15.0, 25.0, 31.0])
 
 
 def _armed(ts_s, values, dtype=float):
@@ -29,18 +29,18 @@ def _status(ts_s, states):
 
 def test_step_hold_at_or_before():
     m = arming.disarmed_mask(FakeULog(_armed([0, 10, 20], [0, 1, 0])), T)
-    assert m.tolist() == [True, True, False, False, True]
+    assert m.tolist() == [True, True, False, False, False, True]
 
 
 def test_samples_before_the_first_message_are_not_disarmed():
     m = arming.disarmed_mask(FakeULog(_armed([6], [0])), T)
-    assert m.tolist() == [False, False, True, True, True]
+    assert m.tolist() == [False, False, True, True, True, True]
 
 
 @pytest.mark.parametrize("dtype", [bool, np.uint8, float])
 def test_armed_dtypes(dtype):
     m = arming.disarmed_mask(FakeULog(_armed([0, 10], [0, 1], dtype)), T)
-    assert m.tolist() == [True, True, False, False, False]
+    assert m.tolist() == [True, True, False, False, False, False]
 
 
 def test_actuator_armed_wins_over_vehicle_status():
@@ -54,7 +54,7 @@ def test_actuator_armed_wins_over_vehicle_status():
 )
 def test_vehicle_status_states(state, disarmed):
     m = arming.disarmed_mask(FakeULog(_status([0], [state])), T)
-    assert m.tolist() == [disarmed] * 5
+    assert m.tolist() == [disarmed] * 6
 
 
 def test_actuator_armed_without_its_field_falls_back_to_vehicle_status():
@@ -64,3 +64,22 @@ def test_actuator_armed_without_its_field_falls_back_to_vehicle_status():
 
 def test_neither_topic_gives_none():
     assert arming.disarmed_mask(FakeULog({}), T) is None
+
+
+SETTLE_QUERIES = np.array([15.0, 19.99, 20.0, 25.0])
+SETTLE_EXPECTED = [False, False, True, True]
+
+
+def test_spin_down_after_a_disarm_is_not_disarmed_actuator_armed():
+    m = arming.disarmed_mask(FakeULog(_armed([0, 10], [1, 0])), SETTLE_QUERIES)
+    assert m.tolist() == SETTLE_EXPECTED
+
+
+def test_spin_down_after_a_disarm_is_not_disarmed_vehicle_status():
+    m = arming.disarmed_mask(FakeULog(_status([0, 10], [2, 1])), SETTLE_QUERIES)
+    assert m.tolist() == SETTLE_EXPECTED
+
+
+def test_series_that_starts_disarmed_loses_nothing():
+    m = arming.disarmed_mask(FakeULog(_armed([0], [0])), np.array([5.0]))
+    assert m.tolist() == [True]
