@@ -50,6 +50,20 @@ def test_two_log_names_pool_in_one_row():
     assert (r.log_names, r.logs, r.status) == (("BMP388", "BMP390"), 2, "existing")
 
 
+def test_a_candidate_log_counts_once_in_its_row_and_once_in_other():
+    r = imu_rows([noise_entry("a", "v1", {G: 0.001}, imu="BMI088")])
+    assert (r["Bmi088"].logs, r["Other"].logs) == (1, 1)
+    assert sum(row.logs for row in r.values()) == 2
+
+
+@pytest.mark.parametrize("part", ["BMI088", None, 3, ["BMI088"]])
+def test_a_part_that_is_not_an_object_reads_as_unnamed(part):
+    e = noise_entry("a", "v1", {G: 0.001})
+    e["parts"]["imu"] = part
+    r = imu_rows([e])
+    assert r["Other"].logs == 1 and all(row.logs == 0 for v, row in r.items() if v != "Other")
+
+
 def test_candidate_row_has_the_other_value_as_current():
     r = imu_rows([noise_entry("a", "v1", {G: 0.001}, imu="BMI088")])["Bmi088"]
     assert (r.status, r.current) == ("candidate", 8.726646e-4)
@@ -110,6 +124,18 @@ def test_generic_gps_counts_only_toward_other():
     t = gps_rows([e])
     assert "Ubx" not in t and t["Other"].logs == 1
     assert all(r.logs == 0 for v, r in t.items() if v != "Other")
+
+
+@pytest.mark.parametrize("mode,row", [(6.0, "UbloxF9P"), (3.0, "Other")])
+def test_a_float_fix_mode_counts_like_the_integer(mode, row):
+    t = gps_rows([noise_entry("a", "v1", {GPS_H: 0.5, "gps.fix_type_mode": mode}, gps="UBX_F9P")])
+    assert {v for v, r in t.items() if r.logs} == {row}
+
+
+@pytest.mark.parametrize("mode", [math.nan, math.inf, 3.5])
+def test_a_fix_mode_that_is_no_fix_type_counts_nowhere(mode):
+    t = gps_rows([noise_entry("a", "v1", {GPS_H: 1.4, "gps.fix_type_mode": mode}, gps="UBX_M8N")])
+    assert all(r.logs == 0 for r in t.values())
 
 
 def test_gps_without_fix_mode_counts_nowhere():

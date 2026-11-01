@@ -34,10 +34,18 @@ def test_vehicle_counts_once_with_its_most_common_chip():
     assert (b["logs"], b["vehicles"]) == (3, 1)
 
 
-def test_chip_tie_goes_to_the_alphabetical_first():
-    es = [noise_entry("a", "v1", {}, board=BOARD, baro="MS5611"),
-          noise_entry("b", "v1", {}, board=BOARD, baro="BMP388")]
+@pytest.mark.parametrize("order", [("MS5611", "BMP388"), ("BMP388", "MS5611")])
+def test_chip_tie_goes_to_the_alphabetical_first(order):
+    es = [noise_entry(f"l{i}", "v1", {}, board=BOARD, baro=chip) for i, chip in enumerate(order)]
     assert _board(es)["baro"] == {"BMP388": 1.0}
+
+
+def test_a_vehicle_on_two_boards_counts_once_on_each():
+    es = [noise_entry("a", "v1", {}, board="A_BOARD", imu="BMI088"),
+          noise_entry("b", "v1", {}, board="B_BOARD", imu="ICM42688P")]
+    t = board_table(es)["boards"]
+    assert (t["A_BOARD"]["vehicles"], t["A_BOARD"]["imu"]) == (1, {"BMI088": 1.0})
+    assert (t["B_BOARD"]["vehicles"], t["B_BOARD"]["imu"]) == (1, {"ICM42688P": 1.0})
 
 
 def test_vehicle_without_the_part_is_not_a_key():
@@ -63,6 +71,14 @@ def test_gyro_parameter_medians():
     json.dumps(bare, allow_nan=False)
 
 
+@pytest.mark.parametrize("bad", [float("nan"), float("inf"), None, "800"])
+def test_a_gyro_parameter_that_is_not_a_finite_number_is_left_out(bad):
+    es = [noise_entry("a", "v1", {"param.IMU_GYRO_RATEMAX": bad}, board=BOARD),
+          noise_entry("b", "v2", {"param.IMU_GYRO_RATEMAX": 800}, board=BOARD)]
+    assert _board(es)["imu_gyro_ratemax_median"] == 800.0
+    assert _board(es[:1])["imu_gyro_ratemax_median"] is None
+
+
 def test_gyro_parameter_median_is_over_vehicle_medians():
     es = [noise_entry("a", "v1", {"param.IMU_GYRO_RATEMAX": 400}, board=BOARD),
           noise_entry("b", "v1", {"param.IMU_GYRO_RATEMAX": 400}, board=BOARD),
@@ -71,22 +87,19 @@ def test_gyro_parameter_median_is_over_vehicle_medians():
     assert _board(es)["imu_gyro_ratemax_median"] == 600.0
 
 
-def test_simulation_and_unreadable_entries_are_left_out():
-    sim = noise_entry("s", "vs", {}, board=BOARD)
-    sim["errors"] = [SIMULATION_ERROR]
-    no_hw = noise_entry("h", "vh", {}, board=BOARD)
-    no_hw["hardware"] = {}
-    for bad in (None, "", 5):
-        e = noise_entry("b", "vb", {}, board=BOARD)
-        e["hardware"] = {"fc_board": bad}
-        no_hw_list = [e]
-        assert board_table(no_hw_list) == {"boards": {}}
-    del_hw = noise_entry("m", "vm", {}, board=BOARD)
-    del del_hw["hardware"]
-    ok = noise_entry("o", "vo", {}, board=BOARD)
-    t = board_table([sim, no_hw, del_hw, ok])
-    assert t["boards"][BOARD]["logs"] == 1
-    assert t["boards"][BOARD]["vehicles"] == 1
+@pytest.mark.parametrize("board", [None, "", 5])
+def test_an_entry_without_a_readable_board_is_left_out(board):
+    entry = {**noise_entry("b", "vb", {}), "hardware": {"fc_board": board}}
+    assert board_table([entry]) == {"boards": {}}
+
+
+def test_simulation_and_boardless_entries_are_left_out():
+    simulated = {**noise_entry("s", "vs", {}, board=BOARD), "errors": [SIMULATION_ERROR]}
+    empty_hardware = {**noise_entry("h", "vh", {}, board=BOARD), "hardware": {}}
+    no_hardware = {k: v for k, v in noise_entry("m", "vm", {}).items() if k != "hardware"}
+    counted = noise_entry("o", "vo", {}, board=BOARD)
+    row = board_table([simulated, empty_hardware, no_hardware, counted])["boards"][BOARD]
+    assert (row["logs"], row["vehicles"]) == (1, 1)
 
 
 def test_sparse_entry_does_not_raise():
