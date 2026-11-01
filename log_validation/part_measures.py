@@ -40,11 +40,12 @@ MIN_GPS_REST_SAMPLES = 4
 TOPIC_GPS_HINT = "vehicle_gps_position or sensor_gps"
 GPS_FIELDS_OLD = ("lat", "lon", "alt")
 GPS_FIELDS_NEW = ("latitude_deg", "longitude_deg", "altitude_msl_m")
-# (key, topic field, unit) of the receiver's own accuracy estimates.
+# (key, topic field, unit, label) of the receiver's own accuracy estimates. A receiver that
+# does not report an estimate sends 0, so samples of 0 or less do not count.
 GPS_ACCURACY_FIELDS = (
-    ("gps.eph_median_m", "eph", "m"),
-    ("gps.epv_median_m", "epv", "m"),
-    ("gps.speed_accuracy_median_m_s", "s_variance_m_s", "m/s"),
+    ("gps.eph_median_m", "eph", "m", "horizontal"),
+    ("gps.epv_median_m", "epv", "m", "vertical"),
+    ("gps.speed_accuracy_median_m_s", "s_variance_m_s", "m/s", "speed"),
 )
 AXES = 3
 
@@ -149,11 +150,15 @@ def _fix_mode(fix: np.ndarray) -> int:
     return int(kinds[counts == counts.max()].max())
 
 
-def _median_of(ulog: Any, topic: str, field: str, mask: np.ndarray) -> float:
+def _median_of(ulog: Any, topic: str, field: str, mask: np.ndarray, label: str) -> float:
+    """Median of the positive estimates; a receiver that reports none sends 0."""
     v = ul.series(ulog, topic, field).values[mask]
     v = v[np.isfinite(v)]
     if v.size == 0:
         raise ValueError(f"no finite '{field}' in {topic}")
+    v = v[v > 0]
+    if v.size == 0:
+        raise ValueError(f"receiver reports no {label} accuracy")
     return float(np.median(v))
 
 
@@ -171,9 +176,9 @@ def gps_accuracy_values(ulog: Any, topic: str | None) -> list[Value]:
     mode = _fix_mode(fix[valid])
     mask = fix == mode
     out = [Value("gps.fix_type_mode", float(mode), "")]
-    for key, field, unit in GPS_ACCURACY_FIELDS:
+    for key, field, unit, label in GPS_ACCURACY_FIELDS:
         try:
-            out.append(Value(key, _median_of(ulog, topic, field, mask), unit))
+            out.append(Value(key, _median_of(ulog, topic, field, mask, label), unit))
         except (KeyError, ValueError) as exc:
             out.append(Value(key, None, unit, str(exc)))
     return out

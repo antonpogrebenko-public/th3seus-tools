@@ -233,6 +233,41 @@ def test_a_missing_accuracy_field_gives_that_keys_error():
     assert [v.key for v in missing] == ["gps.speed_accuracy_median_m_s"] and missing[0].note
 
 
+@pytest.mark.parametrize("key, field, label", [
+    ("gps.eph_median_m", "eph", "horizontal"),
+    ("gps.epv_median_m", "epv", "vertical"),
+    ("gps.speed_accuracy_median_m_s", "s_variance_m_s", "speed")])
+def test_receiver_without_an_accuracy_estimate(key, field, label):
+    fields = {"eph": 1.0, "epv": 2.0, "s_variance_m_s": 0.3, field: [0.0] * 90 + [-1.0] * 10}
+    vs = gps_accuracy_values(_gps_log(fix_type=3, **fields), GPS)
+    assert key not in values(vs) and len(values(vs)) == 3
+    missing = [v for v in vs if v.value is None]
+    assert [(v.key, v.note) for v in missing] == [(key, f"receiver reports no {label} accuracy")]
+
+
+def test_receiver_without_a_speed_accuracy():
+    log = InstanceULog({"sensor_gps": topic(
+        100, 5, fix_type=3, eph=1.2, epv=2.0, s_variance_m_s=0.0, device_id=device_id(0xA8))})
+    entry = analyze_log(_stub_path("nospeed"), loader=lambda p: log)
+    assert "gps.speed_accuracy_median_m_s" not in entry.measurements
+    assert entry.measurements["gps.eph_median_m"] == pytest.approx(1.2)
+    assert ("gps.speed_accuracy_median_m_s: receiver reports no speed accuracy"
+            in entry.errors)
+
+
+def test_zero_accuracy_samples_do_not_count_toward_the_median():
+    eph = [0.0] * 60 + [1.0] * 20 + [2.0] * 20
+    log = _gps_log(fix_type=3, eph=eph, epv=2.0, s_variance_m_s=0.3)
+    assert values(gps_accuracy_values(log, GPS))["gps.eph_median_m"] == pytest.approx(1.5)
+
+
+def test_accuracy_samples_of_another_fix_type_do_not_count():
+    # The zeros are on the RTK float samples; the mode (3) has positive estimates.
+    log = _gps_log(fix_type=[3] * 60 + [5] * 40, eph=[1.0] * 60 + [0.0] * 40, epv=2.0,
+                   s_variance_m_s=0.3)
+    assert values(gps_accuracy_values(log, GPS))["gps.eph_median_m"] == pytest.approx(1.0)
+
+
 def test_accuracy_without_a_stationary_window():
     base = _fake()
     moving = {d.name: dict(d.data) for d in base.data_list}

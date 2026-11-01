@@ -49,7 +49,10 @@ noise pass adds, for the tables below:
 - `gps.fix_type_mode` (the most common fix type among samples with a 3D fix or better,
   extrapolated samples not counted) and, as medians over the samples with that fix
   type, `gps.eph_median_m`, `gps.epv_median_m`, `gps.speed_accuracy_median_m_s`: the
-  receiver's own accuracy estimates. A log with no 3D-fix sample gets none of them.
+  receiver's own accuracy estimates. A log with no 3D-fix sample gets none of them. A
+  sample whose estimate is 0 or less does not count (a receiver that does not report an
+  estimate sends 0); when no sample is left, that key is missing and the entry's errors
+  say the receiver reports no such accuracy.
 - `gps.rest_spread_horizontal_m`, `gps.rest_spread_altitude_m`, `gps.rest_window_s`: the
   total spread of the GPS position over the at-rest window, a cross-check of the
   receiver's estimates. They are recorded only when the window is at least
