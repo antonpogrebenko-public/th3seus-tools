@@ -294,7 +294,7 @@ def test_directory_has_every_listed_file(tmp_path):
     assert names == {"report.md", "ranges.csv", "log-ids/noise.txt", "log-ids/battery.txt",
                      "log-ids/response.txt", "noise-results.json", "noise-profiles.json",
                      "battery-fit.json", "response-results.json", "airframes.json",
-                     "run-info.json"}
+                     "run-info.json", "rust/battery_tables.rs"}
     assert (out / "log-ids" / "battery.txt").read_text() == "b0\nb1\nb2\nb3\nb4\nb5\nh1\nh2\n"
     assert json.loads((out / "run-info.json").read_text())["tool_commit"] == "abc1234"
 
@@ -338,7 +338,7 @@ def test_cli_round_trip_writes_every_file(tmp_path):
     code = main(["--noise", str(paths["noise"]), "--battery", str(paths["battery"]),
                  "--response", str(paths["response"]), "--airframes", str(paths["airframes"]),
                  "--run-info", str(paths["run_info"]), "--out-dir", str(out)])
-    assert code == 0 and len(_files(out)) == 11
+    assert code == 0 and len(_files(out)) == 12
     assert out.joinpath("report.md").read_text().startswith("# ")
 
 
@@ -400,7 +400,7 @@ def test_local_path_is_not_leaked(tmp_path):
     out = tmp_path / "out"
     assert main(_calibrate_args(work, out)) == 0
     files = [f for f in out.rglob("*") if f.is_file()]
-    assert len(files) == 11
+    assert len(files) == 12
     for f in files:
         text = f.read_text()
         assert str(log_dir.resolve()) not in text and str(Path.home()) not in text
@@ -600,6 +600,7 @@ def test_battery_table_shows_why_a_class_falls_back():
              "fallback_reason": "implausible (median below the 4 mohm/cell floor)"}
     older = {**own, "cell_count": 6, "low_n": True}  # a JSON written before the reason
     battery["r_fits"] = [own, floor, older]
+    battery["r_fits_by_capacity"] = []  # its rows would share the "| 4S" key below
     text = render_report([], battery, [], airframes_dict(), [], run_info())
     rows = {line.split(" | ")[0]: line for line in text.splitlines() if line.startswith("| ")}
     assert rows["| 4S"].endswith("| own fit |")

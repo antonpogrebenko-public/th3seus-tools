@@ -7,8 +7,10 @@ from typing import Any, Mapping, Sequence
 
 from .calibration_counts import PassCounts, battery_counts, entry_counts
 from .calibration_markdown import NA, _num, _table
+from .calibration_parts import PART_TABLES_SECTION, render_part_tables
 from .calibration_noise import TICK_HZ, noise_before_after, vibration_evidence
 from .calibration_ranges import ALL, RangeRow, log_id_lists
+from .battery_capacity import MIN_CLASS_VEHICLES
 
 SECTIONS = ("Run", "IMU noise before and after", "Battery", "Vehicle response",
             "Reference airframes", "Randomization ranges",
@@ -75,6 +77,25 @@ def _deployed_from(fit: Mapping[str, Any]) -> str:
     return f"pooled median: {reason}" if reason else "pooled median"
 
 
+def _capacity_rows(battery: Mapping[str, Any]) -> list[str]:
+    """The per cell count and pack-capacity class rows, with the class bounds used."""
+    lines = ["Internal resistance per cell count and pack capacity (the log's battery capacity "
+             "parameter). Spread only: the simulator table stays per cell count.", ""]
+    if "r_fits_by_capacity" not in battery:
+        return lines + ["No capacity rows: this battery fit file has none.", ""]
+    bounds = ", ".join(f"{b:g}" for b in battery.get("capacity_bounds_mah") or [])
+    lines += [f"Capacity class bounds (mAh): {bounds or NA}.", ""]
+    fits = battery["r_fits_by_capacity"]
+    if not fits:
+        return lines + [f"No cell count and capacity class has {MIN_CLASS_VEHICLES} vehicles.", ""]
+    rows = [[f"{f.get('cell_count')}S", str(f.get("capacity_class", NA)),
+             _num(f.get("median_mohm_per_cell"), ".2f"), _num(f.get("p10_mohm_per_cell"), ".2f"),
+             _num(f.get("p90_mohm_per_cell"), ".2f"), str(f.get("n_steps", NA)),
+             str(f.get("n_vehicles", NA))] for f in fits]
+    return lines + _table(["Cells", "Capacity (mAh)", "Median mohm", "p10", "p90", "Steps",
+                           "Vehicles"], rows)
+
+
 def _battery(battery: Mapping[str, Any]) -> list[str]:
     fits = battery.get("r_fits") or []
     rows = [[f"{f.get('cell_count')}S", _num(f.get("median_mohm_per_cell"), ".2f"),
@@ -87,7 +108,8 @@ def _battery(battery: Mapping[str, Any]) -> list[str]:
              *_table(["Cells", "Median mohm", "p10", "p90", "Deployed mohm", "Steps", "Vehicles",
                       "Deployed from"], rows),
              f"Pooled median: {_num(battery.get('overall_r_median_mohm_per_cell'), '.2f')} "
-             f"mohm per cell over {battery.get('overall_r_n', NA)} steps.", ""]
+             f"mohm per cell over {battery.get('overall_r_n', NA)} steps.", "",
+             *_capacity_rows(battery)]
     step = battery.get("step_check") or {}
     met = "met" if battery.get("validation_target_met") else "not met"
     return lines + ["Held-out checks:", "", *_table(["Check", "Value"], [
@@ -224,12 +246,17 @@ def _counts(noise: Sequence[dict], battery: Mapping[str, Any], response: Sequenc
 
 def render_report(noise: Sequence[dict], battery: Mapping[str, Any], response: Sequence[dict],
                   airframes: Mapping[str, Any], ranges: Sequence[RangeRow],
-                  run_info: Mapping[str, Any]) -> str:
-    """The calibration report; sections in the order of `SECTIONS`."""
+                  run_info: Mapping[str, Any], parts: Mapping[str, Any] | None = None,
+                  boards: Mapping[str, Any] | None = None) -> str:
+    """The calibration report; sections in the order of `SECTIONS`, and with `parts` the
+    part-tables section right after the noise section."""
     bodies = (_run(run_info), _noise(noise), _battery(battery), _response(ranges),
               _airframes(airframes), _ranges(ranges), _gaps(noise, response, ranges),
               _counts(noise, battery, response, run_info.get("inputs")))
+    sections = list(zip(SECTIONS, bodies))
+    if parts is not None:
+        sections.insert(2, (PART_TABLES_SECTION, render_part_tables(parts, boards or {})))
     lines = ["# TH3SEUS calibration from public PX4 flight logs", ""]
-    for title, body in zip(SECTIONS, bodies):
+    for title, body in sections:
         lines += _section(title, body)
     return "\n".join(lines).rstrip("\n") + "\n"

@@ -3,7 +3,7 @@
 Usage:
     python -m log_validation.calibration_report --noise noise.json --battery battery.json \\
         --response response.json --airframes airframes.json --run-info run-info.json \\
-        --out-dir calibration [--forbid STR ...]
+        --out-dir calibration [--parts DIR] [--forbid STR ...]
 
 Everything is written through `outputs` with the forbidden strings (home, user, host,
 the folders of the input files and each `--forbid` value), into a staging folder first,
@@ -29,6 +29,9 @@ from .calibration_ranges import (
     ranges_table,
     vehicle_percentiles,
 )
+from .battery_output import rust_constants_text
+from .calibration_parts import (
+    BATTERY_RUST_FILE, PartOutputs, load_part_outputs, write_part_files)
 from .calibration_render import render_report
 from .outputs import (
     PrivateDataError,
@@ -82,10 +85,12 @@ def _by_log_id(entries: list) -> list[dict]:
 
 
 def _stage(stage: Path, forbidden: Sequence[str], noise: list[dict], battery: dict,
-           response: list[dict], airframes: dict, run_info: dict) -> None:
+           response: list[dict], airframes: dict, run_info: dict,
+           parts: PartOutputs | None = None) -> None:
     ranges = ranges_table(noise, battery, response)
-    write_text(stage / "report.md",
-               render_report(noise, battery, response, airframes, ranges, run_info), forbidden)
+    report = render_report(noise, battery, response, airframes, ranges, run_info,
+                           parts.tables if parts else None, parts.boards if parts else None)
+    write_text(stage / "report.md", report, forbidden)
     write_text(stage / "ranges.csv", ranges_csv(ranges), forbidden)
     for name, ids in log_id_lists(noise, battery, response).items():
         write_text(stage / "log-ids" / f"{name}.txt", "".join(f"{i}\n" for i in ids), forbidden)
@@ -95,13 +100,19 @@ def _stage(stage: Path, forbidden: Sequence[str], noise: list[dict], battery: di
     write_json(stage / "response-results.json", response, forbidden)
     write_json(stage / "airframes.json", airframes, forbidden)
     write_json(stage / "run-info.json", run_info, forbidden)
+    write_text(stage / "rust" / BATTERY_RUST_FILE, rust_constants_text(battery) + "\n", forbidden)
+    if parts is not None:
+        write_part_files(stage, forbidden, parts)
 
 
 def write_calibration_dir(
     out_dir: Path, noise_path: Path, battery_path: Path, response_path: Path,
     airframes_path: Path, run_info_path: Path, extra_forbidden: Sequence[str] = (),
+    parts_dir: Path | None = None,
 ) -> None:
-    """Write report.md, ranges.csv, log-ids/{noise,battery,response}.txt and the normalized inputs.
+    """Write report.md, ranges.csv, log-ids/{noise,battery,response}.txt, rust/battery_tables.rs
+    and the normalized inputs; with `parts_dir` (the part_tables output folder) also the part
+    tables, the board table, the Rust text and log-ids/parts.txt.
 
     Raises ValueError for an input of the wrong shape (a nested row included) or an
     `out_dir` that is not empty. Raises PrivateDataError when any output would hold
@@ -115,11 +126,13 @@ def write_calibration_dir(
     run_info = _load(run_info_path, dict, "run-info")
     _check_airframes(airframes)
     _check_run_info(run_info)
-    forbidden = input_forbidden(inputs, extra_forbidden)
+    parts = load_part_outputs(parts_dir) if parts_dir is not None else None
+    guarded = (*inputs, Path(parts_dir) / "part-tables.json") if parts else inputs
+    forbidden = input_forbidden(guarded, extra_forbidden)
 
     def stage_files(stage: Path) -> None:
         try:
-            _stage(stage, forbidden, noise, battery, response, airframes, run_info)
+            _stage(stage, forbidden, noise, battery, response, airframes, run_info, parts)
         except (KeyError, TypeError, AttributeError) as e:
             # The top-level shapes are checked above; a nested row of the wrong shape
             # shows up only while rendering. Nothing has reached out_dir yet.
@@ -140,6 +153,8 @@ def _build_parser() -> argparse.ArgumentParser:
                        ("run-info", "run info JSON: date, tool_commit, parameters, commands, "
                                     "and optionally inputs (counts)")):
         parser.add_argument(f"--{name}", type=Path, required=True, help=what)
+    parser.add_argument("--parts", type=Path, default=None, metavar="DIR",
+                        help="the part_tables output folder (part tables, board table, Rust text)")
     parser.add_argument("--out-dir", type=Path, required=True, help="calibration directory")
     parser.add_argument("--forbid", action="append", default=[], metavar="STR",
                         help="a string no output may contain (repeatable), such as an account ID")
@@ -150,7 +165,7 @@ def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
     try:
         write_calibration_dir(args.out_dir, args.noise, args.battery, args.response,
-                              args.airframes, args.run_info, args.forbid)
+                              args.airframes, args.run_info, args.forbid, args.parts)
     except (PrivateDataError, ValueError, OSError) as e:
         print(f"Error: {e}", file=sys.stderr)
         return 2
