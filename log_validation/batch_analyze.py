@@ -16,6 +16,7 @@ from typing import Any
 from pyulog import ULog
 
 from . import report
+from .arming import TOPIC_ARMED, TOPIC_STATUS
 from .hardware import extract_hardware_info, is_simulation
 from .manifest import (
     DEFAULT_MAX_PER_VEHICLE,
@@ -51,6 +52,8 @@ REQUIRED_TOPICS = tuple(dict.fromkeys((
     TOPIC_MAG,
     TOPIC_AIR_DATA,
     TOPIC_GPS_POSITION,
+    TOPIC_ARMED,
+    TOPIC_STATUS,
     *PART_TOPICS,
 )))
 

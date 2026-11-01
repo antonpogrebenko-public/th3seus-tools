@@ -129,7 +129,8 @@ def test_default_loader_parses_only_the_required_topics(tmp_path, monkeypatch):
     assert filters == [list(REQUIRED_TOPICS)]
     assert {"sensor_combined", "sensor_gyro", "sensor_accel", "vehicle_air_data", "sensor_mag",
             "vehicle_gps_position", "sensor_baro", "sensor_gps", "sensors_status_imu",
-            "sensors_status_baro", "sensors_status_mag", "vehicle_imu"} == set(filters[0])
+            "sensors_status_baro", "sensors_status_mag", "vehicle_imu", "actuator_armed",
+            "vehicle_status"} == set(filters[0])
     assert set(results[0].measurements) == ALL_MEASUREMENTS
 
 
