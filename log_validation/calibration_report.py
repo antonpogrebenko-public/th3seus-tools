@@ -31,7 +31,7 @@ from .calibration_ranges import (
 )
 from .battery_output import rust_constants_text
 from .calibration_parts import (
-    BATTERY_RUST_FILE, PartOutputs, load_part_outputs, write_part_files)
+    BATTERY_RUST_FILE, PartOutputs, check_part_log_ids, load_part_outputs, write_part_files)
 from .calibration_render import render_report
 from .outputs import (
     PrivateDataError,
@@ -117,8 +117,9 @@ def write_calibration_dir(
     and the normalized inputs; with `parts_dir` (the part_tables output folder) also the part
     tables, the board table, the Rust text and log-ids/parts.txt.
 
-    Raises ValueError for an input of the wrong shape (a nested row included) or an
-    `out_dir` that is not empty. Raises PrivateDataError when any output would hold
+    Raises ValueError for an input of the wrong shape (a nested row included), a parts
+    folder that names a log the noise results do not hold, or an `out_dir` that is not
+    empty. Raises PrivateDataError when any output would hold
     a private string; then nothing is written to `out_dir`.
 
     `noise-results.json` and `response-results.json` are written as `.json.gz` (deterministic
@@ -133,6 +134,8 @@ def write_calibration_dir(
     _check_airframes(airframes)
     _check_run_info(run_info)
     parts = load_part_outputs(parts_dir) if parts_dir is not None else None
+    if parts is not None:
+        check_part_log_ids(parts, [e["log_id"] for e in noise])
     guarded = (*inputs, Path(parts_dir) / "part-tables.json") if parts else inputs
     forbidden = input_forbidden(guarded, extra_forbidden)
 

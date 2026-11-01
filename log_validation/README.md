@@ -189,7 +189,9 @@ python -m log_validation.calibration_report --noise noise.json --battery battery
 ```
 
 `--parts` is optional: the `part_tables` output folder. Without it the directory has no
-part tables and no `log-ids/parts.txt`.
+part tables and no `log-ids/parts.txt`. The folder must have been built from these noise
+results: when its `part-tables.json` names a log ID that `--noise` does not hold, the
+command exits with 2 and writes nothing.
 
 ### Part tables
 
@@ -306,11 +308,13 @@ The calibration directory holds:
   report, lists, ranges, profiles and tables always stay plain.
 - With `--parts`: `part-tables.json`, `board-table.json` and `rust/imu_chip.rs`,
   `rust/baro_chip.rs`, `rust/mag_chip.rs`, `rust/gps_chipset.rs`,
-  `rust/daemon_aliases.rs`, copied from the `part_tables` folder; `log-ids/parts.txt`,
-  the logs behind a proposed part value only (a log whose values were all refused is not
-  in it); and a part-tables section in `report.md` (every row with its current and
-  proposed value, the reason when there is none, the barometer and magnetometer rates
-  and factors, the boards with the most vehicles).
+  `rust/daemon_aliases.rs`, copied from the `part_tables` folder; `part-tables.json` is
+  copied without its `log_ids` key, which `log-ids/parts.txt` holds (at the full corpus
+  the list is several MB). `log-ids/parts.txt` names the logs behind a proposed part
+  value only (a log whose values were all refused is not in it). And a part-tables
+  section in `report.md` (every row with its current and proposed value, the reason when
+  there is none, the barometer and magnetometer rates and factors, the boards with the
+  most vehicles).
 - `rust/battery_tables.rs` (always): the same text `battery_fit --emit-rust` prints.
 - `noise-profiles.json`: derived from `noise-results.json` (the `aggregate` profiles
   per MCU family, board and IMU chip, and over all logs); these are the values

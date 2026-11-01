@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from pathlib import Path
 
 N_VEHICLES = 6
@@ -85,10 +86,13 @@ def run_info(date: str = "2026-10-29") -> dict:
             "commands": ["python -m log_validation.batch_analyze logs -o noise.json"]}
 
 
-def write_inputs(directory: Path, run_date: str = "2026-10-29") -> dict[str, Path]:
+def write_inputs(directory: Path, run_date: str = "2026-10-29",
+                 extra_noise: Sequence[dict] = ()) -> dict[str, Path]:
+    """The five inputs as JSON files; `extra_noise` entries follow the noise entries."""
     directory.mkdir(parents=True, exist_ok=True)
-    docs = {"noise": noise_entries(), "battery": battery_dict(), "response": response_entries(),
-            "airframes": airframes_dict(), "run_info": run_info(run_date)}
+    docs = {"noise": noise_entries() + list(extra_noise), "battery": battery_dict(),
+            "response": response_entries(), "airframes": airframes_dict(),
+            "run_info": run_info(run_date)}
     paths = {}
     for name, doc in docs.items():
         paths[name] = directory / f"{name}.json"

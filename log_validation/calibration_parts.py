@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any, Collection, Mapping, Sequence
 
 from .calibration_markdown import NA, _num, _table
 from .outputs import write_json, write_text
@@ -19,12 +19,13 @@ from .part_rust import ALIASES_FILE, RUST_FILES
 from .part_tables import BOARD_TABLE_FILE, PART_TABLES_FILE, RUST_DIR
 
 __all__ = ["BATTERY_RUST_FILE", "PART_TABLES_SECTION", "PartOutputs", "TOP_BOARDS",
-           "load_part_outputs", "render_part_tables", "write_part_files"]
+           "check_part_log_ids", "load_part_outputs", "render_part_tables", "write_part_files"]
 
 PART_TABLES_SECTION = "Part tables"
 TOP_BOARDS = 10
 BATTERY_RUST_FILE = "battery_tables.rs"
 PARTS_LOG_IDS_FILE = "parts.txt"
+LOG_IDS_KEY = "log_ids"
 FLAG_TEXT = "yes (beyond 3x)"
 RATE_TYPES = ("baro", "mag")
 PART_HEADINGS = (("imu", "IMU"), ("baro", "Barometer"), ("mag", "Magnetometer"),
@@ -60,7 +61,7 @@ def _read_json(path: Path) -> Any:
 def _check_tables(tables: Any) -> dict:
     if not isinstance(tables, dict):
         raise ValueError(f"{PART_TABLES_FILE} must hold a JSON object")
-    rows, log_ids = tables.get("rows"), tables.get("log_ids")
+    rows, log_ids = tables.get("rows"), tables.get(LOG_IDS_KEY)
     if not isinstance(rows, list) or not all(isinstance(r, dict) for r in rows):
         raise ValueError(f"{PART_TABLES_FILE} needs 'rows' as a list of objects")
     if not isinstance(log_ids, list) or not all(isinstance(i, str) for i in log_ids):
@@ -93,13 +94,27 @@ def load_part_outputs(parts_dir: Path) -> PartOutputs:
     return PartOutputs(tables=tables, boards=boards, rust=rust)
 
 
+def check_part_log_ids(parts: PartOutputs, noise_log_ids: Collection[str]) -> None:
+    """ValueError when the parts folder names a log the noise results do not hold: it was
+    built from other noise results, and its tables would mix two runs."""
+    known = set(noise_log_ids)
+    foreign = sorted(set(parts.tables[LOG_IDS_KEY]) - known)
+    if foreign:
+        raise ValueError(f"the parts folder's {PART_TABLES_FILE} names {len(foreign)} log ID(s) "
+                         f"not from these noise results (first: {foreign[0]})")
+
+
 def write_part_files(stage: Path, forbidden: Sequence[str], parts: PartOutputs) -> None:
-    """Write the parts files and `log-ids/parts.txt` (sorted, no duplicates) into `stage`."""
-    write_json(stage / PART_TABLES_FILE, parts.tables, forbidden)
+    """Write the parts files and `log-ids/parts.txt` (sorted, no duplicates) into `stage`.
+
+    The copied part tables leave out `log_ids`: `log-ids/parts.txt` holds them, and at
+    the full corpus the list is several MB."""
+    tables = {k: v for k, v in parts.tables.items() if k != LOG_IDS_KEY}
+    write_json(stage / PART_TABLES_FILE, tables, forbidden)
     write_json(stage / BOARD_TABLE_FILE, parts.boards, forbidden)
     for name, text in parts.rust.items():
         write_text(stage / RUST_DIR / name, text, forbidden)
-    ids = sorted(set(parts.tables["log_ids"]))
+    ids = sorted(set(parts.tables[LOG_IDS_KEY]))
     write_text(stage / "log-ids" / PARTS_LOG_IDS_FILE, "".join(f"{i}\n" for i in ids), forbidden)
 
 

@@ -16,6 +16,7 @@ from log_validation.calibration_parts import (
 from log_validation.calibration_render import SECTIONS, render_report
 from log_validation.calibration_report import main, write_calibration_dir
 from log_validation.calibration_ranges import ranges_table
+from log_validation.outputs import json_text
 from log_validation.tests.calibration_inputs import (
     airframes_dict, battery_dict, noise_entries, response_entries, run_info, write_inputs)
 from log_validation.tests.part_fakes import noise_entry
@@ -53,14 +54,19 @@ def _files(directory: Path) -> dict[str, bytes]:
             for p in sorted(directory.rglob("*")) if p.is_file()}
 
 
+def part_entries() -> list[dict]:
+    """50 BMI088 logs plus one mag-only log that fails the white-noise check."""
+    entries = [noise_entry(f"i{n:02d}", f"v{n:02d}", IMU_M, imu="BMI088") for n in range(50)]
+    entries.append(noise_entry("m1", "vm", {"mag.noise_sigma_gauss": 1e-3,
+                                            "mag.allan_slope": 0.0,
+                                            "mag.resolution_gauss": 1e-6,
+                                            "mag.rate_hz": 50.0}, mag="RM3100"))
+    return entries
+
+
 def make_parts(tmp_path: Path, entries=None, name="parts") -> Path:
-    """Run the part_tables pass on `entries` (50 BMI088 logs plus one mag-only log)."""
-    if entries is None:
-        entries = [noise_entry(f"i{n:02d}", f"v{n:02d}", IMU_M, imu="BMI088") for n in range(50)]
-        entries.append(noise_entry("m1", "vm", {"mag.noise_sigma_gauss": 1e-3,
-                                                "mag.allan_slope": 0.0,
-                                                "mag.resolution_gauss": 1e-6,
-                                                "mag.rate_hz": 50.0}, mag="RM3100"))
+    """Run the part_tables pass on `entries` (`part_entries()` by default)."""
+    entries = part_entries() if entries is None else entries
     noise = tmp_path / "pin" / f"{name}-noise.json"
     noise.parent.mkdir(exist_ok=True)
     noise.write_text(json.dumps(entries))
@@ -68,6 +74,12 @@ def make_parts(tmp_path: Path, entries=None, name="parts") -> Path:
     code = part_tables.main([str(noise), "--out-dir", str(parts), "--run-date", "2026-11-05"])
     assert code == 0
     return parts
+
+
+def parts_and_inputs(tmp_path: Path, entries=None) -> tuple[Path, dict[str, Path]]:
+    """A parts folder and the calibration inputs whose noise results hold its logs."""
+    entries = part_entries() if entries is None else entries
+    return make_parts(tmp_path, entries), write_inputs(tmp_path / "in", extra_noise=entries)
 
 
 def cli(paths, out, *extra):
@@ -252,8 +264,7 @@ def test_missing_parts_dir_is_refused(tmp_path):
 
 
 def test_only_contributing_logs(tmp_path):
-    parts = make_parts(tmp_path)
-    paths = write_inputs(tmp_path / "in")
+    parts, paths = parts_and_inputs(tmp_path)
     out = tmp_path / "out"
     write_calibration_dir(out, *(paths[k] for k in COMMAND_ARGS), parts_dir=parts)
     ids = (out / "log-ids" / "parts.txt").read_text().splitlines()
@@ -261,30 +272,57 @@ def test_only_contributing_logs(tmp_path):
 
 
 def test_log_ids_are_sorted_and_without_duplicates(tmp_path):
-    parts = make_parts(tmp_path)
+    parts, paths = parts_and_inputs(tmp_path)
     doc = json.loads((parts / "part-tables.json").read_text())
-    doc["log_ids"] = ["z", "a", "z", "m"]
+    doc["log_ids"] = ["i10", "i02", "i10", "i05"]
     (parts / "part-tables.json").write_text(json.dumps(doc))
-    paths = write_inputs(tmp_path / "in")
     out = tmp_path / "out"
     write_calibration_dir(out, *(paths[k] for k in COMMAND_ARGS), parts_dir=parts)
-    assert (out / "log-ids" / "parts.txt").read_text() == "a\nm\nz\n"
+    assert (out / "log-ids" / "parts.txt").read_text() == "i02\ni05\ni10\n"
 
 
 def test_directory_with_parts_has_every_file(tmp_path):
-    parts = make_parts(tmp_path)
-    paths = write_inputs(tmp_path / "in")
+    parts, paths = parts_and_inputs(tmp_path)
     out = tmp_path / "out"
     assert cli(paths, out, "--parts", str(parts)) == 0
     names = set(_files(out))
     assert names >= PART_FILES and len(names) == 12 + len(PART_FILES) - 1
     assert (out / "rust" / BATTERY_RUST_FILE).read_text() == rust_constants_text(
         battery_dict()) + "\n"
-    for name in ("part-tables.json", "board-table.json", "rust/imu_chip.rs",
-                 "rust/daemon_aliases.rs"):
+    for name in ("board-table.json", "rust/imu_chip.rs", "rust/daemon_aliases.rs"):
         assert (out / name).read_text() == (parts / name).read_text()
     report = (out / "report.md").read_text()
     assert "## Part tables" in report and "BMI088" in report
+
+
+def test_the_copied_part_tables_leave_the_log_ids_to_parts_txt(tmp_path):
+    parts, paths = parts_and_inputs(tmp_path)
+    out = tmp_path / "out"
+    assert cli(paths, out, "--parts", str(parts)) == 0
+    source = json.loads((parts / "part-tables.json").read_text())
+    copied_text = (out / "part-tables.json").read_text()
+    assert "log_ids" in source and "log_ids" not in json.loads(copied_text)
+    assert copied_text == json_text({k: v for k, v in source.items() if k != "log_ids"})
+    ids = (out / "log-ids" / "parts.txt").read_text().splitlines()
+    assert ids == sorted(source["log_ids"]) and len(ids) == 50
+
+
+def test_parts_from_other_noise_results_are_refused_without_writing(tmp_path, capsys):
+    parts = make_parts(tmp_path)
+    paths = write_inputs(tmp_path / "in", extra_noise=part_entries()[:49])  # no "i49"
+    out = tmp_path / "out"
+    assert cli(paths, out, "--parts", str(parts)) == 2
+    err = capsys.readouterr().err
+    assert err.startswith("Error: ") and "not from these noise results" in err
+    assert "1 log ID" in err and "i49" in err
+    assert not out.exists() or not any(out.iterdir())
+
+
+def test_parts_with_no_proposed_value_pass_the_log_id_check(tmp_path):
+    parts, paths = parts_and_inputs(tmp_path, [noise_entry("solo", "v1", IMU_M, imu="BMI088")])
+    out = tmp_path / "out"
+    assert cli(paths, out, "--parts", str(parts)) == 0
+    assert (out / "log-ids" / "parts.txt").read_text() == ""
 
 
 def test_directory_without_parts_has_the_battery_rust_only(tmp_path):
@@ -301,9 +339,8 @@ def test_directory_without_parts_has_the_battery_rust_only(tmp_path):
     ("part-tables.json", "[]"), ("part-tables.json", None), ("board-table.json", "{}"),
     ("rust/mag_chip.rs", "// caf\u00e9\n")])
 def test_malformed_parts_dir_exits_2_without_writing(tmp_path, capsys, name, text):
-    parts = make_parts(tmp_path)
+    parts, paths = parts_and_inputs(tmp_path)
     _break(parts, name, text)
-    paths = write_inputs(tmp_path / "in")
     out = tmp_path / "out"
     assert cli(paths, out, "--parts", str(parts)) == 2
     assert capsys.readouterr().err.startswith("Error: ")
@@ -311,10 +348,9 @@ def test_malformed_parts_dir_exits_2_without_writing(tmp_path, capsys, name, tex
 
 
 def test_a_private_string_in_a_parts_file_is_refused_without_writing(tmp_path, capsys):
-    parts = make_parts(tmp_path)
+    parts, paths = parts_and_inputs(tmp_path)
     leaky = parts / "rust" / "imu_chip.rs"
     leaky.write_text(f"// built in {parts.resolve()}\n", encoding="utf-8")
-    paths = write_inputs(tmp_path / "in")
     out = tmp_path / "out"
     assert cli(paths, out, "--parts", str(parts)) == 2
     assert "private data" in capsys.readouterr().err
@@ -322,17 +358,16 @@ def test_a_private_string_in_a_parts_file_is_refused_without_writing(tmp_path, c
 
 
 def test_a_forbid_string_applies_to_the_parts_files(tmp_path, capsys):
-    parts = make_parts(tmp_path)
+    parts, paths = parts_and_inputs(tmp_path)
     (parts / "rust" / "imu_chip.rs").write_text("// acme-private-bucket-123\n", encoding="utf-8")
-    paths = write_inputs(tmp_path / "in")
     out = tmp_path / "out"
     assert cli(paths, out, "--parts", str(parts), "--forbid", "acme-private-bucket-123") == 2
+    assert "private data" in capsys.readouterr().err
     assert not out.exists() or not any(out.iterdir())
 
 
 def test_parts_rerun_is_identical(tmp_path):
-    parts = make_parts(tmp_path)
-    paths = write_inputs(tmp_path / "in")
+    parts, paths = parts_and_inputs(tmp_path)
     first, second = tmp_path / "one", tmp_path / "two"
     assert cli(paths, first, "--parts", str(parts)) == 0
     assert cli(paths, second, "--parts", str(parts)) == 0
