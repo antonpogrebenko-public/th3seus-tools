@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import gzip
 import json
 import math
 from dataclasses import asdict
@@ -483,7 +484,7 @@ def test_malformed_nested_row_exits_2_without_writing(tmp_path, capsys, name, ch
 
 
 @pytest.mark.parametrize("name, text, message", [
-    ("noise", "{not json", "noise results is not valid JSON"),
+    ("noise", "{not json", "noise results: noise.json is not valid JSON"),
     ("response", json.dumps({"log_id": "x"}), "response results must hold a JSON list"),
     ("battery", json.dumps([1, 2]), "battery fit must hold a JSON dict"),
     ("noise", json.dumps([{"measurements": {}}]), "per-log results must be objects with a log_id"),
@@ -640,3 +641,14 @@ def test_calibration_dir_compresses_large_per_log_results(tmp_path):
     assert {"report.md", "ranges.csv", "noise-profiles.json", "battery-fit.json",
             "airframes.json", "run-info.json"} <= names
     assert _files(first) == _files(second)
+
+
+def test_gzipped_per_log_inputs_give_the_same_directory(tmp_path):
+    paths = write_inputs(tmp_path / "in")
+    packed = dict(paths)
+    for name in ("noise", "response"):
+        packed[name] = paths[name].with_name(paths[name].name + ".gz")
+        packed[name].write_bytes(gzip.compress(paths[name].read_bytes()))
+    assert main(_args(paths, tmp_path / "plain")) == 0
+    assert main(_args(packed, tmp_path / "packed")) == 0
+    assert _files(tmp_path / "plain") == _files(tmp_path / "packed")

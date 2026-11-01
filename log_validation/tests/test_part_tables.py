@@ -11,7 +11,6 @@ from pathlib import Path
 
 import pytest
 
-from log_validation import part_tables
 from log_validation.part_tables import (
     check_noise_entries, load_catalog_spellings, main, part_tables_document)
 from log_validation.part_rows import RowRules, build_part_tables
@@ -137,11 +136,12 @@ def test_rerun_is_byte_identical(tmp_path):
     assert '"bmi088"' in aliases and "ImuChip::Bmi088" in aliases
 
 
-def test_private_string_is_refused_and_nothing_written(tmp_path):
+def test_private_string_is_refused_and_nothing_written(tmp_path, capsys):
     entries = entries_of_12_vehicles(n=10)
     entries[0] = {**entries[0], "log_id": str(tmp_path / "in")}
     assert run(tmp_path, entries) == 2
     assert nothing_written(tmp_path)
+    assert "private data" in capsys.readouterr().err
 
 
 @pytest.mark.parametrize("extra", [["--min-vehicles", "0"], ["--allan-slope-tolerance", "0"],
@@ -203,14 +203,6 @@ def test_invalid_variant_identifier_exits_2(tmp_path, capsys):
     assert run(tmp_path, entries_of_12_vehicles(name="123")) == 2
     assert nothing_written(tmp_path)
     assert "Rust identifier" in capsys.readouterr().err
-
-
-def test_a_value_error_from_the_rust_emitter_exits_2(tmp_path, monkeypatch):
-    def boom(*args, **kwargs):
-        raise ValueError("bad variant")
-    monkeypatch.setattr(part_tables, "emit_rust_files", boom)
-    assert run(tmp_path, entries_of_12_vehicles()) == 2
-    assert nothing_written(tmp_path)
 
 
 def test_empty_list_is_valid_input(tmp_path):

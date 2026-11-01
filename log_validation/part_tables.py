@@ -32,7 +32,8 @@ from pathlib import Path
 from typing import Any
 
 from .outputs import (
-    PrivateDataError, check_out_dir, input_forbidden, read_json, write_json, write_staged, write_text)
+    PrivateDataError, check_out_dir, input_forbidden, read_json, write_json, write_staged,
+    write_text)
 from .part_boards import board_table
 from .part_rows import (
     DEFAULT_ALLAN_SLOPE_TOLERANCE, DEFAULT_MIN_VEHICLES, DEFAULT_SIM_RATE_HZ, PartTables,

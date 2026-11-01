@@ -236,6 +236,30 @@ def test_write_staged_leaves_the_folder_alone_when_a_write_fails(tmp_path):
     assert not out.exists()
 
 
+def test_write_staged_leaves_the_folder_alone_when_the_copy_fails(tmp_path, monkeypatch):
+    def copy_one_then_fail(src, dst, *args, **kwargs):
+        first = sorted(Path(src).iterdir())[0]
+        Path(dst).mkdir(parents=True, exist_ok=True)
+        (Path(dst) / first.name).write_bytes(first.read_bytes())
+        raise OSError("disk full")
+
+    def stage_files(stage):
+        write_text(stage / "a.txt", "x\n", [])
+        write_text(stage / "b.txt", "y\n", [])
+
+    monkeypatch.setattr(outputs.shutil, "copytree", copy_one_then_fail)
+    with pytest.raises(OSError):
+        outputs.write_staged(tmp_path / "out", stage_files)
+    assert list(tmp_path.iterdir()) == []  # no partial folder, no copy left beside it
+
+
+def test_write_staged_fills_an_existing_empty_folder(tmp_path):
+    out = tmp_path / "out"
+    out.mkdir()
+    outputs.write_staged(out, lambda stage: write_text(stage / "a.txt", "x\n", []))
+    assert (out / "a.txt").read_text() == "x\n" and list(tmp_path.iterdir()) == [out]
+
+
 def test_write_staged_refuses_a_non_empty_folder(tmp_path):
     out = tmp_path / "out"
     out.mkdir()

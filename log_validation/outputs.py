@@ -155,7 +155,7 @@ def check_out_dir(out_dir: Path) -> None:
 
 
 def write_staged(out_dir: Path, stage_files: Callable[[Path], None]) -> None:
-    """Run `stage_files(stage)` on a temporary folder, then copy it into `out_dir`.
+    """Run `stage_files(stage)` on a temporary folder, then move it into `out_dir`.
 
     `stage_files` writes every file with `write_text` / `write_json`, so a refused
     write (PrivateDataError) or any other error leaves `out_dir` as it was.
@@ -164,8 +164,26 @@ def write_staged(out_dir: Path, stage_files: Callable[[Path], None]) -> None:
     check_out_dir(out)
     with tempfile.TemporaryDirectory() as tmp:
         stage = Path(tmp) / "staged"
+        stage.mkdir()
         stage_files(stage)
-        shutil.copytree(stage, out, dirs_exist_ok=True)
+        _move_into_place(stage, out)
+
+
+def _move_into_place(stage: Path, out: Path) -> None:
+    """Copy `stage` into a temporary folder beside `out`, then rename it to `out`.
+
+    The rename stays on one file system, so a copy that fails half way (a full disk)
+    leaves `out` as it was and removes the partial copy."""
+    out.parent.mkdir(parents=True, exist_ok=True)
+    beside = Path(tempfile.mkdtemp(prefix=f".{out.name}.", dir=out.parent))
+    try:
+        copy = beside / "copy"
+        shutil.copytree(stage, copy)
+        if out.exists():
+            out.rmdir()  # empty: check_out_dir
+        copy.rename(out)
+    finally:
+        shutil.rmtree(beside, ignore_errors=True)
 
 
 def merge_per_log(paths: Sequence[Path]) -> list[dict]:

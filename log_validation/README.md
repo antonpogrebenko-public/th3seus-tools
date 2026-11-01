@@ -189,7 +189,8 @@ python -m log_validation.calibration_report --noise noise.json --battery battery
     --parts parts --out-dir calibration --forbid SOME_PRIVATE_STRING
 ```
 
-`--parts` is optional: the `part_tables` output folder. Without it the directory has no
+`--noise` and `--response` may also be gzipped (a name ending in `.gz`), as a committed
+calibration directory holds them. `--parts` is optional: the `part_tables` output folder. Without it the directory has no
 part tables and no `log-ids/parts.txt`. The folder must have been built from these noise
 results: when its `part-tables.json` names a log ID that `--noise` does not hold, the
 command exits with 2 and writes nothing.
@@ -311,9 +312,11 @@ The calibration directory holds:
   larger than 10 MiB (`noise-results.json`, `response-results.json`) is written as
   `noise-results.json.gz` / `response-results.json.gz` instead: deterministic gzip
   (compression level 9, modification time 0, no file name), so the same inputs give
-  the same bytes. Decompress before the profile-seeding script reads them
-  (`gunzip -k noise-results.json.gz`). `part_tables` reads the `.gz` directly. The
-  report, lists, ranges, profiles and tables always stay plain.
+  the same bytes with the same Python and zlib (the header is fixed; another zlib
+  build may compress the same text differently, while the decompressed text stays
+  the same). Decompress before the profile-seeding script reads them
+  (`gunzip -k noise-results.json.gz`). `part_tables` and `calibration_report` read the
+  `.gz` directly. The report, lists, ranges, profiles and tables always stay plain.
 - With `--parts`: `part-tables.json`, `board-table.json` and `rust/imu_chip.rs`,
   `rust/baro_chip.rs`, `rust/mag_chip.rs`, `rust/gps_chipset.rs`,
   `rust/daemon_aliases.rs`, copied from the `part_tables` folder; `part-tables.json` is

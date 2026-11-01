@@ -14,7 +14,6 @@ is the `date` of run-info.json, so the same inputs give the same files.
 from __future__ import annotations
 
 import argparse
-import json
 import sys
 from pathlib import Path
 from typing import Any, Sequence
@@ -38,6 +37,7 @@ from .outputs import (
     PrivateDataError,
     check_out_dir,
     input_forbidden,
+    read_json,
     write_json,
     write_json_or_gz,
     write_staged,
@@ -52,10 +52,11 @@ AIRFRAME_KEYS = ("min_vehicles", "comparisons", "recommendations")
 
 
 def _load(path: Path, kind: type, what: str) -> Any:
+    """The JSON value of `path` (gzipped when the name ends in ".gz"), of type `kind`."""
     try:
-        value = json.loads(Path(path).read_text(encoding="utf-8"))
-    except json.JSONDecodeError as e:
-        raise ValueError(f"{what} is not valid JSON: {e.msg} (line {e.lineno})") from e
+        value = read_json(Path(path))
+    except ValueError as e:
+        raise ValueError(f"{what}: {e}") from e
     if not isinstance(value, kind):
         raise ValueError(f"{what} must hold a JSON {kind.__name__}")
     return value
