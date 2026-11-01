@@ -40,6 +40,8 @@ MIN_GPS_REST_SAMPLES = 4
 # Distinct samples the barometer and magnetometer white-noise statistics need (the Allan slope's
 # minimum); fewer give an error value instead.
 MIN_DISTINCT_SAMPLES = ns.ALLAN_MIN_SAMPLES
+# When the sensor took the sample; a sample that repeats it is a reading published again.
+FIELD_SAMPLE_TIME = "timestamp_sample"
 TOPIC_GPS_HINT = "vehicle_gps_position or sensor_gps"
 GPS_FIELDS_OLD = ("lat", "lon", "alt")
 GPS_FIELDS_NEW = ("latitude_deg", "longitude_deg", "altitude_msl_m")
@@ -69,25 +71,39 @@ def isa_altitude_m(pressure_pa: np.ndarray) -> np.ndarray:
     return ISA_SEA_LEVEL_K / ISA_LAPSE_K_PER_M * (1.0 - ratio**ISA_EXPONENT)
 
 
+def _sample_times(ulog: Any, topic: str, instance: int) -> np.ndarray | None:
+    """When the sensor took each sample (`timestamp_sample`); None when the topic has none."""
+    try:
+        return ul.series(ulog, topic, FIELD_SAMPLE_TIME, instance).values
+    except KeyError:
+        return None
+
+
+def _new_readings(ulog: Any, topic: str, instance: int, t: np.ndarray, values: np.ndarray,
+                  keep: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """The new readings among the samples `keep` selects: by the sample time where the topic
+    has one, else by value (`noise_stats.new_readings`)."""
+    sample_t = _sample_times(ulog, topic, instance)
+    return ns.new_readings(t[keep], values[keep], None if sample_t is None else sample_t[keep])
+
+
 def _baro_series(ulog: Any, window: Window, instance: int) -> tuple[np.ndarray, np.ndarray]:
-    """Time and altitude (m about the window's mean pressure) of the distinct good readings."""
+    """Time and altitude (m about the window's mean pressure) of the new good readings."""
     s = ul.series(ulog, TOPIC_BARO, "pressure", instance)
-    mask = slice_to_window(s.t_s, window)
-    t, p = s.t_s[mask], s.values[mask]
-    good = np.isfinite(p) & (p > 0)
-    t, p = t[good], p[good]
-    if p.size == 0:
+    keep = slice_to_window(s.t_s, window) & np.isfinite(s.values) & (s.values > 0)
+    if not keep.any():
         raise ValueError("no valid pressure in the still window")
+    t, p = _new_readings(ulog, TOPIC_BARO, instance, s.t_s, s.values, keep)
     if np.median(p) < HPA_BELOW_PA:
         p = p * PA_PER_HPA
-    t, p = ns.distinct_samples(t, p)
     return t, isa_altitude_m(p) - isa_altitude_m(np.mean(p))
 
 
-def _require_distinct(count: int, sensor: str) -> None:
-    """Raise ValueError, with a note saying why, when there are too few distinct samples for
-    the white-noise statistics (fewer would give NaN with a RuntimeWarning, not a value)."""
-    if count == 1:
+def _require_readings(readings: np.ndarray, sensor: str) -> None:
+    """Raise ValueError, with a note saying why, when the readings are all equal or too few
+    for the white-noise statistics (fewer would give NaN with a RuntimeWarning, not a value)."""
+    count = readings.shape[0]
+    if count == 1 or bool(np.all(readings == readings[0])):
         raise ValueError(f"constant {sensor} reading in the still window")
     if count < MIN_DISTINCT_SAMPLES:
         raise ValueError(f"only {count} distinct {sensor} samples in the still window "
@@ -98,7 +114,7 @@ def baro_chip_values(ulog: Any, window: Window, instance: int) -> list[Value]:
     """Noise, rate, Allan slope and resolution of the barometer chip in the still window."""
     try:
         t, alt = _baro_series(ulog, window, instance)
-        _require_distinct(alt.size, "barometer")
+        _require_readings(alt, "barometer")
         return [
             Value("baro.chip_noise_sigma", ns.white_noise_std(alt), "m"),
             Value("baro.chip_rate_hz", ns.sample_rate_hz(t), "Hz"),
@@ -121,7 +137,7 @@ def _mag_rate(t: np.ndarray) -> Value:
 def _mag_white_noise(xyz: np.ndarray) -> list[Value]:
     """Allan slope (mean over the axes) and resolution (smallest over the axes)."""
     try:
-        _require_distinct(xyz.shape[0], "magnetometer")
+        _require_readings(xyz, "magnetometer")
         for a in range(AXES):
             if np.ptp(xyz[:, a]) == 0:
                 raise ValueError(f"magnetometer axis {'xyz'[a]} is constant in the still window")
@@ -134,14 +150,14 @@ def _mag_white_noise(xyz: np.ndarray) -> list[Value]:
 
 
 def mag_evidence_values(ulog: Any, window: Window, instance: int) -> list[Value]:
-    """Rate, white-noise Allan slope and resolution of the magnetometer in the still window.
+    """Rate, white-noise Allan slope and resolution of the magnetometer in the still window,
+    over its new readings (by sample time where the topic has one, else by value).
 
-    The rate needs only two distinct samples, so a short window or a constant axis that
-    loses the slope and resolution keeps it."""
+    The rate needs only two readings, so a short window or a constant axis that loses the
+    slope and resolution keeps it."""
     try:
         t, xyz = ul.xyz(ulog, TOPIC_MAG, instance)
-        mask = slice_to_window(t, window)
-        t, xyz = ns.distinct_samples(t[mask], xyz[mask])
+        t, xyz = _new_readings(ulog, TOPIC_MAG, instance, t, xyz, slice_to_window(t, window))
         if t.size == 0:
             raise ValueError("no magnetometer sample in the still window")
     except (KeyError, ValueError) as exc:

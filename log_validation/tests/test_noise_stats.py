@@ -133,3 +133,26 @@ def test_distinct_samples_of_rows_drop_a_row_equal_in_every_column():
 def test_distinct_samples_of_an_empty_series_is_empty():
     t, v = ns.distinct_samples(np.array([]), np.array([]))
     assert t.size == 0 and v.size == 0
+
+
+def test_new_readings_with_sample_times_keep_equal_readings():
+    # The third sample repeats the second's sample time: a re-published reading.
+    t, v = ns.new_readings(np.array([0.0, 1, 2, 3, 4]), np.array([1.0, 1, 1, 2, 2]),
+                           np.array([10.0, 11, 11, 12, 13]))
+    assert t.tolist() == [0.0, 1.0, 3.0, 4.0] and v.tolist() == [1.0, 1.0, 2.0, 2.0]
+
+
+def test_new_readings_of_rows_with_sample_times():
+    t, v = ns.new_readings(np.array([0.0, 1, 2]), np.array([[1.0, 1], [1, 1], [1, 1]]),
+                           np.array([5.0, 5, 6]))
+    assert t.tolist() == [0.0, 2.0] and v.tolist() == [[1.0, 1.0], [1.0, 1.0]]
+
+
+def test_new_readings_without_sample_times_are_the_distinct_samples():
+    t, v = ns.new_readings(np.array([0.0, 1, 2, 3]), np.array([1.0, 1, 2, 2]))
+    assert t.tolist() == [0.0, 2.0] and v.tolist() == [1.0, 2.0]
+
+
+def test_new_readings_of_an_empty_series_is_empty():
+    t, v = ns.new_readings(np.array([]), np.array([]), np.array([]))
+    assert t.size == 0 and v.size == 0

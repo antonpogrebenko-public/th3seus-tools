@@ -77,6 +77,79 @@ def test_repeated_readings_are_not_new_samples():
     assert abs(v["baro.chip_noise_sigma"] - 0.1) / 0.1 < 0.10
 
 
+def _m_per_pa() -> float:
+    above, below = (isa_altitude_m(np.array([BASE_PA + d])) for d in (1.0, -1.0))
+    return float(abs(above - below)[0]) / 2.0
+
+
+def _quantized_baro_log(rate_hz=50.0, seconds=60.0, publish=1, sample_times=True):
+    """sensor_baro readings of white noise (0.1 m of altitude) quantized to a 0.1 m step, so
+    about a quarter of consecutive readings are equal; each reading is published `publish`
+    times, with its own timestamp_sample when `sample_times`."""
+    n = int(rate_hz * seconds)
+    step_pa = 0.1 / _m_per_pa()
+    readings = BASE_PA + np.round(np.random.default_rng(13).normal(0, 1.0, n)) * step_pa
+    data = {"timestamp": ts_us(n * publish, rate_hz * publish),
+            "pressure": np.repeat(readings, publish)}
+    if sample_times:
+        data["timestamp_sample"] = np.repeat(ts_us(n, rate_hz), publish)
+    return FakeULog({"sensor_baro": data})
+
+
+# Quantized white noise: the per-sample variance is sigma^2 + step^2 / 12 (step = sigma).
+QUANTIZED_SIGMA_M = 0.1 * math.sqrt(1 + 1 / 12)
+
+
+def test_equal_readings_with_their_own_sample_time_are_kept():
+    v = values(baro_chip_values(_quantized_baro_log(), WINDOW_60S, 0))
+    assert abs(v["baro.chip_noise_sigma"] - QUANTIZED_SIGMA_M) / QUANTIZED_SIGMA_M < 0.05
+    assert abs(v["baro.chip_rate_hz"] - 50.0) / 50.0 < 0.01
+
+
+def test_a_reading_published_twice_counts_once_by_its_sample_time():
+    v = values(baro_chip_values(_quantized_baro_log(publish=2), WINDOW_60S, 0))
+    assert abs(v["baro.chip_rate_hz"] - 50.0) / 50.0 < 0.01
+    assert abs(v["baro.chip_noise_sigma"] - QUANTIZED_SIGMA_M) / QUANTIZED_SIGMA_M < 0.05
+
+
+def test_without_sample_times_equal_values_are_repeats():
+    # The fallback drops the equal genuine readings too, which overstates the noise.
+    v = values(baro_chip_values(_quantized_baro_log(sample_times=False), WINDOW_60S, 0))
+    assert v["baro.chip_noise_sigma"] > 1.1 * QUANTIZED_SIGMA_M
+
+
+def test_constant_baro_with_sample_times_is_constant():
+    data = {"timestamp": ts_us(3000, 50.0), "timestamp_sample": ts_us(3000, 50.0),
+            "pressure": np.full(3000, BASE_PA)}
+    out = baro_chip_values(FakeULog({"sensor_baro": data}), WINDOW_60S, 0)
+    assert len(out) == 1 and out[0].value is None
+    assert out[0].note == "constant barometer reading in the still window"
+
+
+def _held_mag_log(rate_hz=100.0, seconds=60.0, publish=1, hold=10):
+    """sensor_mag in a steady field whose quantized reading holds each level for `hold`
+    readings: equal genuine readings, each with its own timestamp_sample, each published
+    `publish` times."""
+    n = int(rate_hz * seconds)
+    level = (np.arange(n) // hold) % 2 * 0.002
+    data = {"timestamp": ts_us(n * publish, rate_hz * publish),
+            "timestamp_sample": np.repeat(ts_us(n, rate_hz), publish)}
+    for axis, base in zip("xyz", (0.21, 0.03, 0.49)):
+        data[axis] = np.repeat(base + level, publish)
+    return FakeULog({"sensor_mag": data})
+
+
+def test_mag_rate_counts_equal_readings_with_their_own_sample_time():
+    v = values(mag_evidence_values(_held_mag_log(), WINDOW_60S, 0))
+    assert abs(v["mag.rate_hz"] - 100.0) / 100.0 < 0.01
+    assert v["mag.resolution_gauss"] == pytest.approx(0.002)
+
+
+def test_mag_reading_published_twice_counts_once_by_its_sample_time():
+    v = values(mag_evidence_values(_held_mag_log(rate_hz=50.0, publish=2), WINDOW_60S, 0))
+    assert abs(v["mag.rate_hz"] - 50.0) / 50.0 < 0.01
+
+
 def test_bad_pressure_samples_are_ignored():
     log = _baro_log(0.1)
     p = log.get_dataset("sensor_baro").data["pressure"].copy()

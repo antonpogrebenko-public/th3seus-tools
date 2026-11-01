@@ -46,10 +46,16 @@ noise pass adds, for the tables below:
   `baro.chip_resolution_m`: the raw barometer's own noise, rate, Allan slope and
   resolution. `baro.noise_sigma` still measures the fused altitude.
 - `mag.rate_hz`, `mag.allan_slope`, `mag.resolution_gauss`, next to
-  `mag.noise_sigma_gauss`. The barometer's four values and the magnetometer's slope
-  and resolution need 16 distinct samples in the still window; with fewer, the entry
-  gets an error giving the count (or saying the reading is constant). `mag.rate_hz`
-  needs only two.
+  `mag.noise_sigma_gauss`. These seven values are computed over the sensor's new
+  readings in the still window: a sample that only publishes the previous reading again
+  is not counted. Where the topic has `timestamp_sample` (when the sensor took the
+  sample), a sample is such a repeat when its sample time equals the previous sample's,
+  so a genuine reading equal to the previous one still counts; without it, a sample
+  equal to the previous one is taken as a repeat. `baro.chip_rate_hz` and `mag.rate_hz`
+  are therefore the rate of new readings, not the rate the topic is logged at. The
+  barometer's four values and the magnetometer's slope and resolution need 16 readings
+  in the still window; with fewer, the entry gets an error giving the count (or saying
+  the reading is constant). `mag.rate_hz` needs only two.
 - `gps.fix_type_mode` (the most common fix type among samples with a 3D fix or better,
   extrapolated samples not counted) and, as medians over the samples with that fix
   type, `gps.eph_median_m`, `gps.epv_median_m`, `gps.speed_accuracy_median_m_s`: the
@@ -256,11 +262,14 @@ The rules:
   resolution (the white-noise check). The row says how many logs failed each condition.
 - Barometer and magnetometer values are converted with
   `value * sqrt(sim rate / log rate)`, using each log's own rate, when that rate is at
-  least the simulator rate. A log below the simulator rate keeps its value (factor 1):
-  the PX4 logger keeps one sample per interval instead of averaging, so a slowly logged
-  series (raw barometer and magnetometer topics are often logged at about 1 Hz) holds
-  samples at the driver's own, unknown rate. The row shows the median logged rate and
-  factor, and flags a median factor above 3 or below 1/3.
+  least the simulator rate. The log rate is `baro.chip_rate_hz` or `mag.rate_hz`: the
+  rate of new readings in the still window (a re-published sample is not counted, by
+  its sample time where the log has one), not the rate the topic is logged at. A log
+  below the simulator rate keeps its value (factor 1): the PX4 logger keeps one sample
+  per interval instead of averaging, so a slowly logged series (raw barometer and
+  magnetometer topics are often logged at about 1 Hz) holds samples at the driver's own,
+  unknown rate. The row shows the median log rate and factor, and flags a median factor
+  above 3 or below 1/3.
 - The `Other` entry pools, per vehicle, every non-excluded part of the type that passes
   the rules above. Generic names (such as `UAVCAN`, `UBX`, `NMEA`) and unidentified
   parts count only toward `Other`; simulated parts count nowhere.

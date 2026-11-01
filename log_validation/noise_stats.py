@@ -186,6 +186,25 @@ def distinct_samples(t_s: np.ndarray, values: np.ndarray) -> tuple[np.ndarray, n
     return t[keep], v[keep]
 
 
+def new_readings(t_s: np.ndarray, values: np.ndarray, sample_times: np.ndarray | None = None
+                 ) -> tuple[np.ndarray, np.ndarray]:
+    """The samples that are new readings of the sensor; the first is kept.
+
+    With `sample_times` (when the sensor took each sample, such as PX4's `timestamp_sample`),
+    a sample whose time equals the previous sample's is the same reading published again,
+    while a genuine reading equal to the previous one is kept. Without them, a sample equal
+    to the previous one is taken as a repeat (`distinct_samples`)."""
+    if sample_times is None:
+        return distinct_samples(t_s, values)
+    t = np.asarray(t_s, dtype=float)
+    v = np.asarray(values, dtype=float)
+    s = np.asarray(sample_times, dtype=float)
+    if s.size == 0:
+        return t, v
+    keep = np.concatenate(([True], s[1:] != s[:-1]))
+    return t[keep], v[keep]
+
+
 def allan_slope(samples: np.ndarray, max_samples: int = ALLAN_SLOPE_MAX_SAMPLES) -> float:
     """Least-squares slope of log(Allan deviation) on log(tau) over taus of 1 to max_samples.
 
