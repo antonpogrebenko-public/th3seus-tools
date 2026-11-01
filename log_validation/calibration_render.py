@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import json
-import math
 from typing import Any, Mapping, Sequence
 
 from .calibration_counts import PassCounts, battery_counts, entry_counts
+from .calibration_markdown import NA, _num, _table
 from .calibration_noise import TICK_HZ, noise_before_after, vibration_evidence
 from .calibration_ranges import ALL, RangeRow, log_id_lists
 
@@ -14,7 +14,6 @@ SECTIONS = ("Run", "IMU noise before and after", "Battery", "Vehicle response",
             "Reference airframes", "Randomization ranges",
             "Gaps TH3SEUS does not model", "Counts")
 RUN_DATE_PREFIX = "- Run date: "
-NA = "n/a"
 RESPONSE_QUANTITIES = ("effectiveness.", "lag_minus_filter_s.", "hover.command", "motor_lag_s",
                        "rate.", "inflight_gyro_noise.")
 # The optional run-info `inputs` counts, from the download step and the passes' stderr.
@@ -23,22 +22,6 @@ INPUT_LABELS = (("manifest_rows", "Manifest rows"),
                 ("logs_without_row", "Logs without a manifest row"),
                 ("capped_out", "Logs over the per-vehicle cap"),
                 ("download_failed", "Failed downloads"))
-
-
-def _num(value: Any, spec: str = ".4g") -> str:
-    ok = isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
-    return format(value, spec) if ok else NA
-
-
-def _cell(text: str) -> str:
-    """A table cell: a "|" in the text (a log-controlled reason may hold one) is escaped."""
-    return str(text).replace("|", "\\|")
-
-
-def _table(headers: Sequence[str], rows: Sequence[Sequence[str]]) -> list[str]:
-    lines = ["| " + " | ".join(headers) + " |", "|" + "---|" * len(headers)]
-    lines.extend("| " + " | ".join(_cell(c) for c in row) + " |" for row in rows)
-    return lines + [""]
 
 
 def _section(title: str, body: Sequence[str]) -> list[str]:
