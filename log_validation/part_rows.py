@@ -157,11 +157,12 @@ def _observe(part_type: str, entry: Mapping[str, Any], value: float, rules: RowR
 
 
 def _log_name(entry: Mapping[str, Any], part_type: str) -> str | None:
-    """The part's log name; None when the entry has no readable one (unnamed)."""
+    """The part's log name without surrounding whitespace, the string `classify_log_part`
+    classifies; None when the entry has no readable one (unnamed)."""
     parts = entry.get("parts")
     part = parts.get(part_type) if isinstance(parts, Mapping) else None
     name = part.get("name") if isinstance(part, Mapping) else None
-    return name if isinstance(name, str) else None
+    return name.strip() if isinstance(name, str) else None
 
 
 def _counts_toward_variant(part_type: str, entry_name: str, measurements: Mapping[str, Any]) -> bool:

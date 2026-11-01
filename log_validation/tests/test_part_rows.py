@@ -222,3 +222,10 @@ def test_task6_fields_have_neutral_defaults():
     assert isinstance(r, PartRow)
     assert (r.checked, r.failed_slope, r.failed_resolution) == (0, 0, 0)
     assert r.median_rate_hz is None and r.median_factor is None and r.factor_flagged is False
+
+
+def test_a_padded_log_name_is_recorded_as_classified():
+    # classify_log_part strips the name; the row keeps the same stripped name.
+    names = [" BMI088 " if i % 2 else "BMI088" for i in range(12)]
+    r = imu_rows([noise_entry(f"l{i}", f"v{i}", {G: 0.001}, imu=n) for i, n in enumerate(names)])
+    assert r["Bmi088"].log_names == ("BMI088",) and r["Bmi088"].logs == 12

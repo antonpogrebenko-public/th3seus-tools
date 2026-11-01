@@ -329,3 +329,17 @@ def test_corrupt_gzip_input_exits_2_and_writes_nothing(tmp_path, data, capsys):
     assert code == 2
     assert nothing_written(tmp_path)
     assert capsys.readouterr().err.startswith("Error: ")
+
+
+@pytest.mark.parametrize("padded", [" BMI088 ", " BMI088\t"])
+def test_padded_log_names_give_unpadded_rust_text(tmp_path, padded):
+    entries = [noise_entry(f"l{i}", f"v{i}", IMU_M, imu=(padded if i % 2 else "BMI088"))
+               for i in range(12)]
+    assert run(tmp_path, entries) == 0
+    doc = json.loads((tmp_path / "out" / "part-tables.json").read_text())
+    assert {tuple(r["log_names"]) for r in doc["rows"] if r["variant"] == "Bmi088"} == \
+        {("BMI088",)}
+    rust = (tmp_path / "out" / "rust" / "imu_chip.rs").read_text()
+    assert "            // PX4 log names BMI088; new in run 2026-11-05" in rust.splitlines()
+    aliases = (tmp_path / "out" / "rust" / "daemon_aliases.rs").read_text()
+    assert '        "bmi088" => ImuChip::Bmi088,' in aliases.splitlines()
