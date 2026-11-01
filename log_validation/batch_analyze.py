@@ -38,6 +38,8 @@ from .part_ids import (
 from .part_measures import DEFAULT_GPS_REST_MIN_S, gyro_rate_params
 from .report import TOPIC_ACCEL, TOPIC_AIR_DATA, TOPIC_COMBINED, TOPIC_GYRO
 
+SIMULATION_ERROR = "simulation log skipped (SITL/HIL)"
+
 # The only topics any of the measurements below read. Kept next to the parse so
 # adding a measurement that needs another topic fails loudly here rather than
 # silently returning nothing.
@@ -147,7 +149,7 @@ def analyze_log(
             log_id=log_id,
             hardware=hw_dict,
             measurements={},
-            errors=["simulation log skipped (SITL/HIL)"],
+            errors=[SIMULATION_ERROR],
             vehicle_id=vehicle_id,
             airframe_id=airframe_id,
             parts=parts.to_json(),

@@ -93,7 +93,7 @@ import numpy as np
 from pyulog import ULog
 
 # The noise pass's airframe rule (SYS_AUTOSTART, None when absent or 0), so both outputs agree.
-from .batch_analyze import _airframe_id
+from .batch_analyze import SIMULATION_ERROR, _airframe_id
 from .flight_segments import FlightSegment, detect_flight_segments
 from .hardware import extract_hardware_info, is_simulation
 from .manifest import (
@@ -166,7 +166,7 @@ MAX_GAP_INTERVALS = 3.5
 MAV_TYPE_QUADROTOR = 2
 QUADROTOR_ROTOR_COUNT = 4
 
-ERROR_SIMULATION = "simulation log skipped (SITL/HIL)"
+ERROR_SIMULATION = SIMULATION_ERROR
 ERROR_NO_TORQUE = f"no {TOPIC_TORQUE} (firmware before control allocation)"
 ERROR_WORKER_DIED = "worker process died"
 
