@@ -22,6 +22,7 @@ from typing import Any, TypeVar
 import numpy as np
 from pyulog import ULog
 
+from .battery_capacity import pack_capacity_mah
 from .hardware import extract_hardware_info, is_simulation
 from .manifest import DEFAULT_MAX_PER_VEHICLE, select_logs, selection_counts
 from .parallel import run_per_log
@@ -69,6 +70,7 @@ _SUFFIX_OF_STATUS = {
 _STATUS_OF_SUFFIX = {suffix: status for status, suffix in _SUFFIX_OF_STATUS.items()}
 _REQUIRED_KEYS = ("log_id", "cell_count", "t_s", "v", "i")
 _OPTIONAL_KEYS = ("remaining", "discharged_mah")
+_CAPACITY_KEY = "capacity_mah"  # optional scalar; extracts written before it load as None
 
 
 # ---------------------------------------------------------------------------
@@ -91,6 +93,7 @@ class LogBatteryData:
     i: np.ndarray
     remaining: np.ndarray | None
     discharged_mah: np.ndarray | None
+    capacity_mah: float | None = None  # battery capacity parameter as logged (-1 = unset)
 
 
 # ---------------------------------------------------------------------------
@@ -154,6 +157,7 @@ def _battery_data(log_id: str, ulog: Any) -> LogBatteryData | None:
         i=i,
         remaining=_optional_series(ds.data, "remaining"),
         discharged_mah=_optional_series(ds.data, "discharged_mah"),
+        capacity_mah=pack_capacity_mah(getattr(ulog, "initial_parameters", None) or {}),
     )
 
 
@@ -186,6 +190,8 @@ def save_extracted(data: LogBatteryData, out_dir: Path) -> Path:
         "i": data.i,
     }
     optional = {k: getattr(data, k) for k in _OPTIONAL_KEYS if getattr(data, k) is not None}
+    if data.capacity_mah is not None:
+        optional[_CAPACITY_KEY] = np.array(data.capacity_mah)
     with open(partial, "wb") as fh:
         np.savez_compressed(fh, **arrays, **optional)
     os.replace(partial, path)
@@ -207,6 +213,7 @@ def load_extracted(path: Path) -> LogBatteryData:
         i=arrays["i"],
         remaining=arrays.get("remaining"),
         discharged_mah=arrays.get("discharged_mah"),
+        capacity_mah=_optional_capacity(arrays, name),
     )
     series = [data.t_s, data.v, data.i, data.remaining, data.discharged_mah]
     shapes = {a.shape for a in series if a is not None}
@@ -215,6 +222,10 @@ def load_extracted(path: Path) -> LogBatteryData:
     if not 1 <= data.cell_count <= MAX_CELL_COUNT:
         raise ValueError(f"{name}: cell_count {data.cell_count} is outside 1..{MAX_CELL_COUNT}")
     return data
+
+
+def _optional_capacity(arrays: dict[str, np.ndarray], name: str) -> float | None:
+    return _scalar(arrays, _CAPACITY_KEY, name, float) if _CAPACITY_KEY in arrays else None
 
 
 def _scalar(arrays: dict[str, np.ndarray], key: str, name: str, convert: Callable[[Any], T]) -> T:

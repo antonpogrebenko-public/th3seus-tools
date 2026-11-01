@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
+from dataclasses import asdict
 from pathlib import Path
+from typing import Any
 
+from .battery_capacity import MIN_CLASS_VEHICLES
 from .battery_model import (
     MIN_R_OBSERVATIONS_PER_CLASS,
     R_PLAUSIBLE_FLOOR_MOHM_PER_CELL,
@@ -47,6 +50,8 @@ def result_to_dict(r: BatteryFitResult) -> dict:
             }
             for f in r.r_fits
         ],
+        "capacity_bounds_mah": list(r.capacity_bounds_mah),
+        "r_fits_by_capacity": [asdict(f) for f in r.r_fits_by_capacity],
         "overall_r_median_mohm_per_cell": r.overall_r_median_mohm_per_cell,
         "overall_r_n": r.overall_r_n,
         "ocv_curve": {
@@ -107,6 +112,33 @@ def _fmt(value: float | None) -> str:
     return "n/a" if value is None else f"{value:.4f}"
 
 
+def _capacity_lines(r: BatteryFitResult) -> list[str]:
+    """The per cell count and pack-capacity table (the Rust constants do not use it)."""
+    bounds = ", ".join(f"{b:g}" for b in r.capacity_bounds_mah)
+    lines = [
+        "",
+        "## Internal Resistance by Pack Capacity",
+        "",
+        f"Pack capacity is the log's battery capacity parameter; class bounds (mAh): {bounds}.  "
+        f"A class with fewer than {MIN_CLASS_VEHICLES} vehicles is left out.  "
+        "Spread only: the Rust constants stay per cell count.",
+        "",
+    ]
+    if not r.r_fits_by_capacity:
+        return lines + ["No cell count and capacity class has enough vehicles."]
+    lines += [
+        "| Cell count | Capacity (mAh) | Median (mohm/cell) | p10 | p90 | n step events | Vehicles |",
+        "|---|---|---|---|---|---|---|",
+    ]
+    for f in r.r_fits_by_capacity:
+        lines.append(
+            f"| {f.cell_count}S | {f.capacity_class} | {f.median_mohm_per_cell:.2f} | "
+            f"{f.p10_mohm_per_cell:.2f} | {f.p90_mohm_per_cell:.2f} | {f.n_steps} | "
+            f"{f.n_vehicles} |"
+        )
+    return lines
+
+
 def write_markdown_summary(
     r: BatteryFitResult, path: str | Path, forbidden: Sequence[str] = ()
 ) -> None:
@@ -160,6 +192,8 @@ def write_markdown_summary(
             f"{f.n_vehicles} | {reason} |"
         )
 
+    lines += _capacity_lines(r)
+
     lines += [
         "",
         "## OCV Curve (per cell, all cell counts pooled)",
@@ -208,38 +242,45 @@ def write_markdown_summary(
 
 
 def emit_rust_constants(r: BatteryFitResult) -> str:
+    """The Rust constants of a result (see ``rust_constants_text``)."""
+    return rust_constants_text(result_to_dict(r))
+
+
+def rust_constants_text(battery: Mapping[str, Any]) -> str:
     """Render the deployed R table + OCV table as Rust source constants.
 
-    The output is in the format ``hitl-physics/src/battery.rs`` uses, so the
-    tables can be copied there as they are.
+    ``battery`` is the result's JSON dict.  The output is in the format
+    ``hitl-physics/src/battery.rs`` uses, so the tables can be copied there as
+    they are; it holds nothing from the pack-capacity rows.
     """
     lines: list[str] = []
     lines.append(
         "// FITTED_R_TABLE: deployed per-cell R (mohm/cell), keyed by cell count."
     )
     lines.append(
-        f"// Canonical run, split seed={r.split_seed}, {r.real_log_count} real logs, "
-        f"{r.sim_log_count} SIM excluded."
+        f"// Canonical run, split seed={battery['split_seed']}, "
+        f"{battery['real_log_count']} real logs, {battery['sim_log_count']} SIM excluded."
     )
     lines.append("const FITTED_R_TABLE: &[(u8, f64)] = &[")
-    for f in r.r_fits:
+    for f in battery["r_fits"]:
         note = (
-            f"n={f.n_observations} LOW-N -> pooled median"
-            if f.low_n
-            else f"n={f.n_observations}"
+            f"n={f['n_observations']} LOW-N -> pooled median"
+            if f["low_n"]
+            else f"n={f['n_observations']}"
         )
         lines.append(
-            f"    ({f.cell_count}, {f.deployed_mohm_per_cell:.4f}),  // {note}"
+            f"    ({f['cell_count']}, {f['deployed_mohm_per_cell']:.4f}),  // {note}"
         )
     lines.append("];")
     lines.append("")
     lines.append(
         f"const FITTED_R_DEFAULT_MOHM_PER_CELL: f64 = "
-        f"{r.overall_r_median_mohm_per_cell:.4f};  // pooled, n={r.overall_r_n}"
+        f"{battery['overall_r_median_mohm_per_cell']:.4f};  // pooled, n={battery['overall_r_n']}"
     )
     lines.append("")
     lines.append("const OCV_TABLE: &[(f64, f64)] = &[")
-    for soc, v in zip(r.ocv_curve.soc_knots, r.ocv_curve.v_per_cell_knots):
+    ocv = battery["ocv_curve"]
+    for soc, v in zip(ocv["soc_knots"], ocv["v_per_cell_knots"]):
         lines.append(f"    ({soc:.4f}, {v:.4f}),")
     lines.append("];")
     return "\n".join(lines)

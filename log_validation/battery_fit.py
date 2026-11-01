@@ -59,6 +59,7 @@ import numpy as np
 
 # The extract step, the result types and the outputs live in their own modules;
 # their public names are re-exported so `from log_validation.battery_fit import ...` works.
+from .battery_capacity import DEFAULT_CAPACITY_BOUNDS_MAH, add_capacity_args, capacity_class_fits
 from .battery_extract import (  # noqa: F401
     BATTERY_TOPIC, MAX_CELL_COUNT, MIN_PEAK_CURRENT_A, MIN_VOLTAGE_RANGE_V, NO_DATA_STATUSES,
     NPZ_SUFFIX, STATUS_LOAD_ERROR, STATUS_NO_MANIFEST_ROW, STATUS_OK, STATUS_SIM,
@@ -345,6 +346,7 @@ class _LogObservations:
     cell_count: int
     r_obs: list[float]
     ocv_obs: list[tuple[float, float]]
+    capacity_mah: float | None = None
 
 
 def _soc_for_ocv(data: LogBatteryData) -> np.ndarray | None:
@@ -367,7 +369,7 @@ def _observe(data: LogBatteryData) -> _LogObservations:
         else _extract_ocv_observations(data.v, data.i, soc, data.cell_count)
     )
     r_obs = _extract_r_observations(data.v, data.i, data.t_s, data.cell_count)
-    return _LogObservations(data.log_id, data.cell_count, r_obs, ocv_obs)
+    return _LogObservations(data.log_id, data.cell_count, r_obs, ocv_obs, data.capacity_mah)
 
 
 def _vehicle_key(log_id: str, vehicle_of: Mapping[str, str]) -> tuple[str, str]:
@@ -515,6 +517,7 @@ def fit_extracted(
     *,
     no_data: Mapping[str, str] | None = None,
     logs_without_manifest_row: int = 0,
+    capacity_bounds: Sequence[float] = DEFAULT_CAPACITY_BOUNDS_MAH,
 ) -> BatteryFitResult:
     """Fit R and OCV on the fit side of the split; score the holdout side.
 
@@ -576,6 +579,8 @@ def fit_extracted(
         holdout_scored_log_ids=holdout_scored_log_ids,
         fit_logs_without_samples=len(observations) - len(fit_log_ids),
         holdout_logs_not_scored=len(scored) - len(holdout_scored_log_ids),
+        r_fits_by_capacity=capacity_class_fits(observations, vehicle_of, capacity_bounds),
+        capacity_bounds_mah=tuple(capacity_bounds),
     )
 
 
@@ -598,6 +603,7 @@ def fit_obs_dir(
     max_per_vehicle: int = DEFAULT_MAX_PER_VEHICLE,
     holdout_frac: float = DEFAULT_HOLDOUT_FRAC,
     seed: int = DEFAULT_SPLIT_SEED,
+    capacity_bounds: Sequence[float] = DEFAULT_CAPACITY_BOUNDS_MAH,
 ) -> BatteryFitResult:
     """fit_extracted over the files that extract_dir left in one or more folders.
 
@@ -619,6 +625,7 @@ def fit_obs_dir(
     return fit_extracted(
         datas, vehicle_of, holdout_frac, seed,
         no_data=no_data, logs_without_manifest_row=without_row + len(marked),
+        capacity_bounds=capacity_bounds,
     )
 
 
@@ -630,6 +637,7 @@ def analyze_logs(
     max_per_vehicle: int = DEFAULT_MAX_PER_VEHICLE,
     jobs: int = 1,
     loader: Callable[[Path], Any] = load_battery_topics,
+    capacity_bounds: Sequence[float] = DEFAULT_CAPACITY_BOUNDS_MAH,
 ) -> BatteryFitResult:
     """Extract the selected .ulg files of *log_dir* to a temporary folder, then fit.
 
@@ -645,7 +653,9 @@ def analyze_logs(
     _check_holdout_frac(holdout_frac)
     with tempfile.TemporaryDirectory() as tmp:
         extract_dir(Path(log_dir), Path(tmp), manifest_path, max_per_vehicle, jobs, loader)
-        return fit_obs_dir(Path(tmp), manifest_path, max_per_vehicle, holdout_frac, seed)
+        return fit_obs_dir(
+            Path(tmp), manifest_path, max_per_vehicle, holdout_frac, seed, capacity_bounds
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -674,6 +684,7 @@ def _build_parser() -> argparse.ArgumentParser:
         help="fit from the folders of one or more --extract-to runs instead of --log-dir",
     )
     add_selection_args(parser)
+    add_capacity_args(parser)
     parser.add_argument(
         "--holdout-frac",
         type=float,
@@ -719,12 +730,14 @@ def _run_fit(args: argparse.Namespace) -> int:
           file=sys.stderr, flush=True)
     if args.obs_dir is not None:
         result = fit_obs_dir(
-            args.obs_dir, args.manifest, args.max_per_vehicle, args.holdout_frac, args.seed
+            args.obs_dir, args.manifest, args.max_per_vehicle, args.holdout_frac, args.seed,
+            args.capacity_bounds,
         )
     else:
         result = analyze_logs(
             args.log_dir, args.holdout_frac, args.seed,
             args.manifest, args.max_per_vehicle, args.jobs,
+            capacity_bounds=args.capacity_bounds,
         )
     print(
         f"Real logs: {result.real_log_count} | SIM excluded: {result.sim_log_count} | "

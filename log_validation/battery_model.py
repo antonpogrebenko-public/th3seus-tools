@@ -10,6 +10,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from .battery_capacity import DEFAULT_CAPACITY_BOUNDS_MAH, CapacityClassRFit
+
 # ---------------------------------------------------------------------------
 # Resistance-table thresholds (used by the fit and quoted in the Markdown)
 # ---------------------------------------------------------------------------
@@ -126,3 +128,5 @@ class BatteryFitResult:
     holdout_scored_log_ids: tuple[str, ...]  # sorted; scored by the MAE or the step check
     fit_logs_without_samples: int  # usable fit-side logs with no step and no OCV sample
     holdout_logs_not_scored: int  # usable holdout-side logs scored by neither check
+    r_fits_by_capacity: tuple[CapacityClassRFit, ...] = ()  # per cell count and capacity class
+    capacity_bounds_mah: tuple[float, ...] = DEFAULT_CAPACITY_BOUNDS_MAH
