@@ -20,7 +20,7 @@ from .th3seus_parts import (
     daemon_parse, normalize, variant)
 
 __all__ = ["ALIASES_FILE", "RUST_FILES", "emit_daemon_aliases", "emit_part_source",
-           "emit_rust_files", "rust_f64"]
+           "emit_rust_files", "is_plain", "rust_f64"]
 
 RUST_FILES = {"imu": "imu_chip.rs", "baro": "baro_chip.rs", "mag": "mag_chip.rs",
               "gps": "gps_chipset.rs"}
@@ -33,6 +33,11 @@ RESERVED_VARIANTS = frozenset({"Self", "None", OTHER})
 EXPONENT = re.compile(r"e([+-])0*(\d+)")
 I1, I2, I3, I4 = "    ", "        ", "            ", "                "
 GPS = "gps"
+
+
+def is_plain(text: str) -> bool:
+    """Printable ASCII without `"` and `\\`: safe in a Rust string literal and a line comment."""
+    return PLAIN_ALIAS.fullmatch(text) is not None
 
 
 def rust_f64(value: float) -> str:
@@ -75,6 +80,15 @@ def _new_variants(tables: PartTables, part: str) -> tuple[str, ...]:
 
 def _log_names(rows: Mapping[str, PartRow]) -> tuple[str, ...]:
     return tuple(sorted({n for r in rows.values() for n in r.log_names}))
+
+
+def _comment_names(part: str, rows: Mapping[str, PartRow]) -> tuple[str, ...]:
+    """The log names of a new variant, for its comment; ValueError for a name that is not
+    plain printable ASCII (a line break would end the comment, and every output is ASCII)."""
+    names = _log_names(rows)
+    for name in names:
+        _check_plain(part, "log name", name)
+    return names
 
 
 def _field_lines(part: str, name: str, base: Variant, rows: Mapping[str, PartRow],
@@ -125,7 +139,7 @@ def _arms(spec: PartType, tables: PartTables, run_date: str) -> list[str]:
                       old_existing, run_date)
     other = next(v for v in spec.variants if v.name == OTHER)
     for name in _new_variants(tables, spec.key):
-        names = ", ".join(_log_names(rows[name]))
+        names = ", ".join(_comment_names(spec.key, rows[name]))
         lines += _arm(spec, name, other, f"PX4 log names {names}; new in run {run_date}",
                       rows[name], OTHER, run_date)
     if spec.no_profile_variants:
@@ -182,9 +196,13 @@ def _usable_catalog(catalog: Mapping[str, str], indent: str) -> tuple[dict[str, 
     return usable, skipped
 
 
+def _check_plain(part: str, what: str, text: str) -> None:
+    if not is_plain(text):
+        raise ValueError(f"{part}: {what} {text!r} is not plain printable ASCII")
+
+
 def _check_alias(part: str, alias: str) -> None:
-    if not PLAIN_ALIAS.fullmatch(alias):
-        raise ValueError(f"{part}: alias {alias!r} is not plain printable ASCII")
+    _check_plain(part, "alias", alias)
 
 
 def _alias_line(spec: PartType, name: str, aliases: Sequence[str]) -> str:
@@ -229,6 +247,7 @@ def _block(spec: PartType, tables: PartTables, catalog: Mapping[str, str]) -> li
     for spelling, log_name in sorted(catalog.items(), key=lambda kv: normalize(kv[0])):
         if normalize(log_name) not in known:
             _check_alias(spec.key, normalize(spelling))
+            _check_plain(spec.key, "catalog log name", log_name)
             lines.append(f"{indent}// not emitted: \"{normalize(spelling)}\" "
                          f"({log_name} has no new variant)")
     return lines

@@ -29,6 +29,24 @@ def test_write_json_refuses_forbidden(tmp_path):
     assert not target.exists()
 
 
+NON_ASCII_HOME = "/home/Jos\u00e9"
+
+
+def test_json_text_is_ascii_with_escapes():
+    text = json_text({"name": "Jos\u00e9"})
+    assert text == '{\n "name": "Jos\\u00e9"\n}\n'
+    assert json.loads(text) == {"name": "Jos\u00e9"}
+
+
+@pytest.mark.parametrize("over_bytes", [outputs.GZIP_OVER_BYTES, 10])
+def test_a_forbidden_non_ascii_string_is_refused_plain_or_gzipped(tmp_path, over_bytes):
+    # The written text holds the string escaped; the guard checks the unescaped text.
+    records = [{"p": f"{NON_ASCII_HOME}/logs/x.ulg"}] * 5
+    with pytest.raises(PrivateDataError):
+        write_json_or_gz(tmp_path / "o.json", records, [NON_ASCII_HOME], over_bytes)
+    assert list(tmp_path.iterdir()) == []
+
+
 def test_write_text_refuses_forbidden(tmp_path):
     target = tmp_path / "o.md"
     with pytest.raises(PrivateDataError):
@@ -169,9 +187,11 @@ def test_write_json_refuses_backslash_forbidden(tmp_path):
     assert not target.exists()
 
 
-def test_write_json_is_utf8(tmp_path):
+def test_write_json_writes_non_ascii_text_as_escapes(tmp_path):
     write_json(tmp_path / "o.json", {"k": "caf\u00e9"}, [])
-    assert "caf\u00e9".encode("utf-8") in (tmp_path / "o.json").read_bytes()
+    data = (tmp_path / "o.json").read_bytes()
+    assert data == b'{\n "k": "caf\\u00e9"\n}\n'
+    assert json.loads(data.decode("ascii")) == {"k": "caf\u00e9"}
 
 
 def _merge_args(tmp_path: Path, *parts: Path) -> list[str]:

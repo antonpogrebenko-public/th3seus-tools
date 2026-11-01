@@ -78,14 +78,28 @@ def write_text(path: Path, text: str, forbidden: Sequence[str]) -> None:
     path.write_text(text, encoding="utf-8")
 
 
+def _dumps(cleaned: Any, ensure_ascii: bool) -> str:
+    return json.dumps(cleaned, indent=1, sort_keys=True, allow_nan=False,
+                      ensure_ascii=ensure_ascii) + "\n"
+
+
 def json_text(obj: Any) -> str:
-    """The text `write_json` writes: sorted keys, indent 1, NaN/inf as null, one newline."""
-    return json.dumps(_clean(obj), indent=1, sort_keys=True, allow_nan=False,
-                      ensure_ascii=False) + "\n"
+    """The text `write_json` writes: sorted keys, indent 1, NaN/inf as null, one newline,
+    ASCII only (any other character is written as a \\u escape)."""
+    return _dumps(_clean(obj), ensure_ascii=True)
+
+
+def _checked_json_text(obj: Any, forbidden: Sequence[str]) -> str:
+    """`json_text(obj)` after the guard has checked the unescaped text: a forbidden string
+    with non-ASCII characters (a home folder such as /home/Jos\\u00e9) appears escaped in
+    the written text, so the guard looks at the text before escaping."""
+    cleaned = _clean(obj)
+    _check(_dumps(cleaned, ensure_ascii=False), forbidden)
+    return _dumps(cleaned, ensure_ascii=True)
 
 
 def write_json(path: Path, obj: Any, forbidden: Sequence[str]) -> None:
-    write_text(path, json_text(obj), forbidden)
+    write_text(path, _checked_json_text(obj, forbidden), forbidden)
 
 
 def _deterministic_gzip(data: bytes) -> bytes:
@@ -100,11 +114,12 @@ def _deterministic_gzip(data: bytes) -> bytes:
 def write_json_or_gz(path: Path, obj: Any, forbidden: Sequence[str],
                      over_bytes: int = GZIP_OVER_BYTES) -> Path:
     """Write `obj` as JSON to `path`, or to `path` + ".gz" (deterministic gzip) when the
-    UTF-8 text is larger than `over_bytes`. The private-string guard checks the text
-    before it is compressed. Returns the path written."""
-    text = json_text(obj)
+    text (ASCII, as `json_text`) is larger than `over_bytes`. The private-string guard
+    checks the unescaped text and the written text before either is compressed. Returns
+    the path written."""
+    text = _checked_json_text(obj, forbidden)
     _check(text, forbidden)
-    data = text.encode("utf-8")
+    data = text.encode("ascii")
     path = Path(path)
     if len(data) <= over_bytes:
         write_text(path, text, ())

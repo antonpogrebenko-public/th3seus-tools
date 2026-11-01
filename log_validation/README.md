@@ -230,7 +230,9 @@ of one part type, in the structure of `hitl-physics` 0.13.1 `src/build.rs`;
 block is `if` lines to paste before the substring rules of `parse_gps_chipset`. A value
 with a proposed number carries a comment with the old value, its source, the run date
 and the vehicle count. The same inputs give byte-identical files, and all of them are
-ASCII.
+ASCII: the JSON files write any other character of the input text (a board, part or log
+name) as a `\u` escape, and the pass refuses (exit 2) a new variant whose log name is not
+printable ASCII, as the Rust text would hold it as it is.
 
 The rules:
 
@@ -277,8 +279,10 @@ The catalog spellings file is `{"imu": {"<spelling>": "<PX4 log name>"}, "baro":
 "mag": {...}, "gps": {...}}`; the spellings are emitted, normalized, next to the log names
 of the new variants. Log names are compared after normalizing (so `icp-201xx` matches
 `ICP201XX`), and a spelling that is empty after normalizing (such as `-`) is skipped with
-a comment. The pass exits with 2 and writes nothing for a bad option, an
-unreadable, corrupt or malformed input, or private data in an output. It guards against
+a comment. Every spelling and log name in the file must be printable ASCII without `"`
+and `\`, as the Rust text holds them. The pass exits with 2 and writes nothing for a bad
+option, an unreadable, corrupt or malformed input, or private data in an output. It
+guards against
 the home directory, user and host name and the input folders; there is no `--forbid`
 option, so run `calibration_report --forbid` over the result for other private strings.
 
@@ -348,7 +352,10 @@ nothing is written) when any output contains the home directory, the user or hos
 name, the folder of an input file, or a `--forbid` string. Only those are checked, so
 pass `--forbid` for every other private string, such as a cloud account ID or a
 bucket name. `--out-dir` must be new or empty. The Run date line of `report.md` is the
-`date` of `run-info.json`, so the same inputs give the same files.
+`date` of `run-info.json`, so the same inputs give the same files. Every JSON output of
+every pass is ASCII: a character outside ASCII in the input text is written as a `\u`
+escape (the check above looks at the text before escaping, so a private string with
+such a character is still found).
 
 Deployment note: re-seeding the TH3SEUS profiles from this run lowers the simulated
 IMU noise for every TH3SEUS user, because the old estimator overstated the per-sample

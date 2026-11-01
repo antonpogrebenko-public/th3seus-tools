@@ -38,7 +38,7 @@ from .part_boards import board_table
 from .part_rows import (
     DEFAULT_ALLAN_SLOPE_TOLERANCE, DEFAULT_MIN_VEHICLES, DEFAULT_SIM_RATE_HZ, PartTables,
     RowRules, build_part_tables)
-from .part_rust import emit_rust_files
+from .part_rust import emit_rust_files, is_plain
 from .th3seus_parts import HITL_DAEMON_VERSION, HITL_PHYSICS_VERSION, PART_TYPES
 
 PART_TABLES_FILE = "part-tables.json"
@@ -81,7 +81,9 @@ def check_noise_entries(value: Any) -> list[dict]:
 
 
 def load_catalog_spellings(path: Path) -> dict[str, dict[str, str]]:
-    """{part type: {catalog string: log part name}}; ValueError for any other shape."""
+    """{part type: {catalog string: log part name}}; ValueError for any other shape, and for
+    a string that is not printable ASCII or holds `"` or `\\` (the strings are written into
+    the Rust text, as aliases and in comments)."""
     try:
         value = json.loads(Path(path).read_text(encoding="utf-8"))
     except json.JSONDecodeError as e:
@@ -95,6 +97,10 @@ def load_catalog_spellings(path: Path) -> dict[str, dict[str, str]]:
         if not isinstance(spellings, dict) or not all(
                 isinstance(k, str) and isinstance(v, str) for k, v in spellings.items()):
             raise ValueError(f"catalog spellings for {part_type!r} must map strings to strings")
+        for text in (*spellings, *spellings.values()):
+            if not is_plain(text):
+                raise ValueError(f"catalog spellings for {part_type!r}: {ascii(text)} is not "
+                                 "printable ASCII without '\"' and '\\'")
     return value
 
 

@@ -93,6 +93,27 @@ def test_every_output_is_ascii(tmp_path):
         (tmp_path / "out" / name).read_bytes().decode("ascii")
 
 
+def test_non_ascii_input_text_gives_ascii_outputs(tmp_path):
+    entries = entries_of_12_vehicles()
+    entries[0] = noise_entry("l\u00e9", "v0", IMU_M, board="FMU_\u00c9", imu="BMI088")
+    entries.append(noise_entry("odd", "v-odd", IMU_M, imu="BMI\u00e9"))
+    assert run(tmp_path, entries) == 0
+    for name in OUTPUTS:
+        (tmp_path / "out" / name).read_bytes().decode("ascii")
+    doc = json.loads((tmp_path / "out" / "part-tables.json").read_text(encoding="ascii"))
+    assert "l\u00e9" in doc["log_ids"]
+    assert any(r["log_names"] == ["BMI\u00e9"] for r in doc["rows"])
+    boards = json.loads((tmp_path / "out" / "board-table.json").read_text(encoding="ascii"))
+    assert "FMU_\u00c9" in boards["boards"]
+
+
+def test_a_new_variant_log_name_that_is_not_plain_ascii_exits_2(tmp_path, capsys):
+    # The Kelvin sign lowercases to "k", so the alias is ASCII but the Rust comment is not.
+    assert run(tmp_path, entries_of_12_vehicles(name="BMI088\u212a")) == 2
+    assert nothing_written(tmp_path)
+    assert "printable ASCII" in capsys.readouterr().err
+
+
 def test_options_reach_the_document(tmp_path):
     assert run(tmp_path, entries_of_12_vehicles(), "--min-vehicles", "3",
                "--allan-slope-tolerance", "0.2", "--sim-rate-baro", "100",
@@ -167,6 +188,30 @@ def test_malformed_catalog_spellings_exit_2(tmp_path, catalog):
     path.write_text(catalog)
     assert run(tmp_path, entries_of_12_vehicles(), "--catalog-spellings", str(path)) == 2
     assert nothing_written(tmp_path)
+
+
+NOT_PLAIN_SPELLINGS = [
+    {"BMI\u00e9": "BMI088"}, {"BMI-088": "BMI\u00e9"}, {"BMI-088": "BMI\n088"},
+    {"BMI\n088": "BMI088"}, {"X1": 'A"B'}, {"X1": "A\\B"}, {'A"B': "BMI088"},
+    {"X1\t": "BMI088"}]
+
+
+@pytest.mark.parametrize("spellings", NOT_PLAIN_SPELLINGS)
+def test_catalog_spelling_that_is_not_plain_printable_ascii_exits_2(tmp_path, spellings, capsys):
+    path = tmp_path / "in" / "catalog.json"
+    write_input(tmp_path, entries_of_12_vehicles())
+    path.write_text(json.dumps({"imu": spellings}))
+    assert run(tmp_path, entries_of_12_vehicles(), "--catalog-spellings", str(path)) == 2
+    assert nothing_written(tmp_path)
+    assert capsys.readouterr().err.startswith("Error: catalog spellings")
+
+
+@pytest.mark.parametrize("spellings", NOT_PLAIN_SPELLINGS)
+def test_load_catalog_spellings_refuses_text_that_is_not_plain(tmp_path, spellings):
+    path = tmp_path / "c.json"
+    path.write_text(json.dumps({"imu": spellings}))
+    with pytest.raises(ValueError, match="not printable ASCII"):
+        load_catalog_spellings(path)
 
 
 def test_missing_catalog_spellings_file_exits_2(tmp_path):
