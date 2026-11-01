@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import gzip
 import json
 import os
 import subprocess
@@ -268,3 +269,26 @@ def test_load_catalog_spellings(tmp_path):
 def test_load_catalog_spellings_unreadable(tmp_path):
     with pytest.raises(OSError):
         load_catalog_spellings(tmp_path / "none.json")
+
+
+def test_part_tables_reads_a_gzip_input(tmp_path):
+    entries = entries_of_12_vehicles()
+    assert run(tmp_path, entries, out="plain") == 0
+    packed = tmp_path / "in" / "noise.json.gz"
+    packed.write_bytes(gzip.compress(json.dumps(entries).encode("utf-8")))
+    code = main([str(packed), "--out-dir", str(tmp_path / "gz"), "--run-date", "2026-11-05"])
+    assert code == 0
+    for name in OUTPUTS:
+        assert (tmp_path / "gz" / name).read_bytes() == (tmp_path / "plain" / name).read_bytes()
+
+
+@pytest.mark.parametrize("data", [
+    gzip.compress(json.dumps([1] * 500).encode())[:-15], b"plain text, not gzip"])
+def test_corrupt_gzip_input_exits_2_and_writes_nothing(tmp_path, data, capsys):
+    bad = tmp_path / "in" / "noise.json.gz"
+    bad.parent.mkdir()
+    bad.write_bytes(data)
+    code = main([str(bad), "--out-dir", str(tmp_path / "out"), "--run-date", "2026-11-05"])
+    assert code == 2
+    assert nothing_written(tmp_path)
+    assert capsys.readouterr().err.startswith("Error: ")

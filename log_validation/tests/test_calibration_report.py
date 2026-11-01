@@ -620,3 +620,19 @@ def test_battery_held_out_count_says_what_it_counts():
     text = render_report([], battery_dict(), [], airframes_dict(), [], run_info())
     assert ("| Held-out logs with a voltage error (MAE) | 2 of 3 real held-out logs, "
             "usable or not |") in text
+
+
+def test_calibration_dir_compresses_large_per_log_results(tmp_path):
+    def build(name):
+        paths = write_inputs(tmp_path / f"in-{name}", "2026-10-29")
+        out = tmp_path / name
+        write_calibration_dir(out, *(paths[k] for k in COMMAND_ARGS), gzip_over_bytes=100)
+        return out
+
+    first, second = build("one"), build("two")
+    names = set(_files(first))
+    assert {"noise-results.json.gz", "response-results.json.gz"} <= names
+    assert not {"noise-results.json", "response-results.json"} & names
+    assert {"report.md", "ranges.csv", "noise-profiles.json", "battery-fit.json",
+            "airframes.json", "run-info.json"} <= names
+    assert _files(first) == _files(second)

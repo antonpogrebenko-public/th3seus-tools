@@ -36,8 +36,10 @@ from .calibration_render import render_report
 from .outputs import (
     PrivateDataError,
     check_out_dir,
+    GZIP_OVER_BYTES,
     input_forbidden,
     write_json,
+    write_json_or_gz,
     write_staged,
     write_text,
 )
@@ -86,7 +88,8 @@ def _by_log_id(entries: list) -> list[dict]:
 
 def _stage(stage: Path, forbidden: Sequence[str], noise: list[dict], battery: dict,
            response: list[dict], airframes: dict, run_info: dict,
-           parts: PartOutputs | None = None) -> None:
+           parts: PartOutputs | None = None,
+           gzip_over_bytes: int = GZIP_OVER_BYTES) -> None:
     ranges = ranges_table(noise, battery, response)
     report = render_report(noise, battery, response, airframes, ranges, run_info,
                            parts.tables if parts else None, parts.boards if parts else None)
@@ -94,10 +97,10 @@ def _stage(stage: Path, forbidden: Sequence[str], noise: list[dict], battery: di
     write_text(stage / "ranges.csv", ranges_csv(ranges), forbidden)
     for name, ids in log_id_lists(noise, battery, response).items():
         write_text(stage / "log-ids" / f"{name}.txt", "".join(f"{i}\n" for i in ids), forbidden)
-    write_json(stage / "noise-results.json", noise, forbidden)
+    write_json_or_gz(stage / "noise-results.json", noise, forbidden, gzip_over_bytes)
     write_json(stage / "noise-profiles.json", to_json(aggregate_profiles(noise)), forbidden)
     write_json(stage / "battery-fit.json", battery, forbidden)
-    write_json(stage / "response-results.json", response, forbidden)
+    write_json_or_gz(stage / "response-results.json", response, forbidden, gzip_over_bytes)
     write_json(stage / "airframes.json", airframes, forbidden)
     write_json(stage / "run-info.json", run_info, forbidden)
     write_text(stage / "rust" / BATTERY_RUST_FILE, rust_constants_text(battery) + "\n", forbidden)
@@ -108,7 +111,7 @@ def _stage(stage: Path, forbidden: Sequence[str], noise: list[dict], battery: di
 def write_calibration_dir(
     out_dir: Path, noise_path: Path, battery_path: Path, response_path: Path,
     airframes_path: Path, run_info_path: Path, extra_forbidden: Sequence[str] = (),
-    parts_dir: Path | None = None,
+    parts_dir: Path | None = None, gzip_over_bytes: int = GZIP_OVER_BYTES,
 ) -> None:
     """Write report.md, ranges.csv, log-ids/{noise,battery,response}.txt, rust/battery_tables.rs
     and the normalized inputs; with `parts_dir` (the part_tables output folder) also the part
@@ -116,7 +119,10 @@ def write_calibration_dir(
 
     Raises ValueError for an input of the wrong shape (a nested row included) or an
     `out_dir` that is not empty. Raises PrivateDataError when any output would hold
-    a private string; then nothing is written to `out_dir`."""
+    a private string; then nothing is written to `out_dir`.
+
+    `noise-results.json` and `response-results.json` are written as `.json.gz` (deterministic
+    gzip) when their text is larger than `gzip_over_bytes`."""
     check_out_dir(out_dir)
     inputs = (noise_path, battery_path, response_path, airframes_path, run_info_path)
     noise = _by_log_id(_load(noise_path, list, "noise results"))
@@ -132,7 +138,8 @@ def write_calibration_dir(
 
     def stage_files(stage: Path) -> None:
         try:
-            _stage(stage, forbidden, noise, battery, response, airframes, run_info, parts)
+            _stage(stage, forbidden, noise, battery, response, airframes, run_info, parts,
+                   gzip_over_bytes)
         except (KeyError, TypeError, AttributeError) as e:
             # The top-level shapes are checked above; a nested row of the wrong shape
             # shows up only while rendering. Nothing has reached out_dir yet.

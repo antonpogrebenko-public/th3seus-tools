@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import argparse
 import getpass
+import gzip
+import io
 import json
 import math
 import os
@@ -11,12 +13,16 @@ import shutil
 import socket
 import sys
 import tempfile
+import zlib
 from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
 
 from .manifest import DEFAULT_MAX_PER_VEHICLE, cap_per_vehicle, read_manifest
 
 MIN_FORBIDDEN_LEN = 3
+GZIP_OVER_BYTES = 10 * 1024 * 1024
+GZIP_LEVEL = 9
+GZIP_SUFFIX = ".gz"
 
 
 class PrivateDataError(ValueError):
@@ -72,10 +78,59 @@ def write_text(path: Path, text: str, forbidden: Sequence[str]) -> None:
     path.write_text(text, encoding="utf-8")
 
 
-def write_json(path: Path, obj: Any, forbidden: Sequence[str]) -> None:
-    text = json.dumps(_clean(obj), indent=1, sort_keys=True, allow_nan=False,
+def json_text(obj: Any) -> str:
+    """The text `write_json` writes: sorted keys, indent 1, NaN/inf as null, one newline."""
+    return json.dumps(_clean(obj), indent=1, sort_keys=True, allow_nan=False,
                       ensure_ascii=False) + "\n"
-    write_text(path, text, forbidden)
+
+
+def write_json(path: Path, obj: Any, forbidden: Sequence[str]) -> None:
+    write_text(path, json_text(obj), forbidden)
+
+
+def _deterministic_gzip(data: bytes) -> bytes:
+    """Gzip with a zero modification time, no file name and the fixed OS byte (255),
+    so the bytes do not depend on the Python version or the platform."""
+    buffer = io.BytesIO()
+    with gzip.GzipFile(fileobj=buffer, mode="wb", compresslevel=GZIP_LEVEL, mtime=0) as gz:
+        gz.write(data)
+    return buffer.getvalue()
+
+
+def write_json_or_gz(path: Path, obj: Any, forbidden: Sequence[str],
+                     over_bytes: int = GZIP_OVER_BYTES) -> Path:
+    """Write `obj` as JSON to `path`, or to `path` + ".gz" (deterministic gzip) when the
+    UTF-8 text is larger than `over_bytes`. The private-string guard checks the text
+    before it is compressed. Returns the path written."""
+    text = json_text(obj)
+    _check(text, forbidden)
+    data = text.encode("utf-8")
+    path = Path(path)
+    if len(data) <= over_bytes:
+        write_text(path, text, ())
+        return path
+    packed = path.with_name(path.name + GZIP_SUFFIX)
+    packed.parent.mkdir(parents=True, exist_ok=True)
+    packed.write_bytes(_deterministic_gzip(data))
+    return packed
+
+
+def read_json(path: Path) -> Any:
+    """Parse a JSON file, decompressing it first when the name ends in ".gz".
+
+    ValueError for a corrupt or truncated gzip file, invalid UTF-8 or invalid JSON."""
+    path = Path(path)
+    raw = path.read_bytes()
+    try:
+        if path.name.endswith(GZIP_SUFFIX):
+            raw = gzip.decompress(raw)
+        return json.loads(raw.decode("utf-8"))
+    except (gzip.BadGzipFile, zlib.error, EOFError) as e:
+        raise ValueError(f"{path.name} is not a readable gzip file ({type(e).__name__})") from e
+    except UnicodeDecodeError as e:
+        raise ValueError(f"{path.name} is not valid UTF-8 text") from e
+    except json.JSONDecodeError as e:
+        raise ValueError(f"{path.name} is not valid JSON: {e.msg} (line {e.lineno})") from e
 
 
 def input_forbidden(inputs: Sequence[Path], extra: Sequence[str] = ()) -> tuple[str, ...]:

@@ -32,7 +32,7 @@ from pathlib import Path
 from typing import Any
 
 from .outputs import (
-    PrivateDataError, check_out_dir, input_forbidden, write_json, write_staged, write_text)
+    PrivateDataError, check_out_dir, input_forbidden, read_json, write_json, write_staged, write_text)
 from .part_boards import board_table
 from .part_rows import (
     DEFAULT_ALLAN_SLOPE_TOLERANCE, DEFAULT_MIN_VEHICLES, DEFAULT_SIM_RATE_HZ, PartTables,
@@ -110,11 +110,9 @@ def part_tables_document(tables: PartTables, rules: RowRules, run_date: str) -> 
 
 def _read_json(path: Path, what: str) -> Any:
     try:
-        return json.loads(Path(path).read_text(encoding="utf-8"))
-    except json.JSONDecodeError as e:
-        raise ValueError(f"{what} is not valid JSON: {e.msg} (line {e.lineno})") from e
-    except UnicodeDecodeError as e:
-        raise ValueError(f"{what} is not valid UTF-8 text") from e
+        return read_json(path)
+    except ValueError as e:
+        raise ValueError(f"{what}: {e}") from e
 
 
 def write_part_tables(noise_path: Path, out_dir: Path, run_date: str, rules: RowRules,

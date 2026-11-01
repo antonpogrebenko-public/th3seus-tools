@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import gzip
 import json
 from pathlib import Path
 
@@ -12,8 +13,11 @@ from log_validation import outputs
 from log_validation.outputs import (
     PrivateDataError,
     forbidden_strings,
+    json_text,
     merge_per_log,
+    read_json,
     write_json,
+    write_json_or_gz,
     write_text,
 )
 
@@ -239,3 +243,58 @@ def test_write_staged_refuses_a_non_empty_folder(tmp_path):
     with pytest.raises(ValueError):
         outputs.write_staged(out, lambda stage: write_text(stage / "a.txt", "x", []))
     assert [p.name for p in out.iterdir()] == ["old.txt"]
+
+
+BIG = [{"a": i} for i in range(100)]
+
+
+def test_large_json_is_written_as_deterministic_gzip(tmp_path):
+    p = write_json_or_gz(tmp_path / "r.json", BIG, (), over_bytes=100)
+    data = p.read_bytes()
+    assert p.name == "r.json.gz" and not (tmp_path / "r.json").exists()
+    assert data[4:8] == b"\x00\x00\x00\x00"
+    assert gzip.decompress(data).decode() == json_text(BIG)
+    again = write_json_or_gz(tmp_path / "s.json", BIG, (), over_bytes=100)
+    assert again.read_bytes() == data
+
+
+def test_gzip_header_has_no_platform_byte(tmp_path):
+    data = write_json_or_gz(tmp_path / "r.json", BIG, (), over_bytes=100).read_bytes()
+    assert data[9] == 255 and data[4:8] == b"\x00\x00\x00\x00"
+
+
+def test_small_json_stays_plain(tmp_path):
+    p = write_json_or_gz(tmp_path / "r.json", BIG, ())
+    assert p.name == "r.json" and p.read_text(encoding="utf-8") == json_text(BIG)
+
+
+def test_size_at_the_limit_stays_plain(tmp_path):
+    size = len(json_text(BIG).encode("utf-8"))
+    assert write_json_or_gz(tmp_path / "a.json", BIG, (), over_bytes=size).name == "a.json"
+    assert write_json_or_gz(tmp_path / "b.json", BIG, (), over_bytes=size - 1).name == "b.json.gz"
+
+
+def test_gzip_refuses_private_data_before_writing(tmp_path):
+    with pytest.raises(PrivateDataError):
+        write_json_or_gz(tmp_path / "r.json", [{"p": "/secret/x"}] * 50, ["/secret"],
+                         over_bytes=10)
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_read_json_reads_both(tmp_path):
+    plain = write_json_or_gz(tmp_path / "a.json", BIG, ())
+    packed = write_json_or_gz(tmp_path / "b.json", BIG, (), over_bytes=10)
+    assert read_json(plain) == read_json(packed) == BIG
+
+
+@pytest.mark.parametrize("make", [
+    lambda: gzip.compress(b'[{"a": 1}]' * 50)[:-20],
+    lambda: b"this is not gzip",
+    lambda: gzip.compress(b"\xff\xfe not utf8"),
+    lambda: gzip.compress(b"{not json"),
+])
+def test_read_json_maps_corrupt_gzip_to_value_error(tmp_path, make):
+    path = tmp_path / "x.json.gz"
+    path.write_bytes(make())
+    with pytest.raises(ValueError):
+        read_json(path)

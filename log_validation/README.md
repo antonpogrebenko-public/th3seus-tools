@@ -10,7 +10,10 @@ the model defaults so you can tell whether the simulated noise is realistic.
 The calibration run (below) adds passes for the battery (internal resistance and
 open-circuit curve), the vehicle response (control effectiveness, lag, hover command,
 motor lag, in-flight gyro noise) and a comparison of TH3SEUS's predictions with real
-logs of reference kits, and writes the ranges TH3SEUS randomizes over.
+logs of reference kits, and writes the ranges TH3SEUS randomizes over. It also builds
+per-part tables (IMU chip, barometer chip, magnetometer chip, GPS receiver) and a board
+table from the noise results, and writes the proposed values as Rust text for the
+`hitl-physics` and `hitl-daemon` repositories.
 
 ## What it validates
 
@@ -28,6 +31,36 @@ logs of reference kits, and writes the ranges TH3SEUS randomizes over.
 
 Model defaults are mirrored from the Rust crate in `reference.py` (kept in sync
 with `hitl-sensors/src/*.rs`).
+
+### Per-part values in the noise pass
+
+Existing per-log keys keep their meaning (the profile-seeding script reads them). The
+noise pass adds, for the tables below:
+
+- `parts.imu`, `parts.baro`, `parts.mag`, `parts.gps`: which part produced the samples
+  each value was measured on, each with `name`, `devtype`, `device_id` and `source`
+  (the board stays in `hardware.fc_board`). An unknown device type keeps its number and
+  a name that marks it unknown.
+- `baro.chip_noise_sigma`, `baro.chip_rate_hz`, `baro.chip_allan_slope`,
+  `baro.chip_resolution_m`: the raw barometer's own noise, rate, Allan slope and
+  resolution. `baro.noise_sigma` still measures the fused altitude.
+- `mag.rate_hz`, `mag.allan_slope`, `mag.resolution_gauss`, next to
+  `mag.noise_sigma_gauss`.
+- `gps.fix_type_mode` (the most common fix type among samples with a 3D fix or better,
+  extrapolated samples not counted) and, as medians over the samples with that fix
+  type, `gps.eph_median_m`, `gps.epv_median_m`, `gps.speed_accuracy_median_m_s`: the
+  receiver's own accuracy estimates. A log with no 3D-fix sample gets none of them.
+- `gps.rest_spread_horizontal_m`, `gps.rest_spread_altitude_m`, `gps.rest_window_s`: the
+  total spread of the GPS position over the at-rest window, a cross-check of the
+  receiver's estimates. They are recorded only when the window is at least
+  `--gps-rest-min-s` seconds (default 60).
+- `param.IMU_GYRO_RATEMAX` and `param.IMU_GYRO_CUTOFF`, when the log has them.
+
+GPS is read from `vehicle_gps_position`, or from `sensor_gps` when the log has no
+`vehicle_gps_position`; `parts.gps.source` names the topic. The GPS accuracy keys
+(`gps.fix_type_mode`, `gps.eph_median_m`, `gps.epv_median_m`,
+`gps.speed_accuracy_median_m_s`) cover the whole log, not the at-rest window, so a log
+without a still window can now appear in `log-ids/noise.txt`.
 
 ### Not yet validated
 
@@ -84,19 +117,31 @@ once. Where each count is reported:
 The passes, each reading the same folder and manifest:
 
 ```bash
-# 1. IMU noise at rest (old and new estimator)
-python -m log_validation.batch_analyze LOGS --manifest manifest.csv -o noise.json
+# 1. IMU noise at rest (old and new estimator), part identities and per-part values
+python -m log_validation.batch_analyze LOGS --manifest manifest.csv -o noise.json \
+    [--gps-rest-min-s 60]
 
 # 2. Battery resistance and open-circuit curve, with two held-out checks
 python -m log_validation.battery_fit --log-dir LOGS --manifest manifest.csv \
-    --out-json battery.json --out-md battery.md
+    --out-json battery.json --out-md battery.md [--capacity-bounds 1000,2500,5000,10000,20000]
 
 # 3. Vehicle response: control effectiveness, lag, hover, motor lag, in-flight noise
 python -m log_validation.response LOGS --manifest manifest.csv -o response.json
 
 # 4. Compare TH3SEUS's predictions with real logs of the reference kits
 python -m log_validation.reference_airframes response.json -o airframes.json
+
+# 5. Per-part tables, board table and Rust text from the merged noise results
+python -m log_validation.part_tables noise.json --out-dir parts --run-date YYYY-MM-DD \
+    [--catalog-spellings spellings.json]
 ```
+
+`battery_fit --capacity-bounds` takes the class bounds in mAh, comma separated (default
+`1000,2500,5000,10000,20000`). Next to the spread per cell count, the fit reports the
+internal resistance per cell for each cell count and pack-capacity class: the capacity
+is `BAT1_CAPACITY`, else `BAT_CAPACITY`, and a log with an unset or non-positive
+capacity falls in the "unknown capacity" class. A class with fewer than 5 vehicles is
+left out. The emitted Rust constants stay per cell count.
 
 `batch_analyze`, `response` and `battery_fit` take `--jobs N` to run the logs in N
 worker processes (default 1); the output is the same for any N, and a log whose
@@ -110,6 +155,7 @@ Exit statuses, per command (a usage error is 2 for all of them):
 | `battery_fit` | done; target met | target missed, both files written | error |
 | `response` | done | | error |
 | `reference_airframes` | done | | error |
+| `part_tables` | done | | error, private data refused |
 | `outputs merge` | done | | error |
 | `calibration_report` | done | | error, private data refused |
 
@@ -119,7 +165,8 @@ target, even though it has written `battery.json` and `battery.md`; a script tha
 stops on any non-zero status must accept 1 there and go on.
 
 Write a `run-info.json` with `date`, `tool_commit`, `parameters` (caps, gates,
-cut-offs, seeds, N) and `commands`, and optionally `inputs`, the input counts, for
+cut-offs, seeds, N; also `--gps-rest-min-s`, `--capacity-bounds` and the `part_tables`
+options, whether or not they are the defaults, for provenance) and `commands`, and optionally `inputs`, the input counts, for
 example `{"manifest_rows": N, "rows_without_log": N, "logs_without_row": N,
 "capped_out": N, "download_failed": N}`. The report's Counts section shows `inputs`
 as a table, or says that the input counts were not provided. Then build the
@@ -128,8 +175,69 @@ directory:
 ```bash
 python -m log_validation.calibration_report --noise noise.json --battery battery.json \
     --response response.json --airframes airframes.json --run-info run-info.json \
-    --out-dir calibration --forbid SOME_PRIVATE_STRING
+    --parts parts --out-dir calibration --forbid SOME_PRIVATE_STRING
 ```
+
+`--parts` is optional: the `part_tables` output folder. Without it the directory has no
+part tables and no `log-ids/parts.txt`.
+
+### Part tables
+
+`part_tables` reads the merged noise results (a JSON list, or the same list gzipped
+when the name ends in `.gz`), not raw logs. Options and defaults:
+
+| Option | Default | Meaning |
+|---|---|---|
+| `--out-dir DIR` | required | must be new or empty |
+| `--run-date YYYY-MM-DD` | required | written into the tables and the Rust comments |
+| `--min-vehicles` | 10 | a value is proposed only when at least this many vehicles contribute |
+| `--allan-slope-tolerance` | 0.15 | allowed distance of the Allan slope from -0.5 |
+| `--sim-rate-baro`, `--sim-rate-mag` | 50, 50 | the simulator's output rate (Hz) for each sensor |
+| `--catalog-spellings FILE` | none | extra spellings for new variants (below) |
+
+It writes, into `--out-dir`: `part-tables.json`, `board-table.json`, and
+`rust/imu_chip.rs`, `rust/baro_chip.rs`, `rust/mag_chip.rs`, `rust/gps_chipset.rs`,
+`rust/daemon_aliases.rs`. Each Rust file holds the complete enum and profile function
+of one part type, in the structure of `hitl-physics` 0.13.1 `src/build.rs`;
+`daemon_aliases.rs` holds, per parser, the match arms for `hitl-daemon` 0.27.0
+(`parse_imu_chip`, `parse_baro_chip`, `parse_mag_chip`, `parse_gps_chipset`). The GPS
+block is `if` lines to paste before the substring rules of `parse_gps_chipset`. A value
+with a proposed number carries a comment with the old value, its source, the run date
+and the vehicle count. The same inputs give byte-identical files, and all of them are
+ASCII.
+
+The rules:
+
+- Each row gives logs, vehicles, and the median, p25 and p75 over vehicle medians (a
+  vehicle's median is over its own logs; a log without a vehicle ID is its own vehicle).
+  A row gets a proposed value only with at least `--min-vehicles` vehicles, and says so
+  when it does not.
+- Parts map to TH3SEUS entries through a pinned mirror of the two repositories' tables
+  and parsers (`th3seus_parts.py`). A part with no entry gets its own row as a candidate
+  new variant, whose current value is the `Other` entry's.
+- Barometer and magnetometer: a log counts toward a row only when its Allan slope is
+  within `--allan-slope-tolerance` of -0.5 and its per-sample value is at least its
+  resolution (the white-noise check). The row says how many logs failed each condition.
+- Barometer and magnetometer values are converted with `value * sqrt(sim rate / log rate)`,
+  using each log's own rate; the row shows the median logged rate and factor, and
+  flags a median factor above 3 or below 1/3.
+- The `Other` entry pools, per vehicle, every non-excluded part of the type that passes
+  the rules above. Generic names (such as `UAVCAN`, `UBX`, `NMEA`) and unidentified
+  parts count only toward `Other`; simulated parts count nowhere.
+- GPS rows use the receiver's own accuracy estimates and update rate. A log counts toward
+  a GPS variant only when its `gps.fix_type_mode` is the fix class TH3SEUS models for
+  it: RTK fixed for `UbloxF9P` and `SeptentrioMosaic`, standalone 3D for every other
+  variant. It counts toward `Other` only with a 3D fix.
+- `board-table.json` is `{"boards": {BOARD: {"logs", "vehicles", "imu", "baro", "mag",
+  "imu_gyro_ratemax_median", "imu_gyro_cutoff_median"}}}`; the `imu`, `baro` and `mag`
+  maps give each chip's share of the board's vehicles (each vehicle's most common chip).
+
+The catalog spellings file is `{"imu": {"<spelling>": "<PX4 log name>"}, "baro": {...},
+"mag": {...}, "gps": {...}}`; the spellings are emitted, normalized, next to the log names
+of the new variants. The pass exits with 2 and writes nothing for a bad option, an
+unreadable, corrupt or malformed input, or private data in an output. It guards against
+the home directory, user and host name and the input folders; there is no `--forbid`
+option, so run `calibration_report --forbid` over the result for other private strings.
 
 A large corpus can run in chunks, for example one folder per batch of logs. For the
 noise and response passes, run each chunk to its own JSON file and merge them (a log
@@ -169,7 +277,21 @@ The calibration directory holds:
 - `log-ids/noise.txt`, `log-ids/battery.txt`, `log-ids/response.txt`: the Flight
   Review log IDs behind each pass's numbers, one per line, sorted.
 - `noise-results.json`, `battery-fit.json`, `response-results.json`, `airframes.json`,
-  `run-info.json`: the inputs, normalized.
+  `run-info.json`: the inputs, normalized. A per-log result file whose JSON text is
+  larger than 10 MiB (`noise-results.json`, `response-results.json`) is written as
+  `noise-results.json.gz` / `response-results.json.gz` instead: deterministic gzip
+  (compression level 9, modification time 0, no file name), so the same inputs give
+  the same bytes. Decompress before the profile-seeding script reads them
+  (`gunzip -k noise-results.json.gz`). `part_tables` reads the `.gz` directly. The
+  report, lists, ranges, profiles and tables always stay plain.
+- With `--parts`: `part-tables.json`, `board-table.json` and `rust/imu_chip.rs`,
+  `rust/baro_chip.rs`, `rust/mag_chip.rs`, `rust/gps_chipset.rs`,
+  `rust/daemon_aliases.rs`, copied from the `part_tables` folder; `log-ids/parts.txt`,
+  the logs behind a proposed part value only (a log whose values were all refused is not
+  in it); and a part-tables section in `report.md` (every row with its current and
+  proposed value, the reason when there is none, the barometer and magnetometer rates
+  and factors, the boards with the most vehicles).
+- `rust/battery_tables.rs` (always): the same text `battery_fit --emit-rust` prints.
 - `noise-profiles.json`: derived from `noise-results.json` (the `aggregate` profiles
   per MCU family, board and IMU chip, and over all logs); these are the values
   TH3SEUS is seeded from.
@@ -206,7 +328,8 @@ the parameters and commands.
 python -m pytest log_validation/tests -q
 ```
 
-Tests cover the noise estimators, the battery fit, the response fits, the
+Tests cover the noise estimators, the part identification and per-part values, the part
+tables and their Rust text, the battery fit, the response fits, the
 reference-airframe comparison and the calibration report on synthetic logs and
 signals with known parameters (no real logs required).
 
