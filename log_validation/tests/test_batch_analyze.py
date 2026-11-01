@@ -283,7 +283,8 @@ def test_parameters_that_are_not_a_mapping_do_not_stop_the_log():
 
 def test_died_result_unpacks_the_task():
     result = _died_result((Path("d1.ulg"), "v7", load_by_stem, 30.0))
-    assert (result.log_id, result.vehicle_id, result.errors) == ("d1", "v7", ["worker process died"])
+    assert (result.log_id, result.vehicle_id) == ("d1", "v7")
+    assert result.errors == ["worker process died"]
     assert result.measurements == {} and result.parts == empty_parts_json()
 
 

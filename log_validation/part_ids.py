@@ -113,7 +113,8 @@ def _record(decoded: DecodedDevice | None, device_id: int | None, source: str) -
 
 
 def _from_params(params: Mapping[str, Any], names: Sequence[str],
-                 decode: Callable[[int], DecodedDevice | None]) -> tuple[PartRecord, tuple[str, ...]]:
+                 decode: Callable[[int], DecodedDevice | None],
+                 ) -> tuple[PartRecord, tuple[str, ...]]:
     """The first of the calibration parameters that holds a device ID, and a note for each
     malformed one read before it."""
     notes: list[str] = []

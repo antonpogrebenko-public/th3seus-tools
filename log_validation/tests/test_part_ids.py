@@ -20,6 +20,10 @@ BMI088, ICM20602, MPU6000, ICM42688P = 0x66, 0x38, 0x21, 0x26
 MS5611, RM3100, IST8310, UBX_F9P = 0x3D, 0x07, 0x06, 0xAA
 
 
+def _primary_gyro(devtype: int) -> dict:
+    return topic(5, 1, gyro_device_id_primary=device_id(devtype))
+
+
 def test_entry_carries_the_part_records():
     log = InstanceULog({"sensors_status_imu": topic(5, 1, gyro_device_id_primary=device_id(BMI088)),
                         "sensor_baro": topic(5, 1, device_id=device_id(MS5611)),
@@ -31,7 +35,7 @@ def test_entry_carries_the_part_records():
 
 
 def test_primary_gyro_wins_over_the_first_calibration_slot():
-    log = InstanceULog({"sensors_status_imu": topic(5, 1, gyro_device_id_primary=device_id(BMI088))})
+    log = InstanceULog({"sensors_status_imu": _primary_gyro(BMI088)})
     imu = identify_parts(log, {"CAL_GYRO0_ID": device_id(ICM20602)}).imu
     assert (imu.name, imu.source) == ("BMI088", "sensors_status_imu")
 
@@ -74,7 +78,7 @@ def test_malformed_barometer_calibration_id_is_noted():
 
 
 def test_calibration_ids_not_read_give_no_note():
-    log = InstanceULog({"sensors_status_imu": topic(5, 1, gyro_device_id_primary=device_id(BMI088))})
+    log = InstanceULog({"sensors_status_imu": _primary_gyro(BMI088)})
     assert identify_parts(log, {"CAL_GYRO0_ID": float("nan")}).notes == ()
 
 
