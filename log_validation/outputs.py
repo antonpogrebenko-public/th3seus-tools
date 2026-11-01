@@ -174,31 +174,67 @@ def write_staged(out_dir: Path, stage_files: Callable[[Path], None]) -> None:
 
     `stage_files` writes every file with `write_text` / `write_json`, so a refused
     write (PrivateDataError) or any other error leaves `out_dir` as it was.
-    `out_dir` must be new or empty (ValueError otherwise)."""
+    `out_dir` must be new or empty (ValueError otherwise). A new `out_dir` is made by
+    renaming a complete copy; an existing one is filled in place (see `_copy_into`)."""
     out = Path(out_dir)
     check_out_dir(out)
     with tempfile.TemporaryDirectory() as tmp:
         stage = Path(tmp) / "staged"
         stage.mkdir()
         stage_files(stage)
-        _move_into_place(stage, out)
+        if out.exists():
+            _copy_into(stage, out)
+        else:
+            _rename_into_place(stage, out)
 
 
-def _move_into_place(stage: Path, out: Path) -> None:
-    """Copy `stage` into a temporary folder beside `out`, then rename it to `out`.
+def _rename_into_place(stage: Path, out: Path) -> None:
+    """Copy `stage` into a hidden temporary folder beside `out`, then rename it to `out`.
 
     The rename stays on one file system, so a copy that fails half way (a full disk)
-    leaves `out` as it was and removes the partial copy."""
+    leaves no `out` and removes the partial copy. A run killed before the rename leaves
+    the hidden folder (`.<name>.<random>`) behind."""
     out.parent.mkdir(parents=True, exist_ok=True)
     beside = Path(tempfile.mkdtemp(prefix=f".{out.name}.", dir=out.parent))
     try:
         copy = beside / "copy"
         shutil.copytree(stage, copy)
-        if out.exists():
-            out.rmdir()  # empty: check_out_dir
         copy.rename(out)
     finally:
         shutil.rmtree(beside, ignore_errors=True)
+
+
+def _copy_into(stage: Path, out: Path) -> None:
+    """Copy the staged entries into the existing empty folder `out`, which keeps its mode
+    and owner (and stays a symlink when it is one; its parent need not be writable).
+
+    On any error every entry the copy made is removed, so `out` is left empty as it was,
+    and the error is raised again."""
+    made: list[Path] = []
+    try:
+        for entry in sorted(stage.iterdir()):
+            target = out / entry.name
+            made.append(target)
+            if entry.is_dir():
+                shutil.copytree(entry, target)
+            else:
+                shutil.copy2(entry, target)
+    except BaseException:
+        for target in made:
+            _remove_made(target)
+        raise
+
+
+def _remove_made(path: Path) -> None:
+    """Remove a file or folder the copy made; a failure here must not hide the copy's error,
+    which is raised next."""
+    if path.is_dir() and not path.is_symlink():
+        shutil.rmtree(path, ignore_errors=True)
+    elif path.exists() or path.is_symlink():
+        try:
+            path.unlink()
+        except OSError:
+            pass
 
 
 def merge_per_log(paths: Sequence[Path]) -> list[dict]:

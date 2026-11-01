@@ -360,11 +360,16 @@ Every file is checked before it is written: the write is refused (exit status 2,
 nothing is written) when any output contains the home directory, the user or host
 name, the folder of an input file, or a `--forbid` string. Only those are checked, so
 pass `--forbid` for every other private string, such as a cloud account ID or a
-bucket name. `--out-dir` must be new or empty. The Run date line of `report.md` is the
-`date` of `run-info.json`, so the same inputs give the same files. Every JSON output of
-every pass is ASCII: a character outside ASCII in the input text is written as a `\u`
-escape (the check above looks at the text before escaping, so a private string with
-such a character is still found).
+bucket name. `--out-dir` (here and for `part_tables`) must be new or an empty folder
+(a symlink to one works). Every output is first written to a temporary folder. An
+existing empty folder is then filled in place and keeps its permissions; if that copy
+fails, the files it made are removed again. A new folder is created by renaming a
+complete hidden copy (`.<name>.<random>`) made beside it, so its parent must be
+writable; a run killed before the rename can leave that hidden folder behind: delete
+it. The Run date line of `report.md` is the `date` of `run-info.json`, so the same
+inputs give the same files. Every JSON output of every pass is ASCII: a character
+outside ASCII in the input text is written as a `\u` escape (the check above looks at
+the text before escaping, so a private string with such a character is still found).
 
 Deployment note: re-seeding the TH3SEUS profiles from this run lowers the simulated
 IMU noise for every TH3SEUS user, because the old estimator overstated the per-sample

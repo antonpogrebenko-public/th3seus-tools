@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import gzip
 import json
+import os
+import shutil
+import stat
 from pathlib import Path
 
 import numpy as np
@@ -278,6 +281,65 @@ def test_write_staged_fills_an_existing_empty_folder(tmp_path):
     out.mkdir()
     outputs.write_staged(out, lambda stage: write_text(stage / "a.txt", "x\n", []))
     assert (out / "a.txt").read_text() == "x\n" and list(tmp_path.iterdir()) == [out]
+
+
+def _three_files(stage):
+    write_text(stage / "a.txt", "x\n", [])
+    write_text(stage / "b.txt", "y\n", [])
+    write_text(stage / "d" / "c.txt", "z\n", [])
+
+
+def test_write_staged_fills_a_symlink_to_an_empty_folder(tmp_path):
+    target = tmp_path / "target"
+    target.mkdir()
+    link = tmp_path / "out"
+    link.symlink_to(target, target_is_directory=True)
+    outputs.write_staged(link, _three_files)
+    assert link.is_symlink() and (target / "d" / "c.txt").read_text() == "z\n"
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["out", "target"]
+
+
+def test_write_staged_keeps_the_mode_of_an_existing_folder(tmp_path):
+    out = tmp_path / "out"
+    out.mkdir()
+    out.chmod(0o750)
+    outputs.write_staged(out, _three_files)
+    assert stat.S_IMODE(out.stat().st_mode) == 0o750 and (out / "a.txt").read_text() == "x\n"
+
+
+def test_write_staged_fills_an_empty_folder_in_a_read_only_parent(tmp_path):
+    parent = tmp_path / "parent"
+    out = parent / "out"
+    out.mkdir(parents=True)
+    parent.chmod(0o555)
+    try:
+        if os.access(parent, os.W_OK):
+            pytest.skip("chmod cannot make the folder read-only here (running as root?)")
+        outputs.write_staged(out, _three_files)
+        assert (out / "d" / "c.txt").read_text() == "z\n"
+        assert [p.name for p in parent.iterdir()] == ["out"]
+    finally:
+        parent.chmod(0o755)
+
+
+def test_a_copy_into_an_existing_folder_that_fails_half_way_leaves_it_empty(tmp_path,
+                                                                           monkeypatch):
+    out = tmp_path / "out"
+    out.mkdir()
+    real_copy2, calls = shutil.copy2, []
+
+    def copy_then_fail(src, dst, *args, **kwargs):
+        calls.append(src)
+        if len(calls) == 2:
+            Path(dst).write_text("partial")
+            raise OSError("disk full")
+        return real_copy2(src, dst, *args, **kwargs)
+
+    monkeypatch.setattr(outputs.shutil, "copy2", copy_then_fail)
+    with pytest.raises(OSError, match="disk full"):
+        outputs.write_staged(out, _three_files)
+    assert out.is_dir() and list(out.iterdir()) == []
+    assert [p.name for p in tmp_path.iterdir()] == ["out"]
 
 
 def test_write_staged_refuses_a_non_empty_folder(tmp_path):
