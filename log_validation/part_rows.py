@@ -7,6 +7,7 @@ import statistics
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from functools import cached_property
 from typing import Any
 
 from .calibration_ranges import vehicle_percentiles
@@ -91,12 +92,20 @@ def white_noise_failures(slope: float, value: float, resolution: float, toleranc
 
 
 def rate_factor(log_rate_hz: float, sim_rate_hz: float) -> float:
+    """sqrt(sim / log) when the log is at least the simulator rate, else 1.
+
+    The PX4 logger keeps one sample per logging interval instead of averaging, so a series
+    logged below the simulator rate holds samples at the driver's own, unknown rate.
+    """
+    if log_rate_hz < sim_rate_hz:
+        return 1.0
     return math.sqrt(sim_rate_hz / log_rate_hz)
 
 
 @dataclass(frozen=True)
 class _Obs:
-    """One eligible log: its value at the simulator rate and the outcome of the check."""
+    """One eligible log: the outcome of the check and, for a passing log, its value at the
+    simulator rate (a failing log counts nowhere, so it keeps its logged value and no rate)."""
     log_id: str
     vehicle_id: str | None
     value: float
@@ -120,7 +129,7 @@ class _Pool:
     obs: tuple[_Obs, ...] = ()
     names: frozenset[str] = frozenset()
 
-    @property
+    @cached_property
     def samples(self) -> tuple[Sample, ...]:
         """The samples that count toward the row: the logs that pass the check."""
         return tuple(o.sample for o in self.obs if o.passed)
@@ -140,9 +149,11 @@ def _observe(part_type: str, entry: Mapping[str, Any], value: float, rules: RowR
     if any(v is None for v in evidence) or evidence[2] <= 0:
         return None
     slope, res, rate = evidence
-    factor = rate_factor(rate, _sim_rate(part_type, rules))
     failed_slope, failed_res = white_noise_failures(slope, value, res, rules.allan_slope_tolerance)
-    return _Obs(log_id, vehicle_id, value * factor, failed_slope, failed_res, rate, factor)
+    if failed_slope or failed_res:
+        return _Obs(log_id, vehicle_id, value, failed_slope, failed_res)
+    factor = rate_factor(rate, _sim_rate(part_type, rules))
+    return _Obs(log_id, vehicle_id, value * factor, rate_hz=rate, factor=factor)
 
 
 def _log_name(entry: Mapping[str, Any], part_type: str) -> str | None:

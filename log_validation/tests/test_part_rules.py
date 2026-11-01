@@ -83,9 +83,15 @@ def test_value_equal_to_resolution_passes():
     assert white_noise_failures(-0.5, 0.1, 0.1, 0.15) == (False, False)
 
 
-def test_rate_factor_is_the_square_root_of_the_ratio():
+def test_rate_factor_is_the_square_root_of_the_ratio_at_or_above_the_simulator_rate():
     assert rate_factor(100.0, 50.0) == pytest.approx(math.sqrt(0.5))
-    assert rate_factor(50.0, 200.0) == pytest.approx(2.0)
+    assert rate_factor(200.0, 50.0) == pytest.approx(0.5)
+    assert rate_factor(50.0, 50.0) == 1.0
+
+
+@pytest.mark.parametrize("log_rate", [1.0, 25.0, 49.9])
+def test_rate_factor_is_one_below_the_simulator_rate(log_rate):
+    assert rate_factor(log_rate, 50.0) == 1.0
 
 
 def test_100_hz_log_to_a_50_hz_simulator():
@@ -95,18 +101,32 @@ def test_100_hz_log_to_a_50_hz_simulator():
     assert (r.median_rate_hz, r.median_factor) == (100.0, pytest.approx(math.sqrt(0.5)))
 
 
+def test_1_hz_log_to_a_50_hz_simulator():
+    e = noise_entry("a", "v1", {BARO_VALUE: 0.2, **BARO_OK, "baro.chip_rate_hz": 1.0},
+                    baro="BMP388")
+    r = baro_rows([e], RowRules(sim_rate_baro_hz=50.0))["Bmp388"]
+    assert r.median == pytest.approx(0.2) and r.median_factor == 1.0
+    assert r.median_rate_hz == 1.0 and not r.factor_flagged
+
+
 def test_each_log_is_converted_with_its_own_rate_before_aggregation():
-    es = [mag_entry(0, {"mag.rate_hz": 100.0}), mag_entry(1, {"mag.rate_hz": 50.0}),
-          mag_entry(2, {"mag.rate_hz": 25.0})]
-    r = mag_rows(es)["Rm3100"]
-    assert r.median == pytest.approx(0.01)
-    assert r.median_rate_hz == 50.0 and r.median_factor == pytest.approx(1.0)
+    slow = mag_entry(0, {"mag.rate_hz": 1.0}, name="RM3100")
+    fast = mag_entry(1, {"mag.rate_hz": 100.0}, name="IST8310")
+    t = mag_rows([slow, fast])
+    assert (t["Rm3100"].median, t["Rm3100"].median_factor) == (pytest.approx(0.01), 1.0)
+    assert t["Ist8310"].median == pytest.approx(0.01 * math.sqrt(0.5))
+    assert t["Ist8310"].median_factor == pytest.approx(math.sqrt(0.5))
+    other = t["Other"]
+    assert other.median == pytest.approx((0.01 + 0.01 * math.sqrt(0.5)) / 2)
+    assert other.median_factor == pytest.approx((1.0 + math.sqrt(0.5)) / 2)
+    assert other.median_rate_hz == pytest.approx(50.5)
 
 
 def test_barometer_uses_the_barometer_simulator_rate():
-    e = noise_entry("a", "v1", {BARO_VALUE: 0.1, **BARO_OK}, baro="BMP388")
-    r = baro_rows([e], RowRules(sim_rate_baro_hz=200.0, sim_rate_mag_hz=1.0))["Bmp388"]
-    assert r.median == pytest.approx(0.2) and r.median_factor == pytest.approx(2.0)
+    e = noise_entry("a", "v1", {BARO_VALUE: 0.1, **BARO_OK, "baro.chip_rate_hz": 200.0},
+                    baro="BMP388")
+    r = baro_rows([e], RowRules(sim_rate_baro_hz=50.0, sim_rate_mag_hz=200.0))["Bmp388"]
+    assert r.median == pytest.approx(0.05) and r.median_factor == pytest.approx(0.5)
 
 
 def test_missing_proposal_names_the_white_noise_check():
@@ -130,8 +150,28 @@ def test_factor_beyond_3x_is_flagged():
     fast, same = baro(500.0), baro(50.0)
     assert fast.median_factor == pytest.approx(math.sqrt(0.1)) and fast.factor_flagged
     assert not same.factor_flagged
-    assert baro(5.0).factor_flagged  # factor sqrt(10) = 3.16
     assert not baro(150.0).factor_flagged  # factor 0.577
+
+
+def test_slow_log_is_not_flagged():
+    # A 5 Hz log gave factor sqrt(10) = 3.16 under the old rule; below the simulator rate
+    # the factor is 1.
+    e = noise_entry("a", "v1", {BARO_VALUE: 0.1, **BARO_OK, "baro.chip_rate_hz": 5.0},
+                    baro="BMP388")
+    r = baro_rows([e])["Bmp388"]
+    assert (r.median_factor, r.factor_flagged) == (1.0, False)
+
+
+def test_factor_of_exactly_one_third_is_not_flagged():
+    e = noise_entry("a", "v1", {BARO_VALUE: 0.1, **BARO_OK, "baro.chip_rate_hz": 450.0},
+                    baro="BMP388")
+    r = baro_rows([e], RowRules(sim_rate_baro_hz=50.0))["Bmp388"]
+    assert r.median_factor == 1 / FACTOR_FLAG and not r.factor_flagged
+
+
+def test_value_equal_to_resolution_counts_toward_the_row():
+    r = mag_rows([mag_entry(0, {"mag.resolution_gauss": 0.01}, value=0.01)])["Rm3100"]
+    assert (r.checked, r.failed_resolution, r.logs) == (1, 0, 1)
 
 
 def test_tolerance_option():
@@ -179,9 +219,12 @@ def test_checked_is_counted_per_row():
 
 
 def test_median_rate_and_factor_are_over_the_passing_logs():
-    es = [mag_entry(0, {"mag.rate_hz": 100.0}), mag_entry(1, {"mag.rate_hz": 100.0}),
+    # Over all three logs the medians would be 200 Hz and factor 0.5.
+    es = [mag_entry(0, {"mag.rate_hz": 100.0}), mag_entry(1, {"mag.rate_hz": 200.0}),
           mag_entry(2, {"mag.rate_hz": 1000.0, **FAIL_SLOPE})]
-    assert mag_rows(es)["Rm3100"].median_rate_hz == 100.0
+    r = mag_rows(es)["Rm3100"]
+    assert r.median_rate_hz == pytest.approx(150.0)
+    assert r.median_factor == pytest.approx((math.sqrt(0.5) + 0.5) / 2)
 
 
 def test_imu_and_gps_rows_are_not_checked():

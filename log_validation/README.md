@@ -221,9 +221,13 @@ The rules:
 - Barometer and magnetometer: a log counts toward a row only when its Allan slope is
   within `--allan-slope-tolerance` of -0.5 and its per-sample value is at least its
   resolution (the white-noise check). The row says how many logs failed each condition.
-- Barometer and magnetometer values are converted with `value * sqrt(sim rate / log rate)`,
-  using each log's own rate; the row shows the median logged rate and factor, and
-  flags a median factor above 3 or below 1/3.
+- Barometer and magnetometer values are converted with
+  `value * sqrt(sim rate / log rate)`, using each log's own rate, when that rate is at
+  least the simulator rate. A log below the simulator rate keeps its value (factor 1):
+  the PX4 logger keeps one sample per interval instead of averaging, so a slowly logged
+  series (raw barometer and magnetometer topics are often logged at about 1 Hz) holds
+  samples at the driver's own, unknown rate. The row shows the median logged rate and
+  factor, and flags a median factor above 3 or below 1/3.
 - The `Other` entry pools, per vehicle, every non-excluded part of the type that passes
   the rules above. Generic names (such as `UAVCAN`, `UBX`, `NMEA`) and unidentified
   parts count only toward `Other`; simulated parts count nowhere.

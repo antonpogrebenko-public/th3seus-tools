@@ -101,14 +101,15 @@ def test_a_reason_without_a_white_noise_check_has_no_counts():
 
 
 def test_conversion_factor_flag_is_shown():
-    flagged = {**MAG_ROW, "reason": None, "proposed": 1e-3, "median_factor": 4.0,
-               "factor_flagged": True}
+    # 800 Hz logged, 50 Hz simulator: factor sqrt(50 / 800) = 0.25, below 1/3.
+    flagged = {**MAG_ROW, "reason": None, "proposed": 1e-3, "median_rate_hz": 800.0,
+               "median_factor": 0.25, "factor_flagged": True}
     plain = {**MAG_ROW, "variant": "Qmc5883l", "log_names": [], "reason": None,
              "proposed": 1e-3, "factor_flagged": False}
     lines = render([flagged, plain]).splitlines()
     assert "Logged rate (Hz) | Factor | Flag" in "\n".join(lines)
     hit = next(line for line in lines if line.startswith("| Rm3100"))
-    assert "| 100 | 4 | yes (beyond 3x) |" in hit
+    assert "| 800 | 0.25 | yes (beyond 3x) |" in hit
     other = next(line for line in lines if line.startswith("| Qmc5883l |"))
     assert "yes" not in other and other.endswith("| 100 | 0.7071 |  |")
 
