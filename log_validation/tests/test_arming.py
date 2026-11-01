@@ -1,0 +1,66 @@
+"""Tests for the disarmed-sample mask read from the arming topics."""
+
+import numpy as np
+import pytest
+
+from log_validation import arming
+from log_validation.tests.fakes import FakeULog
+
+T = np.array([0.0, 5.0, 10.0, 15.0, 25.0])
+
+
+def _armed(ts_s, values, dtype=float):
+    return {
+        "actuator_armed": {
+            "timestamp": np.asarray(ts_s, float) * 1e6,
+            "armed": np.asarray(values, dtype=dtype),
+        }
+    }
+
+
+def _status(ts_s, states):
+    return {
+        "vehicle_status": {
+            "timestamp": np.asarray(ts_s, float) * 1e6,
+            "arming_state": np.asarray(states, float),
+        }
+    }
+
+
+def test_step_hold_at_or_before():
+    m = arming.disarmed_mask(FakeULog(_armed([0, 10, 20], [0, 1, 0])), T)
+    assert m.tolist() == [True, True, False, False, True]
+
+
+def test_samples_before_the_first_message_are_not_disarmed():
+    m = arming.disarmed_mask(FakeULog(_armed([6], [0])), T)
+    assert m.tolist() == [False, False, True, True, True]
+
+
+@pytest.mark.parametrize("dtype", [bool, np.uint8, float])
+def test_armed_dtypes(dtype):
+    m = arming.disarmed_mask(FakeULog(_armed([0, 10], [0, 1], dtype)), T)
+    assert m.tolist() == [True, True, False, False, False]
+
+
+def test_actuator_armed_wins_over_vehicle_status():
+    m = arming.disarmed_mask(FakeULog({**_armed([0], [0]), **_status([0], [2])}), T)
+    assert m.all()
+
+
+@pytest.mark.parametrize(
+    "state,disarmed",
+    [(0, True), (1, True), (2, False), (3, False), (4, False), (5, False)],
+)
+def test_vehicle_status_states(state, disarmed):
+    m = arming.disarmed_mask(FakeULog(_status([0], [state])), T)
+    assert m.tolist() == [disarmed] * 5
+
+
+def test_actuator_armed_without_its_field_falls_back_to_vehicle_status():
+    log = FakeULog({"actuator_armed": {"timestamp": np.array([0.0])}, **_status([0], [1])})
+    assert arming.disarmed_mask(log, T).all()
+
+
+def test_neither_topic_gives_none():
+    assert arming.disarmed_mask(FakeULog({}), T) is None
