@@ -279,3 +279,11 @@ def test_inputs_are_not_mutated():
     before = repr(es)
     build_part_tables(es)
     assert repr(es) == before
+
+
+def test_reason_names_a_row_without_an_eligible_log():
+    # A finite value without the white-noise evidence is measured, but not eligible.
+    assert REASON_NO_LOGS == "no eligible log"
+    m = {MAG_VALUE: 0.01, "mag.rate_hz": 50.0}
+    r = mag_rows([noise_entry("a", "v1", m, mag="RM3100")])["Rm3100"]
+    assert (r.reason, r.checked, r.logs) == ("no eligible log", 0, 0)

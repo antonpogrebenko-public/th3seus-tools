@@ -180,6 +180,13 @@ def test_bad_run_date_exits_2(tmp_path, date):
     assert nothing_written(tmp_path)
 
 
+@pytest.mark.parametrize("date", ["2026-13-45", "2026-02-30", "2026-00-10"])
+def test_impossible_run_date_exits_2(tmp_path, date, capsys):
+    assert run(tmp_path, entries_of_12_vehicles(), date=date) == 2
+    assert nothing_written(tmp_path)
+    assert capsys.readouterr().err == "Error: --run-date must look like YYYY-MM-DD\n"
+
+
 @pytest.mark.parametrize("catalog", ['{"imu": ["BMI088"]}', '{"wheel": {}}', '{"imu": {"X": 1}}',
                                      "[]", "not json"])
 def test_malformed_catalog_spellings_exit_2(tmp_path, catalog):

@@ -245,9 +245,11 @@ The rules:
 - Each row gives logs, vehicles, and the median, p25 and p75 over vehicle medians (a
   vehicle's median is over its own logs; a log without a vehicle ID is its own vehicle).
   A row gets a proposed value only with at least `--min-vehicles` vehicles. A row
-  without one gives a reason, the first that applies: "no log measured it" (no eligible
-  log), "too few logs pass the white-noise check" (barometer and magnetometer: the
-  eligible logs' vehicles would reach the threshold), then "below the vehicle
+  without one gives a reason, the first that applies: "no eligible log" (no log of the
+  row has a finite value; for the barometer and magnetometer, none has one together
+  with all three white-noise evidence values, the Allan slope, the resolution and a
+  rate above 0), "too few logs pass the white-noise check" (barometer and magnetometer:
+  the eligible logs' vehicles would reach the threshold), then "below the vehicle
   threshold". The report shows it in its "No proposal because" column, with the
   white-noise failure counts on every barometer and magnetometer row whose logs were
   checked.

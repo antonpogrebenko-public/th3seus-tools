@@ -23,6 +23,7 @@ refused, non-empty DIR).
 from __future__ import annotations
 
 import argparse
+import datetime
 import json
 import math
 import re
@@ -165,6 +166,17 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _check_run_date(run_date: str) -> None:
+    """ValueError unless `run_date` is YYYY-MM-DD and a real calendar date."""
+    message = "--run-date must look like YYYY-MM-DD"
+    if not re.fullmatch(RUN_DATE_PATTERN, run_date, re.ASCII):
+        raise ValueError(message)
+    try:
+        datetime.date.fromisoformat(run_date)
+    except ValueError as e:
+        raise ValueError(message) from e
+
+
 def _rules_from(args: argparse.Namespace) -> RowRules:
     """The row rules, or ValueError for an option value out of range."""
     if args.min_vehicles < 1:
@@ -174,8 +186,7 @@ def _rules_from(args: argparse.Namespace) -> RowRules:
                         ("--sim-rate-mag", args.sim_rate_mag)):
         if not (math.isfinite(value) and value > 0):
             raise ValueError(f"{flag} must be a finite number above 0")
-    if not re.fullmatch(RUN_DATE_PATTERN, args.run_date, re.ASCII):
-        raise ValueError("--run-date must look like YYYY-MM-DD")
+    _check_run_date(args.run_date)
     return RowRules(min_vehicles=args.min_vehicles,
                     allan_slope_tolerance=args.allan_slope_tolerance,
                     sim_rate_baro_hz=args.sim_rate_baro, sim_rate_mag_hz=args.sim_rate_mag)

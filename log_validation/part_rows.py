@@ -29,7 +29,9 @@ STATUS_CANDIDATE = "candidate"
 STATUS_OTHER = "other"
 REASON_BELOW_THRESHOLD = "below the vehicle threshold"
 REASON_WHITE_NOISE = "too few logs pass the white-noise check"
-REASON_NO_LOGS = "no log measured it"
+# No log is eligible: none has a finite value, or (barometer and magnetometer) none has
+# it with all three white-noise evidence values and a rate above 0.
+REASON_NO_LOGS = "no eligible log"
 
 GPS = "gps"
 FIX_MODE_KEY = "gps.fix_type_mode"
