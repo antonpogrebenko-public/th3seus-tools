@@ -12,7 +12,7 @@
   - `battery_split_seed`: 20260623
   - `gps_rest_min_s`: 60.0
   - `jobs`: 8
-  - `local_tool_commit`: "2c5f4197a3341d1f0ce69c4253293a9ecf99d669"
+  - `local_tool_commit`: "e73a2939300fffcbfc181fb9c3a24aca6ca6b2a7"
   - `max_per_vehicle`: 3
   - `noise_and_battery_set`: "every log of the mirror that the catalog step could read and marked as real hardware (a log marked as simulated, or whose simulation flag is unknown, is left out); all vehicle types"
   - `part_tables`: {"allan_slope_tolerance": 0.15, "catalog_spellings": "none", "min_vehicles": 10, "sim_rate_baro_hz": 50.0, "sim_rate_mag_hz": 50.0}
@@ -250,7 +250,7 @@ Internal resistance per cell, from current steps. Deployed is the value the simu
 
 | Cells | Median mohm | p10 | p90 | Deployed mohm | Steps | Vehicles | Deployed from |
 |---|---|---|---|---|---|---|---|
-| 1S | 8.37 | 3.36 | 19.10 | 5.57 | 169 | 3 | pooled median: low-n (fewer than 200 step events) |
+| 1S | 8.37 | 3.36 | 19.10 | 5.57 | 169 | 3 | pooled over vehicles: low-n (fewer than 200 step events) |
 | 2S | 13.44 | 4.32 | 36.73 | 13.44 | 4732 | 299 | own fit |
 | 3S | 8.74 | 2.40 | 30.95 | 8.74 | 13839 | 419 | own fit |
 | 4S | 6.08 | 1.56 | 23.66 | 6.08 | 130805 | 1899 | own fit |
@@ -258,7 +258,7 @@ Internal resistance per cell, from current steps. Deployed is the value the simu
 | 6S | 3.21 | 1.21 | 11.05 | 3.21 | 441198 | 3004 | own fit |
 | 7S | 3.37 | 1.00 | 14.68 | 3.37 | 1355 | 35 | own fit |
 | 8S | 3.26 | 1.20 | 9.84 | 3.26 | 21839 | 99 | own fit |
-| 9S | 9.80 | 4.21 | 36.87 | 5.57 | 7 | 1 | pooled median: low-n (fewer than 200 step events) |
+| 9S | 9.80 | 4.21 | 36.87 | 5.57 | 7 | 1 | pooled over vehicles: low-n (fewer than 200 step events) |
 | 10S | 3.89 | 1.59 | 9.00 | 3.89 | 487 | 10 | own fit |
 | 12S | 2.15 | 0.92 | 4.86 | 2.15 | 195505 | 588 | own fit |
 | 13S | 3.80 | 2.36 | 5.08 | 3.80 | 17009 | 39 | own fit |
@@ -320,7 +320,7 @@ Held-out checks:
 | Step check: median error (V per cell) | 0.02994 |
 | Step check: p75 error (V per cell) | 0.06441 |
 
-Held-out check per cell count: median over the scored held-out logs, with the Deployed mohm. The signed error is predicted minus measured voltage per cell; positive means the model predicts too little sag.
+Held-out check per cell count: median over the scored held-out logs, with the Deployed mohm. The signed error is predicted minus measured voltage per cell; positive means the model predicts less sag than the packs show, or that the open-circuit curve sits above these packs.
 
 | Cells | Scored logs | Deployed mohm | Median error (V per cell) | Median signed error (V per cell) |
 |---|---|---|---|---|
