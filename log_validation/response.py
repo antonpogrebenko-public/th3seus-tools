@@ -541,13 +541,14 @@ def _measure(ulog: Any, log_id: str, params: dict[str, Any], gates: ResponseGate
     except Exception as e:
         print(f"{log_id}: flight segments failed: {type(e).__name__}: {e}", file=sys.stderr)
         segments = None
+        segments_error = type(e).__name__
     measurements: dict[str, float] = {}
     errors: list[str] = []
     groups: list[Measured] = [
         _guarded("battery scaling", log_id, lambda: (_battery_scaling(params), []))]
     if segments is None:
-        groups.append(({}, ["flight segments failed (effectiveness, hover, noise and motor "
-                            "lag not measured)"]))
+        groups.append(({}, [f"flight segments failed: {segments_error} (effectiveness, hover, "
+                            "noise and motor lag not measured)"]))
     else:
         groups.append(_guarded("effectiveness", log_id,
                                lambda: _effectiveness_and_lag(ulog, params, gates, segments)))

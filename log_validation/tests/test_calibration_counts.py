@@ -161,7 +161,8 @@ def test_a_note_that_mentions_a_failure_counts_as_skipped(error):
     "load failed: OSError", "parameters unavailable: KeyError",
     "hardware extraction failed: ValueError", "part identification failed: KeyError",
     "analysis failed: ValueError", "gyro rate parameters unavailable: KeyError",
-    "flight segments failed: IndexError", "battery scaling failed: ValueError",
+    "flight segments failed: IndexError (effectiveness, hover, noise and motor lag "
+    "not measured)", "battery scaling failed: ValueError",
     "motor lag failed: ValueError", "cell count failed: KeyError", "worker process died",
 ])
 def test_every_failure_form_the_passes_write_counts_as_failed(error):

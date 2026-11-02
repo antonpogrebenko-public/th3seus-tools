@@ -409,6 +409,18 @@ def test_hover_and_noise_fail_separately(monkeypatch, name, group, other):
     assert result.errors == [f"{group} failed: RuntimeError"]
 
 
+def test_flight_segments_failure_names_the_exception(monkeypatch):
+    import log_validation.response as response
+
+    def broken(*_args, **_kwargs):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(response, "detect_flight_segments", broken)
+    result = _analyze()
+    assert result.errors == ["flight segments failed: RuntimeError (effectiveness, hover, "
+                             "noise and motor lag not measured)"]
+
+
 def test_battery_scaling_and_params_failures_are_contained(monkeypatch):
     import log_validation.response as response
 
