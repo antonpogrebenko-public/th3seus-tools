@@ -88,11 +88,14 @@ def _log(segments, arming, gps=True, **kwargs):
     combined = {"timestamp": ts_us(n, RATE_HZ),
                 "gyro_integral_dt": np.full(n, INTERVAL_US),
                 "accelerometer_integral_dt": np.full(n, INTERVAL_US)}
-    for i in range(3):
-        combined[f"gyro_rad[{i}]"] = _noise(rng, segments)
-        combined[f"accelerometer_m_s2[{i}]"] = (9.81 if i == 2 else 0.0) + _noise(
-            rng, segments, scale=10.0)
-    datasets = {"sensor_combined": combined, **_baro_mag(rng, n / RATE_HZ), **arming}
+    legacy_gyro = {"timestamp": combined["timestamp"]}
+    legacy_accel = {"timestamp": combined["timestamp"]}
+    for i, axis in enumerate("xyz"):
+        combined[f"gyro_rad[{i}]"] = legacy_gyro[axis] = _noise(rng, segments)
+        combined[f"accelerometer_m_s2[{i}]"] = legacy_accel[axis] = (
+            9.81 if i == 2 else 0.0) + _noise(rng, segments, scale=10.0)
+    datasets = {"sensor_combined": combined, "sensor_gyro": legacy_gyro,
+                "sensor_accel": legacy_accel, **_baro_mag(rng, n / RATE_HZ), **arming}
     if gps:
         datasets["vehicle_gps_position"] = _gps(rng, int(n / RATE_HZ * GPS_RATE_HZ))
     return FakeULog(datasets, **kwargs)
@@ -120,6 +123,7 @@ def test_hover_longer_than_the_rest_before_arming():
     rows = report.analyze(_log([(90, 1e-4), (300, 1.5e-3)], _armed([0, 90], [0, 1])))
     assert abs(_value(rows, "gyro.gyro_noise_density") - 1e-4) / 1e-4 < 0.10
     assert abs(_value(rows, "gps.rest_window_s") - 90.0) <= 1.0
+    assert all(_value(rows, key) is not None for key in AT_REST_KEYS)
 
 
 def test_rest_right_after_landing():
@@ -138,13 +142,15 @@ def test_logged_from_arming_on():
 
 
 def test_arming_state_from_vehicle_status():
-    rows = report.analyze(_log([(30, 1e-4), (30, 5e-4)], _status([0, 30], [1, 2])))
+    rows = report.analyze(_log([(30, 1e-4), (30, 5e-4)], _status([0, 30], [1, 2])),
+                          gps_rest_min_s=10.0)
+    assert _value(rows, "gps.rest_window_s") <= 30.0
     assert abs(_value(rows, "gyro.gyro_noise_density") - 1e-4) / 1e-4 < 0.10
 
 
 def test_error_arming_states_count_as_armed():
     rows = report.analyze(_log([(60, 1e-4)], _status([0], [3])))
-    assert _value(rows, "gyro.gyro_noise_density") is None
+    assert all(_value(rows, key) is None for key in AT_REST_KEYS)
     assert _note(rows, "imu.stationary_window") == "no disarmed quiet >=3s run"
 
 
@@ -152,7 +158,8 @@ def test_no_arming_information():
     rows = report.analyze(_log([(60, 1e-4)], {}))
     note = _note(rows, "imu.stationary_window")
     assert "actuator_armed" in note and "vehicle_status" in note
-    assert _value(rows, "gyro.gyro_noise_density") is None
+    assert all(_value(rows, key) is None for key in AT_REST_KEYS)
+    assert _value(rows, "gps.eph_median_m") == pytest.approx(GPS_EPH_M)
 
 
 def test_gyro_only_log_uses_disarmed_samples():
@@ -166,13 +173,29 @@ def test_gyro_only_log_uses_disarmed_samples():
     assert abs(_value(rows, "gyro.legacy_noise_density") - expected) / expected < 0.10
 
 
-def test_entry_error_through_batch_analyze(tmp_path):
-    log = _log([(120, 1e-4)], _armed([0], [1]),
-               params={"CAL_GYRO0_ID": 0x3C000A, "SYS_AUTOSTART": 4001},
-               info={"ver_hw": "PX4_FMU_V5"})
+def _entry(tmp_path, log):
     log_dir = tmp_path / "logs"
     log_dir.mkdir()
     (log_dir / "a1.ulg").write_bytes(b"")
-    entry = batch_analyze(log_dir, None, loader=lambda p: log)[0]
+    return batch_analyze(log_dir, None, loader=lambda p: log)[0]
+
+
+def test_entry_error_through_batch_analyze(tmp_path):
+    log = _log([(120, 1e-4)], _armed([0], [1]),
+               params={"CAL_GYRO0_ID": 0x3C000A, "SYS_AUTOSTART": 4001,
+                       "IMU_GYRO_RATEMAX": 400},
+               info={"ver_hw": "PX4_FMU_V5"})
+    entry = _entry(tmp_path, log)
     assert "imu.stationary_window: no disarmed quiet >=3s run" in entry.errors
+    assert "gps.fix_type_mode" in entry.measurements
+    assert "gps.eph_median_m" in entry.measurements
+    assert entry.measurements["param.IMU_GYRO_RATEMAX"] == 400.0
+
+
+def test_entry_error_without_arming_topics_through_batch_analyze(tmp_path):
+    log = _log([(120, 1e-4)], {}, params={"CAL_GYRO0_ID": 0x3C000A, "SYS_AUTOSTART": 4001},
+               info={"ver_hw": "PX4_FMU_V5"})
+    entry = _entry(tmp_path, log)
+    note = next(e for e in entry.errors if e.startswith("imu.stationary_window:"))
+    assert "actuator_armed" in note and "vehicle_status" in note
     assert "gps.eph_median_m" in entry.measurements
