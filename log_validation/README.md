@@ -424,5 +424,6 @@ signals with known parameters (no real logs required).
   only; the calibration passes measure the battery and the vehicle response, and
   check TH3SEUS's flight dynamics only against reference kits with a published build.
 - At-rest values need a disarmed quiet run of at least 3 s that starts at least 10 s
-  after any disarm; a log recorded only while armed (PX4's default logging) gets none.
+  after any disarm; a log recorded only while armed (PX4's default, `SDLOG_MODE` 0:
+  from arming to disarm) gets none.
 - Bias rows are order-of-magnitude (Gauss-Markov vs Allan signatures differ).

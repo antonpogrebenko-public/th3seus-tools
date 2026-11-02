@@ -16,7 +16,9 @@ from . import ulog_loader as ul
 
 TOPIC_ARMED = "actuator_armed"
 TOPIC_STATUS = "vehicle_status"
-# vehicle_status.arming_state: 0 = init, 1 = standby; 2 = armed and above.
+# vehicle_status.arming_state: only 0 (init) and 1 (standby) mean disarmed in every
+# firmware version. 2 is armed; 3 and up mean different things across firmware versions
+# (error, shutdown, reboot or restore states), so they count as armed on purpose.
 DISARMED_STATES = frozenset({0, 1})
 DISARM_SETTLE_S = 10.0
 NO_ARMING_NOTE = "no arming state: neither 'actuator_armed' nor 'vehicle_status' in log"
