@@ -1,0 +1,8011 @@
+{
+ "boards": {
+  "3": {
+   "baro": {},
+   "imu": {},
+   "imu_gyro_cutoff_median": null,
+   "imu_gyro_ratemax_median": null,
+   "logs": 7,
+   "mag": {},
+   "vehicles": 5
+  },
+  "3DR_CTRL_N1": {
+   "baro": {
+    "DPS310": 1.0
+   },
+   "imu": {
+    "IIM42653": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 4,
+   "mag": {
+    "AK09940A": 0.5,
+    "UAVCAN": 0.5
+   },
+   "vehicles": 2
+  },
+  "3DR_CTRL_ZERO_H7_OEM_REVG": {
+   "baro": {
+    "DPS310": 1.0
+   },
+   "imu": {
+    "BMI088": 0.16666666666666666,
+    "ICM20602": 0.5,
+    "ICM20948": 0.3333333333333333
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 17,
+   "mag": {
+    "AK09916": 1.0
+   },
+   "vehicles": 6
+  },
+  "ACCTON_GODWIT_GA1": {
+   "baro": {
+    "DPS310": 0.125,
+    "ICP201XX": 0.875
+   },
+   "imu": {
+    "BMI088": 0.375,
+    "ICM42688P": 0.5,
+    "UNKNOWN_0x39": 0.125
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 17,
+   "mag": {
+    "RM3100": 1.0
+   },
+   "vehicles": 8
+  },
+  "ACCTON_GODWIT_HOWL2": {
+   "baro": {
+    "DPS310": 1.0
+   },
+   "imu": {
+    "ICM45686": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 146,
+   "mag": {
+    "IST8310": 0.910958904109589,
+    "RM3100": 0.08904109589041095
+   },
+   "vehicles": 146
+  },
+  "ACFlyK9": {
+   "baro": {},
+   "imu": {},
+   "imu_gyro_cutoff_median": null,
+   "imu_gyro_ratemax_median": null,
+   "logs": 1,
+   "mag": {},
+   "vehicles": 1
+  },
+  "ACME_A2": {
+   "baro": {
+    "BMP581": 0.5,
+    "ICP201XX": 0.5
+   },
+   "imu": {
+    "IIM42652": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 600.0,
+   "logs": 4,
+   "mag": {
+    "IST8310": 0.5
+   },
+   "vehicles": 2
+  },
+  "ACOINFO_FMU_V6U": {
+   "baro": {
+    "ICP201XX": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 34.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 1,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 1
+  },
+  "ACOINFO_FMU_V6U_MINI": {
+   "baro": {
+    "ICP201XX": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 3,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 1
+  },
+  "AC_WLY_IIK6": {
+   "baro": {
+    "SPA06": 1.0
+   },
+   "imu": {
+    "ICM45686": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 3,
+   "mag": {
+    "UAVCAN": 1.0
+   },
+   "vehicles": 1
+  },
+  "AERAXA_A1": {
+   "baro": {
+    "BMP581": 1.0
+   },
+   "imu": {
+    "BMI088": 0.6,
+    "BMI270": 0.4
+   },
+   "imu_gyro_cutoff_median": 25.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 13,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 5
+  },
+  "AERIUM_RADIAN_H7": {
+   "baro": {
+    "DPS310": 1.0
+   },
+   "imu": {
+    "BMI270": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 2,
+   "mag": {
+    "LIS3MDL": 1.0
+   },
+   "vehicles": 1
+  },
+  "AERIUM_RADIAN_H7U": {
+   "baro": {
+    "DPS310": 1.0
+   },
+   "imu": {
+    "BMI270": 1.0
+   },
+   "imu_gyro_cutoff_median": 80.0,
+   "imu_gyro_ratemax_median": 1000.0,
+   "logs": 20,
+   "mag": {
+    "BMM150": 0.45454545454545453,
+    "LIS3MDL": 0.5454545454545454
+   },
+   "vehicles": 11
+  },
+  "AEROFC_V1": {
+   "baro": {},
+   "imu": {
+    "MPU9250": 1.0
+   },
+   "imu_gyro_cutoff_median": 80.0,
+   "imu_gyro_ratemax_median": null,
+   "logs": 1,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 1
+  },
+  "AEROPROBING_FMUV01": {
+   "baro": {
+    "BMP581": 1.0
+   },
+   "imu": {
+    "BMI270": 1.0
+   },
+   "imu_gyro_cutoff_median": 80.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 3,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 2
+  },
+  "AET_H743_CH4": {
+   "baro": {
+    "SPL06": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 25.0,
+   "imu_gyro_ratemax_median": 2000.0,
+   "logs": 3,
+   "mag": {
+    "UAVCAN": 1.0
+   },
+   "vehicles": 1
+  },
+  "AFS_CUBEORANGEPLUS": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ICM45686": 1.0
+   },
+   "imu_gyro_cutoff_median": 30.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 2,
+   "mag": {
+    "AK09916": 1.0
+   },
+   "vehicles": 2
+  },
+  "AGAM_FMU_V6XRT": {
+   "baro": {
+    "BMP390": 1.0
+   },
+   "imu": {
+    "ICM42686P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 3,
+   "mag": {
+    "BMM150": 1.0
+   },
+   "vehicles": 1
+  },
+  "AGAM_MEGH7_CRSF_SF45_UART8_1V17": {
+   "baro": {
+    "BMP390": 1.0
+   },
+   "imu": {
+    "ICM45686": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 2000.0,
+   "logs": 4,
+   "mag": {
+    "QMC5883L": 1.0
+   },
+   "vehicles": 2
+  },
+  "AIO_FMU_V6X_CUSTOM": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ICM42670P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 2,
+   "mag": {
+    "MMC5983MA": 1.0
+   },
+   "vehicles": 1
+  },
+  "AIRMIND_MINDPX_V2": {
+   "baro": {
+    "DPS310": 0.3333333333333333,
+    "MS5611": 0.6666666666666666
+   },
+   "imu": {
+    "LSM6DSV": 0.3333333333333333,
+    "MPU6500": 0.6666666666666666
+   },
+   "imu_gyro_cutoff_median": 90.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 7,
+   "mag": {
+    "QMC5883L": 1.0
+   },
+   "vehicles": 3
+  },
+  "AIRMIND_MINDRACER_GEN3_REDPOLL": {
+   "baro": {
+    "DPS310": 1.0
+   },
+   "imu": {
+    "ICM20602": 1.0
+   },
+   "imu_gyro_cutoff_median": 90.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 1,
+   "mag": {
+    "QMC5883L": 1.0
+   },
+   "vehicles": 1
+  },
+  "ALLTECH_FMU_V6C": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "BMI055": 0.2222222222222222,
+    "BMI088": 0.6666666666666666,
+    "ICM42688P": 0.1111111111111111
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 19,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 9
+  },
+  "ALLTECH_FMU_Z4S": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 13,
+   "mag": {
+    "IST8310": 0.6,
+    "MMC5983MA": 0.4
+   },
+   "vehicles": 5
+  },
+  "AMOVLAB_FLYCORE": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 600.0,
+   "logs": 2,
+   "mag": {
+    "QMC5883L": 0.5
+   },
+   "vehicles": 2
+  },
+  "AMOVLAB_ICF6": {
+   "baro": {
+    "MS5611": 0.9830508474576272
+   },
+   "imu": {
+    "BMI088": 0.22033898305084745,
+    "ICM42688P": 0.7796610169491526
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 135,
+   "mag": {
+    "QMC5883L": 1.0
+   },
+   "vehicles": 59
+  },
+  "AMOVLAB_ICF6_V2": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "BMI088": 0.6666666666666666,
+    "ICM42688P": 0.3333333333333333
+   },
+   "imu_gyro_cutoff_median": 30.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 22,
+   "mag": {
+    "QMC5883L": 0.9166666666666666,
+    "RM3100": 0.08333333333333333
+   },
+   "vehicles": 12
+  },
+  "ANELLO_MARITIME_V2": {
+   "baro": {
+    "BMP390": 1.0
+   },
+   "imu": {
+    "UNKNOWN_0x18": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 1,
+   "mag": {
+    "MMC5983MA": 1.0
+   },
+   "vehicles": 1
+  },
+  "ANGEL_FMU_V6X_ARK": {
+   "baro": {
+    "BMP390": 1.0
+   },
+   "imu": {
+    "IIM42653": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 4,
+   "mag": {
+    "BMM150": 1.0
+   },
+   "vehicles": 2
+  },
+  "APT_SAGE": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ADIS16470": 1.0
+   },
+   "imu_gyro_cutoff_median": 65.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 6,
+   "mag": {},
+   "vehicles": 2
+  },
+  "ARK_FMU_V6X": {
+   "baro": {
+    "BMP390": 0.9162303664921466,
+    "MS5611": 0.005235602094240838
+   },
+   "imu": {
+    "ICM42688P": 0.09424083769633508,
+    "IIM42652": 0.5445026178010471,
+    "IIM42653": 0.3193717277486911,
+    "SCH16T": 0.015706806282722512,
+    "UNKNOWN_0x86": 0.005235602094240838,
+    "UNKNOWN_0xE3": 0.010471204188481676,
+    "UNKNOWN_0xEA": 0.005235602094240838
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 374,
+   "mag": {
+    "BMM150": 0.8272251308900523,
+    "IIS2MDC": 0.10471204188481675,
+    "IST8310": 0.015706806282722512,
+    "LIS3MDL": 0.005235602094240838,
+    "RM3100": 0.02617801047120419,
+    "UAVCAN": 0.010471204188481676,
+    "UNKNOWN_0x0C": 0.005235602094240838
+   },
+   "vehicles": 191
+  },
+  "ARK_FPV": {
+   "baro": {
+    "AUAV": 0.039603960396039604,
+    "BMP390": 0.9504950495049505
+   },
+   "imu": {
+    "ADIS16507": 0.009900990099009901,
+    "IIM42653": 0.9900990099009901
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 195,
+   "mag": {
+    "IIS2MDC": 0.9900990099009901,
+    "UAVCAN": 0.009900990099009901
+   },
+   "vehicles": 101
+  },
+  "ARK_FTG_FMU_V6X": {
+   "baro": {
+    "BMP390": 1.0
+   },
+   "imu": {
+    "ICM42688P": 0.5,
+    "IIM42652": 0.5
+   },
+   "imu_gyro_cutoff_median": 32.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 6,
+   "mag": {
+    "BMM150": 1.0
+   },
+   "vehicles": 2
+  },
+  "ARK_PI6X": {
+   "baro": {
+    "BMP390": 0.8
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 10,
+   "mag": {
+    "IIS2MDC": 1.0
+   },
+   "vehicles": 5
+  },
+  "ASC_ASCLINK": {
+   "baro": {
+    "SPL06": 1.0
+   },
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 2000.0,
+   "logs": 5,
+   "mag": {},
+   "vehicles": 3
+  },
+  "ASTRM_AFC_01": {
+   "baro": {
+    "BMP388": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 80.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 1,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 1
+  },
+  "ASTRM_MAH743_AIO": {
+   "baro": {
+    "SPL06": 1.0
+   },
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 80.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 1,
+   "mag": {
+    "QMC5883L": 1.0
+   },
+   "vehicles": 1
+  },
+  "ASUS_ALPHA": {
+   "baro": {
+    "UNKNOWN_0xC6": 1.0
+   },
+   "imu": {
+    "ICM45686": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 1,
+   "mag": {
+    "IIS2MDC": 1.0
+   },
+   "vehicles": 1
+  },
+  "ASUS_ORION_SR2": {
+   "baro": {
+    "UNKNOWN_0xC6": 1.0
+   },
+   "imu": {
+    "ICM45686": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 1600.0,
+   "logs": 6,
+   "mag": {
+    "IIS2MDC": 1.0
+   },
+   "vehicles": 5
+  },
+  "ATG_SWARM_V1": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ICM42688P": 0.8947368421052632,
+    "MPU6500": 0.10526315789473684
+   },
+   "imu_gyro_cutoff_median": 35.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 46,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 38
+  },
+  "ATLAS_V6X": {
+   "baro": {
+    "UAVCAN": 1.0
+   },
+   "imu": {
+    "UNKNOWN_0xB0": 1.0
+   },
+   "imu_gyro_cutoff_median": 30.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 1,
+   "mag": {
+    "UAVCAN": 1.0
+   },
+   "vehicles": 1
+  },
+  "ATMOS_MARLYN_CUBEORANGE": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ICM20602": 1.0
+   },
+   "imu_gyro_cutoff_median": 30.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 2,
+   "mag": {
+    "AK09916": 1.0
+   },
+   "vehicles": 1
+  },
+  "AUAV_H9": {
+   "baro": {
+    "BMP581": 1.0
+   },
+   "imu": {
+    "ICM45686": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 3,
+   "mag": {
+    "RM3100": 1.0
+   },
+   "vehicles": 1
+  },
+  "AUAV_X21": {
+   "baro": {},
+   "imu": {
+    "MPU6000": 1.0
+   },
+   "imu_gyro_cutoff_median": null,
+   "imu_gyro_ratemax_median": null,
+   "logs": 1,
+   "mag": {
+    "AK8963": 1.0
+   },
+   "vehicles": 1
+  },
+  "AUTERION_FMU_V6S": {
+   "baro": {
+    "BMP390": 1.0
+   },
+   "imu": {
+    "BMI088": 0.9795918367346939,
+    "ICM45686": 0.02040816326530612
+   },
+   "imu_gyro_cutoff_median": 60.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 72,
+   "mag": {
+    "BMM150": 0.2653061224489796,
+    "BMM350": 0.6938775510204082,
+    "IIS2MDC": 0.02040816326530612,
+    "UAVCAN": 0.02040816326530612
+   },
+   "vehicles": 49
+  },
+  "AUTERION_FMU_V6X": {
+   "baro": {
+    "BMP390": 1.0
+   },
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 37.5,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 9,
+   "mag": {
+    "BMM150": 0.75,
+    "UAVCAN": 0.25
+   },
+   "vehicles": 4
+  },
+  "AVIS_A30": {
+   "baro": {
+    "BMP280": 1.0
+   },
+   "imu": {
+    "ICM20602": 1.0
+   },
+   "imu_gyro_cutoff_median": 7.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 3,
+   "mag": {
+    "RM3100": 1.0
+   },
+   "vehicles": 1
+  },
+  "AXON_THOR": {
+   "baro": {
+    "BMP581": 1.0
+   },
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 1000.0,
+   "logs": 1,
+   "mag": {
+    "BMM350": 1.0
+   },
+   "vehicles": 1
+  },
+  "BARS_GR": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ICM45686": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 3,
+   "mag": {
+    "MMC5983MA": 1.0
+   },
+   "vehicles": 2
+  },
+  "BEAGLEBOARD_POCKETBEAGLE2_A53_CPD": {
+   "baro": {
+    "BMP581": 1.0
+   },
+   "imu": {
+    "BMI270": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 250.0,
+   "logs": 3,
+   "mag": {
+    "BMM350": 1.0
+   },
+   "vehicles": 3
+  },
+  "BEAGLEBONE_BLUE": {
+   "baro": {
+    "BMP280": 1.0
+   },
+   "imu": {
+    "MPU9250": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 23,
+   "mag": {
+    "AK8963": 1.0
+   },
+   "vehicles": 23
+  },
+  "BFS_SHADOX_EVT": {
+   "baro": {
+    "DPS310": 1.0
+   },
+   "imu": {
+    "IIM42652": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 1000.0,
+   "logs": 3,
+   "mag": {},
+   "vehicles": 3
+  },
+  "BFS_SHADOX_HVT": {
+   "baro": {
+    "DPS310": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 1000.0,
+   "logs": 10,
+   "mag": {
+    "QMC5883L": 0.25
+   },
+   "vehicles": 4
+  },
+  "BRISKFLYING_OMNI_V1": {
+   "baro": {
+    "DPS310": 1.0
+   },
+   "imu": {
+    "ICM42605": 0.5,
+    "LSM6DSV": 0.5
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 2,
+   "mag": {
+    "QMC5883P": 1.0
+   },
+   "vehicles": 2
+  },
+  "BRISKFLYING_OMNI_V1_1": {
+   "baro": {
+    "DPS310": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 80.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 1,
+   "mag": {
+    "QMC5883P": 1.0
+   },
+   "vehicles": 1
+  },
+  "BUAA_ACEFLIGHT": {
+   "baro": {
+    "LPS22HB": 1.0
+   },
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 2000.0,
+   "logs": 2,
+   "mag": {
+    "BMM150": 1.0
+   },
+   "vehicles": 1
+  },
+  "C0X53544D_7_NANO": {
+   "baro": {
+    "BMP581": 1.0
+   },
+   "imu": {
+    "IIM42652": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 1,
+   "mag": {
+    "IIS2MDC": 1.0
+   },
+   "vehicles": 1
+  },
+  "CASIC_AI_FC": {
+   "baro": {
+    "MS5611": 0.3333333333333333
+   },
+   "imu": {
+    "IAM20680HP": 0.3333333333333333,
+    "UNKNOWN_0xE6": 0.6666666666666666
+   },
+   "imu_gyro_cutoff_median": 19.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 6,
+   "mag": {
+    "IST8308": 1.0
+   },
+   "vehicles": 3
+  },
+  "CETCS-FCS-V4": {
+   "baro": {
+    "UNKNOWN_0x00": 1.0
+   },
+   "imu": {},
+   "imu_gyro_cutoff_median": 6.0,
+   "imu_gyro_ratemax_median": null,
+   "logs": 5,
+   "mag": {},
+   "vehicles": 5
+  },
+  "CFH_CFH_RK3576": {
+   "baro": {
+    "BMP388": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 2,
+   "mag": {
+    "QMC5883L": 1.0
+   },
+   "vehicles": 2
+  },
+  "CFH_CFH_RK3588": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "BMI088": 0.9722222222222222,
+    "ICM42688P": 0.027777777777777776
+   },
+   "imu_gyro_cutoff_median": 35.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 72,
+   "mag": {
+    "IST8310": 0.06944444444444445,
+    "RM3100": 0.9305555555555556
+   },
+   "vehicles": 72
+  },
+  "CFH_CFH_RK3588_NUTTX": {
+   "baro": {
+    "DPS310": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 3,
+   "mag": {
+    "RM3100": 1.0
+   },
+   "vehicles": 1
+  },
+  "CF_FFT_V2": {
+   "baro": {
+    "UNKNOWN_0xB9": 1.0
+   },
+   "imu": {
+    "BMI088": 0.10526315789473684,
+    "ICM42688P": 0.8947368421052632
+   },
+   "imu_gyro_cutoff_median": 30.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 28,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 19
+  },
+  "CHW_FMU_W701": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 500.0,
+   "logs": 3,
+   "mag": {
+    "UNKNOWN_0x0C": 1.0
+   },
+   "vehicles": 1
+  },
+  "CIRC_PILOT4": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "BMI088": 0.5,
+    "ICM42688P": 0.5
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 6,
+   "mag": {
+    "IST8308": 1.0
+   },
+   "vehicles": 2
+  },
+  "CIRC_PILOT4_A3_V2": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 10,
+   "mag": {
+    "IST8308": 0.25,
+    "IST8310": 0.75
+   },
+   "vehicles": 4
+  },
+  "CIRC_PILOT4_C1": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 4,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 2
+  },
+  "CIRC_PILOT4_MINI_H1": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 18,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 8
+  },
+  "CIRC_PILOT4_MINI_H1V2": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 28,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 13
+  },
+  "CODEV_AQUILA_CORGI": {
+   "baro": {
+    "BMP388": 1.0
+   },
+   "imu": {
+    "ICM20689": 1.0
+   },
+   "imu_gyro_cutoff_median": 30.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 4,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 2
+  },
+  "CODEV_AQUILA_H3": {
+   "baro": {
+    "BMP388": 0.75,
+    "ICP201XX": 0.25
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 70.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 9,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 4
+  },
+  "CODEV_AQUILA_V2": {
+   "baro": {
+    "BMP388": 1.0
+   },
+   "imu": {
+    "ICM20689": 1.0
+   },
+   "imu_gyro_cutoff_median": 30.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 67,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 34
+  },
+  "CODEV_AQUILA_V3": {
+   "baro": {
+    "BMP388": 1.0
+   },
+   "imu": {
+    "ICM20689": 1.0
+   },
+   "imu_gyro_cutoff_median": 70.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 119,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 67
+  },
+  "CODEV_DP1000_V2": {
+   "baro": {
+    "BMP388": 1.0
+   },
+   "imu": {
+    "ICM20689": 1.0
+   },
+   "imu_gyro_cutoff_median": 30.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 107,
+   "mag": {
+    "IST8310": 0.9807692307692307
+   },
+   "vehicles": 52
+  },
+  "CONSYS_2536B": {
+   "baro": {},
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 1,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 1
+  },
+  "CONSYS_2536_03A": {
+   "baro": {},
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 5,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 2
+  },
+  "CONSYS_2606A": {
+   "baro": {},
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 3,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 1
+  },
+  "CONTUR_PILOT_V1_0": {
+   "baro": {},
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": null,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 3,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 1
+  },
+  "CORVON_743V1": {
+   "baro": {
+    "DPS310": 1.0
+   },
+   "imu": {
+    "BMI088": 0.7857142857142857,
+    "BMI270": 0.21428571428571427
+   },
+   "imu_gyro_cutoff_median": 80.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 88,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 42
+  },
+  "CORVON_743V2": {
+   "baro": {
+    "BMP581": 1.0
+   },
+   "imu": {
+    "BMI088": 0.375,
+    "ICM42688P": 0.625
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 16,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 8
+  },
+  "CORVON_V5": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "BMI088": 0.3333333333333333,
+    "ICM20602": 0.6666666666666666
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 5,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 3
+  },
+  "CORVUS_FMU_V6X": {
+   "baro": {
+    "BMP388": 1.0
+   },
+   "imu": {
+    "ICM45686": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 13,
+   "mag": {
+    "BMM150": 0.09090909090909091,
+    "IST8310": 0.5454545454545454
+   },
+   "vehicles": 11
+  },
+  "CSV_CONVERTER": {
+   "baro": {},
+   "imu": {},
+   "imu_gyro_cutoff_median": null,
+   "imu_gyro_ratemax_median": null,
+   "logs": 1,
+   "mag": {},
+   "vehicles": 1
+  },
+  "CTUAV_FMU_V6XRT": {
+   "baro": {
+    "BMP390": 1.0
+   },
+   "imu": {
+    "ICM42686P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 3,
+   "mag": {
+    "BMM350": 1.0
+   },
+   "vehicles": 1
+  },
+  "CTUAV_NEXUS_MK2": {
+   "baro": {
+    "BMP390": 1.0
+   },
+   "imu": {
+    "ICM42686P": 1.0
+   },
+   "imu_gyro_cutoff_median": 35.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 9,
+   "mag": {
+    "BMM350": 0.6666666666666666,
+    "IST8310": 0.3333333333333333
+   },
+   "vehicles": 3
+  },
+  "CUAV_7_NANO": {
+   "baro": {
+    "BMP280": 0.0038910505836575876,
+    "BMP581": 0.9922178988326849,
+    "ICP201XX": 0.0038910505836575876
+   },
+   "imu": {
+    "BMI088": 0.17509727626459143,
+    "IIM42652": 0.6964980544747081,
+    "IIM42653": 0.12840466926070038
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 598,
+   "mag": {
+    "IIS2MDC": 0.3229571984435798,
+    "IST8310": 0.6575875486381323,
+    "QMC5883L": 0.0038910505836575876,
+    "UAVCAN": 0.011673151750972763
+   },
+   "vehicles": 257
+  },
+  "CUAV_FMU_V6X": {
+   "baro": {
+    "BMP581": 0.9791666666666666,
+    "ICP201XX": 0.020833333333333332
+   },
+   "imu": {
+    "BMI088": 0.3854166666666667,
+    "ICM45686": 0.34375,
+    "IIM42652": 0.2708333333333333
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 217,
+   "mag": {
+    "RM3100": 1.0
+   },
+   "vehicles": 96
+  },
+  "CUAV_FMU_V6X_NOIO": {
+   "baro": {
+    "BMP581": 1.0
+   },
+   "imu": {
+    "BMI088": 0.5,
+    "ICM45686": 0.5
+   },
+   "imu_gyro_cutoff_median": 30.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 6,
+   "mag": {
+    "RM3100": 1.0
+   },
+   "vehicles": 2
+  },
+  "CUAV_LITE": {
+   "baro": {
+    "BMP388": 0.5
+   },
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 6,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 2
+  },
+  "CUAV_NORA": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "BMI088": 0.022388059701492536,
+    "ICM20649": 0.03731343283582089,
+    "ICM20689": 0.7313432835820896,
+    "ICM42688P": 0.208955223880597
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 321,
+   "mag": {
+    "IST8310": 0.022388059701492536,
+    "RM3100": 0.9776119402985075
+   },
+   "vehicles": 134
+  },
+  "CUAV_X25_EVO": {
+   "baro": {
+    "BMP581": 1.0
+   },
+   "imu": {
+    "IIM42652": 0.4875,
+    "IIM42653": 0.5125
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 188,
+   "mag": {
+    "RM3100": 1.0
+   },
+   "vehicles": 80
+  },
+  "CUAV_X25_MEGA": {
+   "baro": {
+    "BMP581": 1.0
+   },
+   "imu": {
+    "ADIS1650X": 0.3333333333333333,
+    "ADIS16607": 0.3333333333333333,
+    "IIM42653": 0.3333333333333333
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 5,
+   "mag": {
+    "RM3100": 1.0
+   },
+   "vehicles": 3
+  },
+  "CUAV_X25_SUPER": {
+   "baro": {
+    "BMP581": 1.0
+   },
+   "imu": {
+    "IIM42652": 0.5,
+    "SCH16T": 0.5
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 2,
+   "mag": {
+    "RM3100": 1.0
+   },
+   "vehicles": 2
+  },
+  "CUAV_X7PRO": {
+   "baro": {
+    "MS5611": 0.9900497512437811,
+    "MS5837": 0.003316749585406302,
+    "UAVCAN": 0.001658374792703151
+   },
+   "imu": {
+    "ADIS16470": 0.11608623548922056,
+    "BMI088": 0.011608623548922056,
+    "ICM20649": 0.009950248756218905,
+    "ICM20689": 0.5621890547263682,
+    "ICM42670P": 0.001658374792703151,
+    "ICM42688P": 0.2935323383084577,
+    "UNKNOWN_0xE9": 0.001658374792703151
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 1423,
+   "mag": {
+    "IST8310": 0.02155887230514096,
+    "RM3100": 0.9635157545605307,
+    "UAVCAN": 0.011608623548922056
+   },
+   "vehicles": 603
+  },
+  "CUBEPILOT_ARTEMIS": {
+   "baro": {
+    "ICP201XX": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 12,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 5
+  },
+  "CUBEPILOT_CUBEORANGE": {
+   "baro": {
+    "MS5611": 0.9871794871794872
+   },
+   "imu": {
+    "ICM20602": 0.5384615384615384,
+    "ICM20649": 0.12051282051282051,
+    "ICM20948": 0.11282051282051282,
+    "ICM42688P": 0.2128205128205128,
+    "UNKNOWN_0xE3": 0.005128205128205128
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 784,
+   "mag": {
+    "AK09916": 0.5743589743589743,
+    "HMC5883": 0.007692307692307693,
+    "IST8310": 0.17692307692307693,
+    "LIS3MDL": 0.01282051282051282,
+    "MMC5983MA": 0.1358974358974359,
+    "QMC5883L": 0.01282051282051282,
+    "RM3100": 0.015384615384615385,
+    "UAVCAN": 0.05128205128205128
+   },
+   "vehicles": 390
+  },
+  "CUBEPILOT_CUBEORANGEPLUS": {
+   "baro": {
+    "ICP201XX": 0.0032258064516129032,
+    "MS5611": 0.9903225806451613
+   },
+   "imu": {
+    "ICM20649": 0.037096774193548385,
+    "ICM20948": 0.02258064516129032,
+    "ICM42688P": 0.09032258064516129,
+    "ICM45686": 0.8467741935483871,
+    "UNKNOWN_0xE4": 0.0016129032258064516
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 1383,
+   "mag": {
+    "AK09916": 0.832258064516129,
+    "HMC5883": 0.004838709677419355,
+    "IIS2MDC": 0.004838709677419355,
+    "IST8310": 0.12258064516129032,
+    "LIS3MDL": 0.008064516129032258,
+    "MMC5983MA": 0.0032258064516129032,
+    "QMC5883L": 0.008064516129032258,
+    "RM3100": 0.01129032258064516,
+    "UAVCAN": 0.0016129032258064516
+   },
+   "vehicles": 620
+  },
+  "CUBEPILOT_HERMES": {
+   "baro": {
+    "ICP201XX": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 2,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 1
+  },
+  "CUBEPILOT_OSIRISGEN2": {
+   "baro": {
+    "ICP201XX": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 63,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 23
+  },
+  "CUBEPILOT_TRIMORANGEPLUS": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "SCH16T": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 2,
+   "mag": {
+    "UAVCAN": 1.0
+   },
+   "vehicles": 1
+  },
+  "CUBEPILOT_ZHUK_STORM": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 2,
+   "mag": {
+    "QMC5883L": 1.0
+   },
+   "vehicles": 1
+  },
+  "CUSTOM_H743_FC": {
+   "baro": {},
+   "imu": {
+    "ICM42670P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 2,
+   "mag": {},
+   "vehicles": 1
+  },
+  "CYBERX_V10": {
+   "baro": {
+    "BMP581": 1.0
+   },
+   "imu": {
+    "BMI088": 0.5,
+    "ICM20689": 0.5
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 3,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 2
+  },
+  "CZI_CZ100": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ICM20689": 0.8727272727272727,
+    "ICM42688P": 0.12727272727272726
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 106,
+   "mag": {
+    "QMC5883P": 0.03636363636363636,
+    "RM3100": 0.9636363636363636
+   },
+   "vehicles": 55
+  },
+  "CZI_CZ100PRO": {
+   "baro": {
+    "BMP390": 1.0
+   },
+   "imu": {
+    "ICM42686P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 12,
+   "mag": {
+    "BMM350": 1.0
+   },
+   "vehicles": 5
+  },
+  "CZI_CZ40": {
+   "baro": {
+    "BMP581": 1.0
+   },
+   "imu": {
+    "ICM45686": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 9,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 4
+  },
+  "CZI_PILOT4": {
+   "baro": {
+    "BMP581": 0.9375
+   },
+   "imu": {
+    "ICM45686": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 75,
+   "mag": {
+    "IST8310": 0.96875,
+    "UNKNOWN_0xD5": 0.03125
+   },
+   "vehicles": 32
+  },
+  "CZI_TF_20": {
+   "baro": {
+    "BMP388": 0.2,
+    "BMP390": 0.8
+   },
+   "imu": {
+    "ICM45686": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 13,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 5
+  },
+  "CZI_TF_MINI": {
+   "baro": {
+    "BMP390": 1.0
+   },
+   "imu": {
+    "ICM45686": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 17,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 9
+  },
+  "DAMIAO_DM_FC01": {
+   "baro": {
+    "SPA06": 0.875,
+    "SPL06": 0.125
+   },
+   "imu": {
+    "BMI088": 0.8333333333333334,
+    "ICM45686": 0.16666666666666666
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 1400.0,
+   "logs": 61,
+   "mag": {
+    "IST8310": 0.5,
+    "QMC5883L": 0.125,
+    "RM3100": 0.08333333333333333
+   },
+   "vehicles": 24
+  },
+  "DAN_FMU_V6C": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "BMI055": 1.0
+   },
+   "imu_gyro_cutoff_median": 30.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 8,
+   "mag": {
+    "IST8310": 0.6666666666666666,
+    "QMC5883P": 0.3333333333333333
+   },
+   "vehicles": 3
+  },
+  "DARKMATTER_BRAHMA_H7": {
+   "baro": {
+    "DPS310": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 1,
+   "mag": {
+    "UAVCAN": 1.0
+   },
+   "vehicles": 1
+  },
+  "DAYUAN_H743": {
+   "baro": {
+    "DPS310": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 12,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 4
+  },
+  "DEVEBOX_H743": {
+   "baro": {
+    "MS5607": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 3,
+   "mag": {
+    "QMC5883L": 1.0
+   },
+   "vehicles": 1
+  },
+  "DHUAV_RASPILOT4": {
+   "baro": {
+    "DPS310": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 2,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 2
+  },
+  "DRONEBLOCKS_H743_AIO": {
+   "baro": {
+    "DPS310": 1.0
+   },
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 120.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 1,
+   "mag": {},
+   "vehicles": 1
+  },
+  "DRONEER_X6": {
+   "baro": {
+    "ICP201XX": 1.0
+   },
+   "imu": {
+    "ICM45686": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 600.0,
+   "logs": 4,
+   "mag": {
+    "RM3100": 1.0
+   },
+   "vehicles": 2
+  },
+  "DRONESTAR_WOLF_REV1": {
+   "baro": {
+    "DPS310": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 2,
+   "mag": {
+    "LIS3MDL": 1.0
+   },
+   "vehicles": 1
+  },
+  "DRONEYEE_AUTOFLY_NANO": {
+   "baro": {
+    "SPL06": 0.3333333333333333,
+    "UAVCAN": 0.3333333333333333
+   },
+   "imu": {
+    "ADIS1657X": 0.1111111111111111,
+    "ADIS16607": 0.1111111111111111,
+    "BMI088": 0.7777777777777778
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 22,
+   "mag": {
+    "QMC5883L": 0.3333333333333333,
+    "UAVCAN": 0.5555555555555556
+   },
+   "vehicles": 9
+  },
+  "DRONEYEE_AUTOFLY_V3": {
+   "baro": {
+    "UNKNOWN_0x53": 0.7619047619047619
+   },
+   "imu": {
+    "ADIS16607": 0.9523809523809523,
+    "ICM42688P": 0.047619047619047616
+   },
+   "imu_gyro_cutoff_median": 25.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 50,
+   "mag": {
+    "QMC5883P": 0.47619047619047616,
+    "UAVCAN": 0.5238095238095238
+   },
+   "vehicles": 21
+  },
+  "DRONEYEE_ZYFC_H7": {
+   "baro": {
+    "MS5611": 0.9722222222222222,
+    "UAVCAN": 0.027777777777777776
+   },
+   "imu": {
+    "BMI088": 0.9722222222222222,
+    "ICM42688P": 0.027777777777777776
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 209,
+   "mag": {
+    "HMC5883": 0.09259259259259259,
+    "IST8310": 0.8796296296296297,
+    "UAVCAN": 0.027777777777777776
+   },
+   "vehicles": 108
+  },
+  "DRONEYEE_ZYFMU_V5": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 30.0,
+   "imu_gyro_ratemax_median": 0.0,
+   "logs": 2,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 1
+  },
+  "DRONEYEE_ZYRACER": {
+   "baro": {
+    "MS5611": 0.8333333333333334
+   },
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 30.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 26,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 12
+  },
+  "DRONEYEE_ZYRACER_H7": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 0.0,
+   "logs": 1,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 1
+  },
+  "DRONEYEE_ZYRACER_V18": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 33.5,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 14,
+   "mag": {
+    "HMC5883": 0.16666666666666666,
+    "IST8310": 0.8333333333333334
+   },
+   "vehicles": 6
+  },
+  "DRONISOS_A5MICOAIR": {
+   "baro": {
+    "SPL06": 1.0
+   },
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 80.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 19,
+   "mag": {
+    "IST8310": 0.2,
+    "QMC5883L": 0.8
+   },
+   "vehicles": 10
+  },
+  "DRONISOS_DUCK": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "BMI055": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 5,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 3
+  },
+  "DRONUS_FLIGHTCONTROLLER": {
+   "baro": {
+    "ICP201XX": 1.0
+   },
+   "imu": {
+    "ICM45686": 1.0
+   },
+   "imu_gyro_cutoff_median": 60.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 3,
+   "mag": {
+    "BMM350": 1.0
+   },
+   "vehicles": 1
+  },
+  "DROTEK_IOSTAR31": {
+   "baro": {
+    "DPS310": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 90.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 12,
+   "mag": {
+    "RM3100": 1.0
+   },
+   "vehicles": 12
+  },
+  "DROTEK_IO_STAR": {
+   "baro": {
+    "DPS310": 0.95
+   },
+   "imu": {
+    "ICM20689": 0.55,
+    "ICM42688P": 0.45
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 20,
+   "mag": {
+    "RM3100": 1.0
+   },
+   "vehicles": 20
+  },
+  "DROTEK_IO_STAR_TROIS": {
+   "baro": {
+    "DPS310": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 38,
+   "mag": {
+    "RM3100": 1.0
+   },
+   "vehicles": 36
+  },
+  "DROTEK_TERMINATOR": {
+   "baro": {
+    "DPS310": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 250.0,
+   "logs": 1,
+   "mag": {
+    "RM3100": 1.0
+   },
+   "vehicles": 1
+  },
+  "DR_P3P_V3A": {
+   "baro": {
+    "SPL06": 1.0
+   },
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 1,
+   "mag": {},
+   "vehicles": 1
+  },
+  "DR_P3P_V3B": {
+   "baro": {
+    "SPL06": 0.9565217391304348
+   },
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 39,
+   "mag": {
+    "IST8310": 0.043478260869565216
+   },
+   "vehicles": 23
+  },
+  "DR_S1_V1": {
+   "baro": {
+    "SPL06": 1.0
+   },
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 6,
+   "mag": {
+    "IST8310": 0.6666666666666666
+   },
+   "vehicles": 3
+  },
+  "DUNTIAN_DUNSTH743": {
+   "baro": {
+    "BMP581": 1.0
+   },
+   "imu": {
+    "ICM42670P": 0.3333333333333333,
+    "ICM42688P": 0.6666666666666666
+   },
+   "imu_gyro_cutoff_median": 45.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 7,
+   "mag": {
+    "HMC5883": 0.3333333333333333,
+    "IST8310": 0.6666666666666666
+   },
+   "vehicles": 3
+  },
+  "E300_V6X": {
+   "baro": {
+    "BMP581": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 2,
+   "mag": {
+    "RM3100": 1.0
+   },
+   "vehicles": 1
+  },
+  "ECHOMAV_ECHOPILOT_AI": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 18,
+   "mag": {
+    "RM3100": 1.0
+   },
+   "vehicles": 8
+  },
+  "ED_ASBNN": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ICM40609D": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 6,
+   "mag": {
+    "IST8310": 0.6666666666666666,
+    "QMC5883L": 0.3333333333333333
+   },
+   "vehicles": 3
+  },
+  "EFYI_FINIX3000": {
+   "baro": {
+    "TCBP001TA": 1.0
+   },
+   "imu": {
+    "IAM20680HP": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 600.0,
+   "logs": 7,
+   "mag": {
+    "IST8308": 1.0
+   },
+   "vehicles": 4
+  },
+  "EFYTECH_FIREFLY": {
+   "baro": {
+    "UNKNOWN_0x91": 1.0
+   },
+   "imu": {
+    "ICM42670P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 0.0,
+   "logs": 61,
+   "mag": {
+    "IST8308": 1.0
+   },
+   "vehicles": 57
+  },
+  "EFYTECH_SWARM": {
+   "baro": {
+    "UNKNOWN_0x91": 1.0
+   },
+   "imu": {
+    "ICM42670P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 0.0,
+   "logs": 3,
+   "mag": {
+    "IST8308": 1.0
+   },
+   "vehicles": 3
+  },
+  "EFYTECH_X": {
+   "baro": {
+    "UNKNOWN_0x91": 1.0
+   },
+   "imu": {
+    "ICM42670P": 0.8571428571428571,
+    "UNKNOWN_0x4D": 0.14285714285714285
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 0.0,
+   "logs": 8,
+   "mag": {
+    "IST8308": 1.0
+   },
+   "vehicles": 7
+  },
+  "EMBEDFIRE_RK3588": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 1,
+   "mag": {
+    "QMC5883L": 1.0
+   },
+   "vehicles": 1
+  },
+  "EMLID_NAVIO2": {
+   "baro": {
+    "MS5611": 0.25882352941176473,
+    "SPL06": 0.32941176470588235
+   },
+   "imu": {
+    "ICM42688P": 0.3411764705882353,
+    "ICM45686": 0.38823529411764707,
+    "LSM9DS1": 0.25882352941176473
+   },
+   "imu_gyro_cutoff_median": 10.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 85,
+   "mag": {
+    "LSM9DS1_M": 0.25882352941176473,
+    "MMC5983MA": 0.023529411764705882,
+    "QMC5883P": 0.4117647058823529
+   },
+   "vehicles": 85
+  },
+  "ENDLESSFLIGHT_H743ULTRA": {
+   "baro": {
+    "SPA06": 1.0
+   },
+   "imu": {
+    "ICM42688P": 0.5,
+    "IIM42652": 0.5
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 7,
+   "mag": {
+    "QMC5883L": 0.5,
+    "QMC5883P": 0.5
+   },
+   "vehicles": 4
+  },
+  "ENDLESSFLIGHT_H7MINIPRO": {
+   "baro": {
+    "DPS310": 1.0
+   },
+   "imu": {
+    "ICM42688P": 0.8333333333333334,
+    "UNKNOWN_0x02": 0.16666666666666666
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 23,
+   "mag": {
+    "QMC5883L": 1.0
+   },
+   "vehicles": 12
+  },
+  "ESPRESSIF_ESP32S3": {
+   "baro": {},
+   "imu": {
+    "ICM42670P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 200.0,
+   "logs": 3,
+   "mag": {
+    "QMC5883L": 1.0
+   },
+   "vehicles": 1
+  },
+  "EVO_FLIGHT_CONTROL_V1": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "BMI055": 0.5,
+    "BMI088": 0.5
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 29,
+   "mag": {
+    "IST8308": 0.0625,
+    "IST8310": 0.9375
+   },
+   "vehicles": 16
+  },
+  "EVO_FLIGHT_CONTROL_V2": {
+   "baro": {
+    "DPS310": 1.0
+   },
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 7,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 3
+  },
+  "FIHAWK_FC_V1": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ICM20689": 0.375,
+    "ICM42688P": 0.625
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 600.0,
+   "logs": 17,
+   "mag": {
+    "RM3100": 1.0
+   },
+   "vehicles": 8
+  },
+  "FIHAWK_FC_V2": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 4,
+   "mag": {
+    "RM3100": 1.0
+   },
+   "vehicles": 3
+  },
+  "FLIR_R1P3_MAINBOARD": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 30.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 4,
+   "mag": {
+    "MMC5983MA": 1.0
+   },
+   "vehicles": 3
+  },
+  "FLIR_R4P1_MAINBOARD": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 30.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 1,
+   "mag": {
+    "MMC5983MA": 1.0
+   },
+   "vehicles": 1
+  },
+  "FLYBOTIX_AUTOPILOT_V0": {
+   "baro": {
+    "BMP388": 1.0
+   },
+   "imu": {
+    "ICM20602": 1.0
+   },
+   "imu_gyro_cutoff_median": 60.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 1,
+   "mag": {
+    "BMM150": 1.0
+   },
+   "vehicles": 1
+  },
+  "FLYBOTIX_AUTOPILOT_V6C": {
+   "baro": {
+    "BMP390": 1.0
+   },
+   "imu": {
+    "ADIS16470": 1.0
+   },
+   "imu_gyro_cutoff_median": 60.0,
+   "imu_gyro_ratemax_median": 500.0,
+   "logs": 5,
+   "mag": {
+    "LIS3MDL": 1.0
+   },
+   "vehicles": 3
+  },
+  "FLYINGRC_H7DPRO": {
+   "baro": {
+    "SPA06": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 65.0,
+   "imu_gyro_ratemax_median": 2000.0,
+   "logs": 2,
+   "mag": {},
+   "vehicles": 1
+  },
+  "FLYING_HELIOS_MAGNI_V1": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "IIM42652": 1.0
+   },
+   "imu_gyro_cutoff_median": 30.0,
+   "imu_gyro_ratemax_median": 0.0,
+   "logs": 10,
+   "mag": {
+    "LSM303AGR": 1.0
+   },
+   "vehicles": 4
+  },
+  "FOHLON_FUAV_V1_6": {
+   "baro": {
+    "SPL06": 1.0
+   },
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 2000.0,
+   "logs": 1,
+   "mag": {
+    "QMC5883L": 1.0
+   },
+   "vehicles": 1
+  },
+  "FOHLON_FUAV_V1_9": {
+   "baro": {
+    "SPL06": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 2000.0,
+   "logs": 1,
+   "mag": {
+    "QMC5883L": 1.0
+   },
+   "vehicles": 1
+  },
+  "FOHLON_KAKUTEH7V2_TEST2": {
+   "baro": {
+    "SPL06": 1.0
+   },
+   "imu": {
+    "BMI088": 0.7142857142857143,
+    "ICM42688P": 0.2857142857142857
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 2000.0,
+   "logs": 10,
+   "mag": {
+    "QMC5883L": 1.0
+   },
+   "vehicles": 7
+  },
+  "FORCELAB_SCYTHE_10": {
+   "baro": {
+    "DPS310": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 75.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 2,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 2
+  },
+  "FREEFLY_ASTRO_FMU_V5X": {
+   "baro": {
+    "BMP388": 1.0
+   },
+   "imu": {
+    "MPU6000": 1.0
+   },
+   "imu_gyro_cutoff_median": 30.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 2,
+   "mag": {
+    "BMM150": 1.0
+   },
+   "vehicles": 2
+  },
+  "FTS_FC_V7": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 3,
+   "mag": {
+    "RM3100": 1.0
+   },
+   "vehicles": 1
+  },
+  "FW_STM32F427": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": null,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 7,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 5
+  },
+  "GAFC_LITE_H743": {
+   "baro": {
+    "SPL06": 1.0
+   },
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 2000.0,
+   "logs": 3,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 1
+  },
+  "GASKAR_ZHUK": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "BMI270": 0.6666666666666666,
+    "ICM42688P": 0.3333333333333333
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 3,
+   "mag": {
+    "QMC5883L": 1.0
+   },
+   "vehicles": 3
+  },
+  "GBI_H743_V1": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "MPU6500": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 12,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 9
+  },
+  "GDCX_H743VI": {
+   "baro": {
+    "MS5611": 0.6666666666666666,
+    "UAVCAN": 0.3333333333333333
+   },
+   "imu": {
+    "BMI088": 0.37254901960784315,
+    "ICM20602": 0.6274509803921569
+   },
+   "imu_gyro_cutoff_median": 20.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 108,
+   "mag": {
+    "IST8310": 0.8431372549019608,
+    "UAVCAN": 0.1568627450980392
+   },
+   "vehicles": 51
+  },
+  "GEARUP_AIRBRAINH743": {
+   "baro": {
+    "DPS310": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 2000.0,
+   "logs": 5,
+   "mag": {
+    "IIS2MDC": 1.0
+   },
+   "vehicles": 3
+  },
+  "GEPP_GEPRCH7": {
+   "baro": {
+    "DPS310": 1.0
+   },
+   "imu": {
+    "ICM42688P": 0.5,
+    "MPU6000": 0.25,
+    "MPU6050": 0.25
+   },
+   "imu_gyro_cutoff_median": 80.0,
+   "imu_gyro_ratemax_median": 1400.0,
+   "logs": 8,
+   "mag": {
+    "QMC5883L": 1.0
+   },
+   "vehicles": 4
+  },
+  "GKXD_DRAGONFLY_V1": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 600.0,
+   "logs": 2,
+   "mag": {
+    "RM3100": 1.0
+   },
+   "vehicles": 1
+  },
+  "GOOSETECH_FMU_V6XRT": {
+   "baro": {
+    "BMP388": 1.0
+   },
+   "imu": {
+    "BMI088": 0.2,
+    "ICM42686P": 0.8
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 14,
+   "mag": {
+    "BMM150": 1.0
+   },
+   "vehicles": 5
+  },
+  "GTEEXR_DRAGON_B_V21": {
+   "baro": {
+    "BMP280": 1.0
+   },
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 3,
+   "mag": {
+    "UNKNOWN_0xC1": 1.0
+   },
+   "vehicles": 1
+  },
+  "GTEEXR_DRAGON_B_V21_INT_FLASH": {
+   "baro": {
+    "BMP280": 1.0
+   },
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 1000.0,
+   "logs": 3,
+   "mag": {
+    "BMM350": 1.0
+   },
+   "vehicles": 1
+  },
+  "GTEEXR_DRAGON_B_V31": {
+   "baro": {
+    "BMP280": 1.0
+   },
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 24.0,
+   "imu_gyro_ratemax_median": 1000.0,
+   "logs": 3,
+   "mag": {
+    "BMM350": 1.0
+   },
+   "vehicles": 1
+  },
+  "GTEEXR_DRAGON_B_V5": {
+   "baro": {
+    "BMP280": 1.0
+   },
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 35.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 3,
+   "mag": {
+    "BMM350": 1.0
+   },
+   "vehicles": 1
+  },
+  "GWG_HD3170E": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ICM20602": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 100.0,
+   "logs": 3,
+   "mag": {
+    "HMC5883": 1.0
+   },
+   "vehicles": 1
+  },
+  "GZ_H743_V1C": {
+   "baro": {
+    "SPL06": 1.0
+   },
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 5,
+   "mag": {
+    "IST8310": 0.5,
+    "QMC5883L": 0.5
+   },
+   "vehicles": 2
+  },
+  "HANASKY_PX4_MINI_V1": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 30.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 2,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 1
+  },
+  "HANA_ALL_IN_ONE": {
+   "baro": {},
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 15.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 2,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 1
+  },
+  "HANHE_H10000": {
+   "baro": {
+    "BMP388": 1.0
+   },
+   "imu": {
+    "ICM20602": 1.0
+   },
+   "imu_gyro_cutoff_median": 27.5,
+   "imu_gyro_ratemax_median": 0.0,
+   "logs": 2,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 2
+  },
+  "HARMATTAN_HARMAFC": {
+   "baro": {
+    "LPS22HB": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 80.0,
+   "imu_gyro_ratemax_median": 1000.0,
+   "logs": 12,
+   "mag": {
+    "IIS2MDC": 0.2857142857142857,
+    "IST8310": 0.5714285714285714,
+    "UNKNOWN_0x0C": 0.14285714285714285
+   },
+   "vehicles": 7
+  },
+  "HCUAV_PROTOTYPE_V1": {
+   "baro": {
+    "ICP201XX": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 4,
+   "mag": {
+    "RM3100": 1.0
+   },
+   "vehicles": 2
+  },
+  "HCUAV_PROTOTYPE_V2": {
+   "baro": {
+    "ICP201XX": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 1,
+   "mag": {
+    "RM3100": 1.0
+   },
+   "vehicles": 1
+  },
+  "HEAVISIDE_NARWHAL": {
+   "baro": {
+    "MS5837": 1.0
+   },
+   "imu": {
+    "ICM45686": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 1,
+   "mag": {
+    "AK09916": 1.0
+   },
+   "vehicles": 1
+  },
+  "HEX_MBV2": {
+   "baro": {
+    "BMP581": 1.0
+   },
+   "imu": {
+    "UNKNOWN_0xED": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 3,
+   "mag": {
+    "IIS2MDC": 1.0
+   },
+   "vehicles": 1
+  },
+  "HFY_F6X": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 600.0,
+   "logs": 6,
+   "mag": {
+    "BMM150": 1.0
+   },
+   "vehicles": 2
+  },
+  "HG_F12_V3": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "BMI055": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 1,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 1
+  },
+  "HKUST_NXT": {
+   "baro": {
+    "BMP388": 0.7333333333333333
+   },
+   "imu": {
+    "BMI088": 0.3333333333333333,
+    "ICM20602": 0.4,
+    "ICM42688P": 0.26666666666666666
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 1000.0,
+   "logs": 24,
+   "mag": {
+    "QMC5883L": 0.06666666666666667
+   },
+   "vehicles": 15
+  },
+  "HKUST_NXT_DUAL": {
+   "baro": {
+    "DPS310": 0.007292616226071103,
+    "SPA06": 0.01731996353691887,
+    "SPL06": 0.927073837739289
+   },
+   "imu": {
+    "ADIS16470": 0.0009115770282588879,
+    "BMI088": 0.9954421148587056,
+    "ICM42688P": 0.0018231540565177757,
+    "SCH16T": 0.0009115770282588879
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 2000.0,
+   "logs": 2294,
+   "mag": {
+    "BMM150": 0.004557885141294439,
+    "IST8310": 0.11668185961713765,
+    "QMC5883L": 0.07383773928896992,
+    "RM3100": 0.009115770282588878,
+    "UAVCAN": 0.0027347310847766638,
+    "UNKNOWN_0x00": 0.0009115770282588879
+   },
+   "vehicles": 1097
+  },
+  "HKUST_YJNXTV3_YB": {
+   "baro": {
+    "UNKNOWN_0xE4": 1.0
+   },
+   "imu": {
+    "BMI088": 0.75,
+    "UNKNOWN_0xE2": 0.25
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 4,
+   "mag": {
+    "IIS2MDC": 1.0
+   },
+   "vehicles": 4
+  },
+  "HNBQ_7_NANO": {
+   "baro": {
+    "BMP581": 1.0
+   },
+   "imu": {
+    "BMI088": 0.5,
+    "IIM42652": 0.5
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 1400.0,
+   "logs": 5,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 2
+  },
+  "HNBQ_AT32F4_NX": {
+   "baro": {
+    "SPA06": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 3,
+   "mag": {
+    "QMC5883L": 1.0
+   },
+   "vehicles": 1
+  },
+  "HNBQ_H7": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 80.0,
+   "imu_gyro_ratemax_median": 2000.0,
+   "logs": 4,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 4
+  },
+  "HNBQ_H7_NOFRAM_400M": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ICM20689": 1.0
+   },
+   "imu_gyro_cutoff_median": 80.0,
+   "imu_gyro_ratemax_median": 2000.0,
+   "logs": 13,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 7
+  },
+  "HNBQ_H7_OLD_EEPROM": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ICM20689": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 2000.0,
+   "logs": 20,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 9
+  },
+  "HNBQ_H7_OLD_EEPROM_NOFRAM": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ICM20689": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 2000.0,
+   "logs": 3,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 1
+  },
+  "HNBQ_H7_OLD_EEPROM_NOFRAM_400M": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ICM20649": 0.5,
+    "ICM20689": 0.5
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 1400.0,
+   "logs": 27,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 14
+  },
+  "HNBQ_KAKUTEH7": {
+   "baro": {
+    "SPA06": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 2000.0,
+   "logs": 44,
+   "mag": {
+    "QMC5883L": 0.65,
+    "QMC5883P": 0.35
+   },
+   "vehicles": 20
+  },
+  "HNBQ_KAKUTEH7_FEILEI": {
+   "baro": {
+    "SPA06": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 1200.0,
+   "logs": 5,
+   "mag": {
+    "QMC5883L": 1.0
+   },
+   "vehicles": 2
+  },
+  "HNBQ_KAKUTEH7_NX": {
+   "baro": {
+    "SPA06": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 2000.0,
+   "logs": 3,
+   "mag": {
+    "QMC5883L": 1.0
+   },
+   "vehicles": 1
+  },
+  "HNBQ_MYAPH7": {
+   "baro": {
+    "SPA06": 0.2857142857142857,
+    "SPL06": 0.7142857142857143
+   },
+   "imu": {
+    "BMI270": 0.9523809523809523,
+    "ICM42688P": 0.047619047619047616
+   },
+   "imu_gyro_cutoff_median": 30.0,
+   "imu_gyro_ratemax_median": 2000.0,
+   "logs": 38,
+   "mag": {
+    "QMC5883L": 0.47619047619047616,
+    "QMC5883P": 0.5238095238095238
+   },
+   "vehicles": 21
+  },
+  "HNBQ_MYAPH7_EEPROM": {
+   "baro": {
+    "SPL06": 1.0
+   },
+   "imu": {
+    "BMI270": 1.0
+   },
+   "imu_gyro_cutoff_median": 35.0,
+   "imu_gyro_ratemax_median": 2000.0,
+   "logs": 2,
+   "mag": {
+    "QMC5883P": 1.0
+   },
+   "vehicles": 1
+  },
+  "HNBQ_MYAPH7_FEILEI": {
+   "baro": {
+    "SPL06": 1.0
+   },
+   "imu": {
+    "BMI270": 1.0
+   },
+   "imu_gyro_cutoff_median": 30.0,
+   "imu_gyro_ratemax_median": 2000.0,
+   "logs": 3,
+   "mag": {
+    "QMC5883L": 0.5,
+    "QMC5883P": 0.5
+   },
+   "vehicles": 2
+  },
+  "HNBQ_MYAPH7_NX": {
+   "baro": {
+    "SPL06": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 2000.0,
+   "logs": 4,
+   "mag": {
+    "QMC5883P": 1.0
+   },
+   "vehicles": 2
+  },
+  "HOLYBRO_DURANDAL_V1": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "BMI088": 0.1,
+    "ICM20602": 0.2,
+    "ICM20689": 0.7
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 24,
+   "mag": {
+    "HMC5883": 0.1,
+    "IST8310": 0.9
+   },
+   "vehicles": 10
+  },
+  "HOLYBRO_FMU_V6X": {
+   "baro": {
+    "BMP581": 0.5,
+    "ICP201XX": 0.5
+   },
+   "imu": {
+    "ICM45686": 0.5,
+    "LSM6DSK320X": 0.5
+   },
+   "imu_gyro_cutoff_median": 35.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 3,
+   "mag": {
+    "BMM150": 0.5,
+    "IST8308": 0.5
+   },
+   "vehicles": 2
+  },
+  "HOLYBRO_KAKUTEH7": {
+   "baro": {
+    "BMP280": 0.2702702702702703,
+    "DPS310": 0.006756756756756757,
+    "SPA06": 0.722972972972973
+   },
+   "imu": {
+    "ICM42688P": 0.7027027027027027,
+    "MPU6000": 0.2972972972972973
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 2000.0,
+   "logs": 311,
+   "mag": {
+    "BMM150": 0.006756756756756757,
+    "HMC5883": 0.08108108108108109,
+    "IIS2MDC": 0.0472972972972973,
+    "IST8310": 0.2635135135135135,
+    "QMC5883L": 0.19594594594594594,
+    "QMC5883P": 0.013513513513513514,
+    "RM3100": 0.02702702702702703
+   },
+   "vehicles": 148
+  },
+  "HOLYBRO_KAKUTEH7MINI": {
+   "baro": {
+    "BMP280": 0.3333333333333333,
+    "SPA06": 0.3333333333333333
+   },
+   "imu": {
+    "ICM42688P": 0.6666666666666666
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 6,
+   "mag": {
+    "QMC5883L": 0.6666666666666666
+   },
+   "vehicles": 3
+  },
+  "HOLYBRO_KAKUTEH7V2": {
+   "baro": {
+    "BMP280": 0.5
+   },
+   "imu": {
+    "BMI270": 0.5
+   },
+   "imu_gyro_cutoff_median": 80.0,
+   "imu_gyro_ratemax_median": 2000.0,
+   "logs": 4,
+   "mag": {},
+   "vehicles": 2
+  },
+  "HOLYBRO_KAKUTEH7_WING": {
+   "baro": {
+    "SPA06": 1.0
+   },
+   "imu": {
+    "ICM42688P": 0.6666666666666666,
+    "LSM6DSK320X": 0.3333333333333333
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 12,
+   "mag": {
+    "IST8310": 0.5,
+    "UAVCAN": 0.3333333333333333
+   },
+   "vehicles": 6
+  },
+  "HSRF_IUAV": {
+   "baro": {},
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 48,
+   "mag": {},
+   "vehicles": 21
+  },
+  "HUMPBACK_POWERFIN": {
+   "baro": {
+    "SPA06": 1.0
+   },
+   "imu": {
+    "UNKNOWN_0x39": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 5,
+   "mag": {
+    "QMC5883P": 1.0
+   },
+   "vehicles": 5
+  },
+  "HUNG_D5_V1": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ICM20948": 1.0
+   },
+   "imu_gyro_cutoff_median": 30.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 3,
+   "mag": {
+    "UAVCAN": 1.0
+   },
+   "vehicles": 1
+  },
+  "HYP_FMU_V6X": {
+   "baro": {
+    "BMP388": 1.0
+   },
+   "imu": {
+    "ICM45686": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 1,
+   "mag": {
+    "BMM150": 1.0
+   },
+   "vehicles": 1
+  },
+  "HZX_BABAI": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ICM20689": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 1,
+   "mag": {
+    "RM3100": 1.0
+   },
+   "vehicles": 1
+  },
+  "IDEX_H743_V2": {
+   "baro": {
+    "DPS310": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 6,
+   "mag": {
+    "RM3100": 1.0
+   },
+   "vehicles": 2
+  },
+  "IHARD_FMU8MP_V1": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ICM20948": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 1,
+   "mag": {
+    "AK09916": 1.0
+   },
+   "vehicles": 1
+  },
+  "INDOWINGS_CYBERONE": {
+   "baro": {
+    "BMP388": 1.0
+   },
+   "imu": {
+    "ICM20689": 1.0
+   },
+   "imu_gyro_cutoff_median": 30.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 30,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 12
+  },
+  "INDOWINGS_CYBERONE_MAX": {
+   "baro": {
+    "BMP388": 1.0
+   },
+   "imu": {
+    "ICM20689": 1.0
+   },
+   "imu_gyro_cutoff_median": 70.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 45,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 33
+  },
+  "IRONCLAD_IMX8MP": {
+   "baro": {
+    "ICP201XX": 0.3333333333333333,
+    "MS5611": 0.6666666666666666
+   },
+   "imu": {
+    "ICM42605": 0.6666666666666666,
+    "ICM45686": 0.3333333333333333
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 500.0,
+   "logs": 3,
+   "mag": {
+    "BMM150": 0.6666666666666666,
+    "LIS3MDL": 0.3333333333333333
+   },
+   "vehicles": 3
+  },
+  "IRONCLAD_IMX8MP_REVB": {
+   "baro": {
+    "ICP201XX": 1.0
+   },
+   "imu": {
+    "ICM45686": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 1,
+   "mag": {
+    "LIS3MDL": 1.0
+   },
+   "vehicles": 1
+  },
+  "IRON_BELLY_DRAGON_PILOT": {
+   "baro": {
+    "ICP201XX": 1.0
+   },
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 2,
+   "mag": {
+    "RM3100": 1.0
+   },
+   "vehicles": 2
+  },
+  "ITRI_FLIGHTPRO": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ICM20649": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 2,
+   "mag": {
+    "RM3100": 1.0
+   },
+   "vehicles": 1
+  },
+  "ITRI_FLIGHTPRO_25": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ICM20689": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 2,
+   "mag": {
+    "RM3100": 1.0
+   },
+   "vehicles": 1
+  },
+  "ITRI_FLIGHTV6NEO": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "BMI055": 0.75,
+    "ICM42688P": 0.25
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 10,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 4
+  },
+  "Indowings_Cyberonemax_SV041023": {
+   "baro": {
+    "BMP388": 1.0
+   },
+   "imu": {
+    "ICM20689": 1.0
+   },
+   "imu_gyro_cutoff_median": 70.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 92,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 43
+  },
+  "JACTO_AERO1": {
+   "baro": {
+    "ICP201XX": 1.0
+   },
+   "imu": {
+    "UNKNOWN_0xE3": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 3,
+   "mag": {
+    "BMM150": 1.0
+   },
+   "vehicles": 1
+  },
+  "JCZF_A1": {
+   "baro": {
+    "DPS310": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 7,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 3
+  },
+  "JDAW_L05_EVT1": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ADIS16470": 1.0
+   },
+   "imu_gyro_cutoff_median": 25.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 1,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 1
+  },
+  "JFB_JFB110": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "IIM42652": 0.6,
+    "UNKNOWN_0x1F": 0.4
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 12,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 5
+  },
+  "JFD_J01": {
+   "baro": {
+    "MS5607": 1.0
+   },
+   "imu": {
+    "ADIS16507": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 2,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 1
+  },
+  "JFD_J02": {
+   "baro": {
+    "MS5607": 1.0
+   },
+   "imu": {
+    "ADIS16507": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 9,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 6
+  },
+  "KATA_H7": {
+   "baro": {
+    "SPA06": 1.0
+   },
+   "imu": {
+    "ADIS1657X": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 1,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 1
+  },
+  "KB_H743": {
+   "baro": {
+    "SPL06": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 1600.0,
+   "logs": 1,
+   "mag": {
+    "QMC5883L": 1.0
+   },
+   "vehicles": 1
+  },
+  "KILLIS_FALCON": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 1,
+   "mag": {
+    "QMC5883L": 1.0
+   },
+   "vehicles": 1
+  },
+  "KITE_F427_V2": {
+   "baro": {
+    "SPL06": 1.0
+   },
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 45.0,
+   "imu_gyro_ratemax_median": 500.0,
+   "logs": 3,
+   "mag": {
+    "QMC5883L": 1.0
+   },
+   "vehicles": 2
+  },
+  "KOADRONE_KOAFC": {
+   "baro": {
+    "SPA06": 1.0
+   },
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 2000.0,
+   "logs": 59,
+   "mag": {
+    "HMC5883": 0.08,
+    "IST8310": 0.68,
+    "QMC5883L": 0.2
+   },
+   "vehicles": 25
+  },
+  "LECTRON_FMU_V6X": {
+   "baro": {
+    "BMP390": 1.0
+   },
+   "imu": {
+    "ICM42670P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 3,
+   "mag": {
+    "IST8310": 0.5,
+    "UNKNOWN_0xC3": 0.5
+   },
+   "vehicles": 2
+  },
+  "LECTRON_JETSON_AUTOPILOT": {
+   "baro": {
+    "BMP390": 1.0
+   },
+   "imu": {
+    "ICM42670P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 1,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 1
+  },
+  "LECTRON_MFA_01": {
+   "baro": {
+    "BMP390": 1.0
+   },
+   "imu": {
+    "BMI270": 0.25,
+    "ICM42670P": 0.75
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 9,
+   "mag": {
+    "HMC5883": 1.0
+   },
+   "vehicles": 4
+  },
+  "LECTRON_PI5_AUTOPILOT": {
+   "baro": {
+    "BMP390": 1.0
+   },
+   "imu": {
+    "ICM42670P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 5,
+   "mag": {
+    "IST8310": 0.5,
+    "UNKNOWN_0xC3": 0.5
+   },
+   "vehicles": 2
+  },
+  "LGK3_DEMO": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ADIS16470": 0.5,
+    "ICM42688P": 0.5
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 6,
+   "mag": {
+    "IIS2MDC": 1.0
+   },
+   "vehicles": 2
+  },
+  "LIDARTECH_JOVIAN_H7": {
+   "baro": {
+    "BMP390": 1.0
+   },
+   "imu": {
+    "ICM40609D": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 1,
+   "mag": {
+    "IIS2MDC": 1.0
+   },
+   "vehicles": 1
+  },
+  "LIDARTECH_SARATHI_H7": {
+   "baro": {
+    "BMP390": 1.0
+   },
+   "imu": {
+    "ICM40609D": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 3,
+   "mag": {
+    "IIS2MDC": 1.0
+   },
+   "vehicles": 2
+  },
+  "LINUX_COMMON": {
+   "baro": {
+    "BMP388": 0.1,
+    "SPL06": 0.9
+   },
+   "imu": {
+    "BMI088": 0.1,
+    "ICM42670P": 0.9
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 160.0,
+   "logs": 20,
+   "mag": {
+    "IST8310": 0.1,
+    "QMC5883P": 0.1
+   },
+   "vehicles": 20
+  },
+  "LSAS_DOMF20_AIOV2": {
+   "baro": {
+    "BMP280": 0.9411764705882353
+   },
+   "imu": {
+    "BMI088": 0.7941176470588235,
+    "BMI270": 0.20588235294117646
+   },
+   "imu_gyro_cutoff_median": 100.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 93,
+   "mag": {
+    "UNKNOWN_0xE6": 0.9117647058823529
+   },
+   "vehicles": 34
+  },
+  "LSH_F4_NSH": {
+   "baro": {
+    "LPS25H": 1.0
+   },
+   "imu": {
+    "BMI270": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 3,
+   "mag": {
+    "MMC5983MA": 1.0
+   },
+   "vehicles": 1
+  },
+  "LUMENIER_H743_NDAA": {
+   "baro": {
+    "DPS310": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 1,
+   "mag": {
+    "IIS2MDC": 1.0
+   },
+   "vehicles": 1
+  },
+  "LUMENIER_NDAA_F7": {
+   "baro": {
+    "BMP280": 0.6666666666666666
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 3,
+   "mag": {
+    "QMC5883L": 0.6666666666666666
+   },
+   "vehicles": 3
+  },
+  "MAM_FMU_V6X": {
+   "baro": {
+    "BMP390": 1.0
+   },
+   "imu": {
+    "ICM42688P": 0.5,
+    "IIM42652": 0.5
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 7,
+   "mag": {
+    "BMM150": 1.0
+   },
+   "vehicles": 4
+  },
+  "MARS_FMU_V4": {
+   "baro": {
+    "BMP388": 1.0
+   },
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 1,
+   "mag": {},
+   "vehicles": 1
+  },
+  "MATEK_H743": {
+   "baro": {
+    "DPS310": 0.45,
+    "MS5611": 0.05,
+    "MS5837": 0.4
+   },
+   "imu": {
+    "BMI088": 0.1,
+    "ICM42688P": 0.7,
+    "ICM45686": 0.2
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 52,
+   "mag": {
+    "IST8310": 0.1,
+    "QMC5883L": 0.65,
+    "QMC5883P": 0.25
+   },
+   "vehicles": 20
+  },
+  "MATEK_H743_MINI": {
+   "baro": {
+    "DPS310": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 12,
+   "mag": {
+    "MMC5983MA": 0.25
+   },
+   "vehicles": 4
+  },
+  "MATEK_H743_SLIM": {
+   "baro": {
+    "DPS310": 1.0
+   },
+   "imu": {
+    "ICM42688P": 0.9883720930232558,
+    "MPU6000": 0.011627906976744186
+   },
+   "imu_gyro_cutoff_median": 60.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 192,
+   "mag": {
+    "IST8310": 0.08139534883720931,
+    "QMC5883L": 0.29069767441860467,
+    "QMC5883P": 0.03488372093023256,
+    "UAVCAN": 0.03488372093023256
+   },
+   "vehicles": 86
+  },
+  "MATEK_H743_SLIM_BFS": {
+   "baro": {
+    "DPS310": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 3,
+   "mag": {
+    "QMC5883L": 1.0
+   },
+   "vehicles": 1
+  },
+  "MATVEY_H743_MATVEYV6": {
+   "baro": {
+    "BMP280": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 3,
+   "mag": {},
+   "vehicles": 1
+  },
+  "MICOAIR_H743": {
+   "baro": {
+    "BAROSIM": 0.0038461538461538464,
+    "BMP388": 0.0038461538461538464,
+    "DPS310": 0.95,
+    "ICP201XX": 0.0038461538461538464
+   },
+   "imu": {
+    "BMI088": 0.8269230769230769,
+    "BMI270": 0.16538461538461538,
+    "UNKNOWN_0xEE": 0.0038461538461538464
+   },
+   "imu_gyro_cutoff_median": 80.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 559,
+   "mag": {
+    "HMC5883": 0.0038461538461538464,
+    "IST8310": 0.9461538461538461,
+    "QMC5883L": 0.023076923076923078,
+    "RM3100": 0.0038461538461538464
+   },
+   "vehicles": 260
+  },
+  "MICOAIR_H743_AIO": {
+   "baro": {
+    "DPS310": 0.9772727272727273
+   },
+   "imu": {
+    "BMI088": 0.7727272727272727,
+    "BMI270": 0.22727272727272727
+   },
+   "imu_gyro_cutoff_median": 100.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 189,
+   "mag": {
+    "IST8310": 0.23863636363636365,
+    "QMC5883L": 0.20454545454545456
+   },
+   "vehicles": 88
+  },
+  "MICOAIR_H743_LITE": {
+   "baro": {
+    "SPA06": 1.0
+   },
+   "imu": {
+    "ICM45686": 1.0
+   },
+   "imu_gyro_cutoff_median": 80.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 22,
+   "mag": {
+    "IST8310": 0.25,
+    "QMC5883L": 0.125
+   },
+   "vehicles": 8
+  },
+  "MICOAIR_H743_V2": {
+   "baro": {
+    "BMP581": 0.0008787346221441124,
+    "DPS310": 0.0008787346221441124,
+    "SPA06": 0.015817223198594025,
+    "SPL06": 0.9666080843585237
+   },
+   "imu": {
+    "BMI088": 0.6827768014059754,
+    "BMI270": 0.3145869947275923,
+    "ICM42688P": 0.0008787346221441124
+   },
+   "imu_gyro_cutoff_median": 80.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 2503,
+   "mag": {
+    "HMC5883": 0.01054481546572935,
+    "IST8310": 0.2179261862917399,
+    "MMC5983MA": 0.007908611599297012,
+    "QMC5883L": 0.6775043936731108,
+    "QMC5883P": 0.020210896309314587,
+    "RM3100": 0.008787346221441126
+   },
+   "vehicles": 1138
+  },
+  "MICROCHIP_SAMV71_XULT_CLICKBOARDS": {
+   "baro": {
+    "BMP390": 1.0
+   },
+   "imu": {
+    "ICM45686": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 6,
+   "mag": {
+    "BMM150": 1.0
+   },
+   "vehicles": 2
+  },
+  "MMC_SK3_V1": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ICM20602": 1.0
+   },
+   "imu_gyro_cutoff_median": null,
+   "imu_gyro_ratemax_median": null,
+   "logs": 6,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 4
+  },
+  "MMSL_PIXHAWK6X": {
+   "baro": {
+    "BMP581": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 2000.0,
+   "logs": 1,
+   "mag": {
+    "RM3100": 1.0
+   },
+   "vehicles": 1
+  },
+  "MNP_FMU_V6X": {
+   "baro": {
+    "BMP390": 1.0
+   },
+   "imu": {
+    "IIM42653": 1.0
+   },
+   "imu_gyro_cutoff_median": 100.0,
+   "imu_gyro_ratemax_median": 2000.0,
+   "logs": 19,
+   "mag": {
+    "BMM350": 0.75,
+    "LIS3MDL": 0.25
+   },
+   "vehicles": 8
+  },
+  "MODALAI_FC_V1": {
+   "baro": {
+    "BMP388": 0.6666666666666666
+   },
+   "imu": {
+    "BMI088": 0.16666666666666666,
+    "ICM20602": 0.6666666666666666,
+    "ICM42688P": 0.16666666666666666
+   },
+   "imu_gyro_cutoff_median": 35.0,
+   "imu_gyro_ratemax_median": 125.0,
+   "logs": 11,
+   "mag": {
+    "IST8308": 0.3333333333333333,
+    "IST8310": 0.3333333333333333,
+    "QMC5883L": 0.16666666666666666
+   },
+   "vehicles": 6
+  },
+  "MODALAI_FC_V2": {
+   "baro": {
+    "BMP388": 0.2727272727272727,
+    "ICP201XX": 0.2727272727272727
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 30.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 23,
+   "mag": {
+    "BMM150": 0.18181818181818182,
+    "IST8310": 0.45454545454545453,
+    "QMC5883L": 0.2727272727272727,
+    "UAVCAN": 0.09090909090909091
+   },
+   "vehicles": 11
+  },
+  "MODALAI_VOXL2": {
+   "baro": {
+    "DPS310": 0.0053811659192825115,
+    "ICP101XX": 0.9112107623318386,
+    "MS5837": 0.0017937219730941704
+   },
+   "imu": {
+    "BMI270": 0.003587443946188341,
+    "ICM42688P": 0.9802690582959641
+   },
+   "imu_gyro_cutoff_median": 80.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 1115,
+   "mag": {
+    "BMM150": 0.009865470852017937,
+    "BMM350": 0.010762331838565023,
+    "IIS2MDC": 0.10224215246636771,
+    "IST8308": 0.04304932735426009,
+    "IST8310": 0.09327354260089686,
+    "LIS3MDL": 0.017040358744394617,
+    "QMC5883L": 0.46905829596412557,
+    "RM3100": 0.08878923766816144,
+    "UNKNOWN_0x0C": 0.0008968609865470852
+   },
+   "vehicles": 1115
+  },
+  "MOONPILOT_H743": {
+   "baro": {
+    "DPS310": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 16,
+   "mag": {
+    "IST8308": 0.14285714285714285,
+    "IST8310": 0.8571428571428571
+   },
+   "vehicles": 7
+  },
+  "MORAKOT_V6": {
+   "baro": {
+    "BMP390": 1.0
+   },
+   "imu": {
+    "ICM45686": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 5,
+   "mag": {
+    "IIS2MDC": 1.0
+   },
+   "vehicles": 3
+  },
+  "MRO_ARMADA_CTRL_ZERO_H7_OEM": {
+   "baro": {
+    "DPS310": 1.0
+   },
+   "imu": {
+    "ICM20602": 1.0
+   },
+   "imu_gyro_cutoff_median": 25.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 4,
+   "mag": {
+    "AK09916": 0.3333333333333333,
+    "IST8308": 0.6666666666666666
+   },
+   "vehicles": 3
+  },
+  "MRO_CTRL_ZERO_H7": {
+   "baro": {
+    "DPS310": 0.8
+   },
+   "imu": {
+    "BMI088": 0.2,
+    "ICM20602": 0.6,
+    "ICM20948": 0.2
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 8,
+   "mag": {
+    "AK09916": 0.6,
+    "IST8308": 0.4
+   },
+   "vehicles": 5
+  },
+  "MRO_CTRL_ZERO_H7_OEM": {
+   "baro": {
+    "DPS310": 0.8235294117647058,
+    "UNKNOWN_0xAC": 0.058823529411764705
+   },
+   "imu": {
+    "BMI088": 0.4117647058823529,
+    "ICM20602": 0.35294117647058826,
+    "ICM20948": 0.11764705882352941,
+    "ICM42605": 0.11764705882352941
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 36,
+   "mag": {
+    "AK09916": 0.5294117647058824,
+    "IIS2MDC": 0.11764705882352941,
+    "IST8308": 0.058823529411764705,
+    "IST8310": 0.058823529411764705,
+    "LIS3MDL": 0.17647058823529413,
+    "QMC5883L": 0.058823529411764705
+   },
+   "vehicles": 17
+  },
+  "MRO_PIXRACERPRO": {
+   "baro": {
+    "DPS310": 1.0
+   },
+   "imu": {
+    "BMI088": 0.09210526315789473,
+    "ICM20602": 0.6710526315789473,
+    "ICM20948": 0.07894736842105263,
+    "UNKNOWN_0x6D": 0.15789473684210525
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 150,
+   "mag": {
+    "AK09916": 0.4473684210526316,
+    "BMM150": 0.05263157894736842,
+    "IST8308": 0.05263157894736842,
+    "IST8310": 0.3815789473684211,
+    "QMC5883L": 0.039473684210526314,
+    "QMC5883P": 0.013157894736842105,
+    "UAVCAN": 0.013157894736842105
+   },
+   "vehicles": 76
+  },
+  "MRO_X21": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ICM20602": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 2,
+   "mag": {
+    "AK8963": 1.0
+   },
+   "vehicles": 1
+  },
+  "MTLO_MO0001": {
+   "baro": {
+    "DPS310": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 2000.0,
+   "logs": 1,
+   "mag": {
+    "IIS2MDC": 1.0
+   },
+   "vehicles": 1
+  },
+  "MULTIROTOR_MULTIG5S": {
+   "baro": {
+    "DPS310": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 1,
+   "mag": {
+    "QMC5883L": 1.0
+   },
+   "vehicles": 1
+  },
+  "MYBOARD_H743_SLIM": {
+   "baro": {
+    "DPS310": 1.0
+   },
+   "imu": {
+    "BMI088": 0.6666666666666666,
+    "BMI270": 0.3333333333333333
+   },
+   "imu_gyro_cutoff_median": 80.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 5,
+   "mag": {
+    "IST8310": 0.3333333333333333,
+    "QMC5883L": 0.6666666666666666
+   },
+   "vehicles": 3
+  },
+  "MYPX4_H743": {
+   "baro": {
+    "BMP581": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 1,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 1
+  },
+  "MYVENDOR_F405_CUSTOM": {
+   "baro": {},
+   "imu": {},
+   "imu_gyro_cutoff_median": null,
+   "imu_gyro_ratemax_median": null,
+   "logs": 6,
+   "mag": {},
+   "vehicles": 3
+  },
+  "MYVENDOR_F769_CUSTOM": {
+   "baro": {
+    "BMP388": 0.6666666666666666
+   },
+   "imu": {
+    "ICM42670P": 0.6666666666666666
+   },
+   "imu_gyro_cutoff_median": null,
+   "imu_gyro_ratemax_median": null,
+   "logs": 5,
+   "mag": {
+    "BMM350": 0.3333333333333333
+   },
+   "vehicles": 3
+  },
+  "MY_COMPANY_H743_WEACT": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 3,
+   "mag": {},
+   "vehicles": 1
+  },
+  "MY_KAKUTEH7": {
+   "baro": {
+    "SPL06": 1.0
+   },
+   "imu": {
+    "MPU9250": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 1,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 1
+  },
+  "NANOHELIJH1_RV1106": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 9,
+   "mag": {
+    "BMM150": 1.0
+   },
+   "vehicles": 9
+  },
+  "NARINFC_H5": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ICM20649": 1.0
+   },
+   "imu_gyro_cutoff_median": 30.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 3,
+   "mag": {
+    "RM3100": 1.0
+   },
+   "vehicles": 1
+  },
+  "NARINFC_H7": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 3,
+   "mag": {
+    "RM3100": 1.0
+   },
+   "vehicles": 1
+  },
+  "NARMA_AF400": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ICM20689": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 1,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 1
+  },
+  "NARMA_AF400N": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "BMI055": 0.3333333333333333,
+    "BMI088": 0.3333333333333333,
+    "ICM20602": 0.3333333333333333
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 8,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 3
+  },
+  "NCSIST_PX4_6A_2550": {
+   "baro": {
+    "DPS310": 1.0
+   },
+   "imu": {
+    "BMI088": 0.5,
+    "BMI270": 0.5
+   },
+   "imu_gyro_cutoff_median": 80.0,
+   "imu_gyro_ratemax_median": 600.0,
+   "logs": 3,
+   "mag": {
+    "LIS3MDL": 1.0
+   },
+   "vehicles": 2
+  },
+  "NEKOPURRTECH_KESTREL": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ICM20649": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 2,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 1
+  },
+  "NEKOPURRTECH_P1": {
+   "baro": {
+    "BMP581": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 1,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 1
+  },
+  "NEROS_BLOCK2": {
+   "baro": {
+    "DPS310": 0.125
+   },
+   "imu": {
+    "ICM42688P": 0.125
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 1500.0,
+   "logs": 18,
+   "mag": {
+    "IIS2MDC": 0.0625
+   },
+   "vehicles": 16
+  },
+  "NEWBEEDRONE_PIXNOVA": {
+   "baro": {
+    "ICP201XX": 1.0
+   },
+   "imu": {
+    "ICM42688P": 0.5,
+    "ICM45686": 0.5
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 2,
+   "mag": {
+    "IST8310": 0.5,
+    "RM3100": 0.5
+   },
+   "vehicles": 2
+  },
+  "NHY_FMU_AT32": {
+   "baro": {
+    "SPL06": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 1,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 1
+  },
+  "NIISTT_SICHIK_2": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ICM40609D": 1.0
+   },
+   "imu_gyro_cutoff_median": 30.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 3,
+   "mag": {
+    "UAVCAN": 1.0
+   },
+   "vehicles": 1
+  },
+  "NONAME_NAMENO": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 20.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 1,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 1
+  },
+  "NXP_FMUK66_V3": {
+   "baro": {
+    "MPL3115A2": 1.0
+   },
+   "imu": {
+    "FXAS21002C": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 5,
+   "mag": {
+    "BMM150": 1.0
+   },
+   "vehicles": 3
+  },
+  "NXP_IMX95": {
+   "baro": {
+    "BMP581": 1.0
+   },
+   "imu": {
+    "ICM45686": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 3,
+   "mag": {
+    "BMM350": 1.0
+   },
+   "vehicles": 1
+  },
+  "NXP_MR_TROPIC": {
+   "baro": {
+    "BMP388": 0.3333333333333333,
+    "BMP390": 0.6666666666666666
+   },
+   "imu": {
+    "BMI088": 0.3333333333333333,
+    "ICM45686": 0.6666666666666666
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 7,
+   "mag": {
+    "BMM350": 0.6666666666666666
+   },
+   "vehicles": 3
+  },
+  "NXP_TROPIC_COMMUNITY": {
+   "baro": {
+    "BMP388": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 6,
+   "mag": {
+    "BMM150": 1.0
+   },
+   "vehicles": 2
+  },
+  "ODONATA_ODONATA_H7": {
+   "baro": {
+    "BMP390": 0.75
+   },
+   "imu": {
+    "ICM42605": 0.75,
+    "ICM42670P": 0.25
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 7,
+   "mag": {
+    "IIS2MDC": 1.0
+   },
+   "vehicles": 4
+  },
+  "ODRONIC_DES1": {
+   "baro": {
+    "BMP388": 1.0
+   },
+   "imu": {
+    "BMI270": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 2000.0,
+   "logs": 2,
+   "mag": {},
+   "vehicles": 1
+  },
+  "OMNIBUS_F4SD": {
+   "baro": {
+    "BMP280": 1.0
+   },
+   "imu": {
+    "MPU6000": 0.6666666666666666,
+    "MPU6500": 0.3333333333333333
+   },
+   "imu_gyro_cutoff_median": 12.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 9,
+   "mag": {},
+   "vehicles": 3
+  },
+  "ORIGIN_INTERCEPTOR": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 1,
+   "mag": {
+    "MMC5983MA": 1.0
+   },
+   "vehicles": 1
+  },
+  "OV_VERBA_H7_R1": {
+   "baro": {
+    "DPS310": 1.0
+   },
+   "imu": {
+    "BMI270": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 1,
+   "mag": {
+    "QMC5883L": 1.0
+   },
+   "vehicles": 1
+  },
+  "P224_V10": {
+   "baro": {
+    "ICP201XX": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 2000.0,
+   "logs": 3,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 1
+  },
+  "PABLOX_F40_V1": {
+   "baro": {
+    "BMP388": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 2,
+   "mag": {
+    "BMM150": 1.0
+   },
+   "vehicles": 2
+  },
+  "PDW_FPV_AM_STACK_FC_V2_REDUX": {
+   "baro": {
+    "BMP390": 0.5
+   },
+   "imu": {
+    "IIM42652": 0.5,
+    "IIM42653": 0.5
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 2,
+   "mag": {
+    "BMM350": 1.0
+   },
+   "vehicles": 2
+  },
+  "PDW_STACK_FC_V2": {
+   "baro": {
+    "BMP390": 1.0
+   },
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 18,
+   "mag": {
+    "BMM350": 1.0
+   },
+   "vehicles": 8
+  },
+  "PDW_VOXLFLIGHT_C100_B1_D": {
+   "baro": {
+    "BMP388": 1.0
+   },
+   "imu": {
+    "ICM42688P": 0.07692307692307693,
+    "UNKNOWN_0xBD": 0.9230769230769231
+   },
+   "imu_gyro_cutoff_median": 26.0,
+   "imu_gyro_ratemax_median": 250.0,
+   "logs": 16,
+   "mag": {
+    "BMM150": 1.0
+   },
+   "vehicles": 13
+  },
+  "PEGA_D_POC": {
+   "baro": {
+    "BMP581": 1.0
+   },
+   "imu": {
+    "BMI270": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 3,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 1
+  },
+  "PIXFLAMINGO_FC360": {
+   "baro": {
+    "DPS310": 1.0
+   },
+   "imu": {
+    "ICM42670P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 1,
+   "mag": {
+    "BMM350": 1.0
+   },
+   "vehicles": 1
+  },
+  "PIXFLAMINGO_H7_IO": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ICM42670P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 600.0,
+   "logs": 2,
+   "mag": {
+    "LIS3MDL": 1.0
+   },
+   "vehicles": 1
+  },
+  "PLEXUS_DEMO": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ADIS16470": 1.0
+   },
+   "imu_gyro_cutoff_median": 120.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 3,
+   "mag": {
+    "IIS2MDC": 1.0
+   },
+   "vehicles": 1
+  },
+  "PLG_0g_V": {
+   "baro": {},
+   "imu": {},
+   "imu_gyro_cutoff_median": null,
+   "imu_gyro_ratemax_median": null,
+   "logs": 1,
+   "mag": {},
+   "vehicles": 1
+  },
+  "POGO_CANFCU_MINI": {
+   "baro": {
+    "UAVCAN": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 1,
+   "mag": {
+    "UAVCAN": 1.0
+   },
+   "vehicles": 1
+  },
+  "PSA_FMU_V4": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ICM20948": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 4,
+   "mag": {
+    "IIS2MDC": 1.0
+   },
+   "vehicles": 3
+  },
+  "PSA_N657_NUCLEO": {
+   "baro": {
+    "LPS22HB": 1.0
+   },
+   "imu": {
+    "UNKNOWN_0x18": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 3,
+   "mag": {
+    "IIS2MDC": 1.0
+   },
+   "vehicles": 1
+  },
+  "PV_04": {
+   "baro": {
+    "BMP280": 1.0
+   },
+   "imu": {
+    "ICM20602": 1.0
+   },
+   "imu_gyro_cutoff_median": 22.5,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 2,
+   "mag": {
+    "RM3100": 0.5,
+    "UAVCAN": 0.5
+   },
+   "vehicles": 2
+  },
+  "PX4FMU_V2": {
+   "baro": {
+    "MS5611": 0.15254237288135594
+   },
+   "imu": {
+    "ICM20608G": 0.01694915254237288,
+    "ICM20649": 0.05084745762711865,
+    "MPU6000": 0.288135593220339,
+    "MPU9250": 0.1864406779661017,
+    "UNKNOWN_0x68": 0.423728813559322
+   },
+   "imu_gyro_cutoff_median": 80.0,
+   "imu_gyro_ratemax_median": null,
+   "logs": 106,
+   "mag": {
+    "AK8963": 0.11864406779661017,
+    "HMC5883": 0.3559322033898305,
+    "IST8310": 0.01694915254237288,
+    "LIS3MDL": 0.06779661016949153,
+    "UNKNOWN_0x00": 0.288135593220339,
+    "UNKNOWN_0x02": 0.11864406779661017
+   },
+   "vehicles": 59
+  },
+  "PX4FMU_V4": {
+   "baro": {},
+   "imu": {
+    "ICM20602": 0.07142857142857142,
+    "ICM20608G": 0.5714285714285714,
+    "MPU6000": 0.07142857142857142,
+    "MPU9250": 0.2857142857142857
+   },
+   "imu_gyro_cutoff_median": 80.0,
+   "imu_gyro_ratemax_median": null,
+   "logs": 18,
+   "mag": {
+    "AK8963": 0.21428571428571427,
+    "HMC5883": 0.42857142857142855,
+    "IST8310": 0.07142857142857142,
+    "LIS3MDL": 0.2857142857142857
+   },
+   "vehicles": 14
+  },
+  "PX4FMU_V4PRO": {
+   "baro": {
+    "MS5611": 0.5
+   },
+   "imu": {
+    "ICM20602": 0.5,
+    "ICM20608G": 0.5
+   },
+   "imu_gyro_cutoff_median": 30.0,
+   "imu_gyro_ratemax_median": null,
+   "logs": 2,
+   "mag": {
+    "AK8963": 1.0
+   },
+   "vehicles": 2
+  },
+  "PX4FMU_V5": {
+   "baro": {
+    "MS5611": 0.25
+   },
+   "imu": {
+    "ICM20602": 0.5,
+    "ICM20689": 0.5
+   },
+   "imu_gyro_cutoff_median": 56.0,
+   "imu_gyro_ratemax_median": null,
+   "logs": 4,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 4
+  },
+  "PX4_AM_PIXHAWK_6C": {
+   "baro": {},
+   "imu": {
+    "BMI055": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 2,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 1
+  },
+  "PX4_B320ED": {
+   "baro": {
+    "BMP388": 1.0
+   },
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 2,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 2
+  },
+  "PX4_BM2": {
+   "baro": {
+    "ICP201XX": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 80.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 3,
+   "mag": {
+    "IST8308": 1.0
+   },
+   "vehicles": 1
+  },
+  "PX4_CUSTOM_FMU_V6XRT": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "UNKNOWN_0x56": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 3,
+   "mag": {
+    "RM3100": 1.0
+   },
+   "vehicles": 1
+  },
+  "PX4_D_FC_V10": {
+   "baro": {
+    "ICP201XX": 1.0
+   },
+   "imu": {
+    "BMI088": 0.47368421052631576,
+    "ICM42688P": 0.5263157894736842
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 114,
+   "mag": {
+    "BMM150": 1.0
+   },
+   "vehicles": 57
+  },
+  "PX4_D_FC_V2": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "BMI088": 0.6666666666666666,
+    "ICM20602": 0.3333333333333333
+   },
+   "imu_gyro_cutoff_median": 30.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 14,
+   "mag": {
+    "BMM150": 1.0
+   },
+   "vehicles": 6
+  },
+  "PX4_D_FC_V3": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "BMI088": 0.35294117647058826,
+    "ICM20602": 0.5882352941176471,
+    "UNKNOWN_0xC0": 0.058823529411764705
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 25,
+   "mag": {
+    "BMM150": 1.0
+   },
+   "vehicles": 17
+  },
+  "PX4_FMU_AT32": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "UNKNOWN_0xE3": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 1,
+   "mag": {
+    "UNKNOWN_0xE3": 1.0
+   },
+   "vehicles": 1
+  },
+  "PX4_FMU_D160": {
+   "baro": {
+    "ICP201XX": 1.0
+   },
+   "imu": {
+    "ADIS1657X": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 1,
+   "mag": {
+    "RM3100": 1.0
+   },
+   "vehicles": 1
+  },
+  "PX4_FMU_HZYJ": {
+   "baro": {
+    "SPA06": 1.0
+   },
+   "imu": {
+    "BMI088": 0.3333333333333333,
+    "ICM45686": 0.6666666666666666
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 7,
+   "mag": {
+    "MMC5983MA": 0.6666666666666666,
+    "RM3100": 0.3333333333333333
+   },
+   "vehicles": 3
+  },
+  "PX4_FMU_HZYJV2": {
+   "baro": {
+    "SPA06": 1.0
+   },
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 60.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 1,
+   "mag": {
+    "MMC5983MA": 1.0
+   },
+   "vehicles": 1
+  },
+  "PX4_FMU_N2": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 25.0,
+   "imu_gyro_ratemax_median": 0.0,
+   "logs": 7,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 3
+  },
+  "PX4_FMU_V2": {
+   "baro": {
+    "MS5607": 0.13157894736842105,
+    "MS5611": 0.7763157894736842
+   },
+   "imu": {
+    "ICM42688P": 0.06578947368421052,
+    "L3GD20": 0.13157894736842105,
+    "MPU6000": 0.8026315789473685
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 147,
+   "mag": {
+    "HMC5883": 0.19736842105263158,
+    "IST8310": 0.039473684210526314,
+    "RM3100": 0.02631578947368421,
+    "UNKNOWN_0x02": 0.013157894736842105,
+    "UNKNOWN_0x11": 0.7105263157894737
+   },
+   "vehicles": 76
+  },
+  "PX4_FMU_V3": {
+   "baro": {
+    "BMP581": 0.011741682974559686,
+    "MS5607": 0.10176125244618395,
+    "MS5611": 0.5870841487279843,
+    "SPL06": 0.003913894324853229
+   },
+   "imu": {
+    "BMI088": 0.0019569471624266144,
+    "ICM20602": 0.005870841487279843,
+    "ICM20608G": 0.015655577299412915,
+    "ICM42688P": 0.0136986301369863,
+    "L3GD20": 0.14285714285714285,
+    "MPU6000": 0.4324853228962818,
+    "MPU9250": 0.3835616438356164,
+    "UNKNOWN_0xE3": 0.0019569471624266144
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 962,
+   "mag": {
+    "AK09916": 0.007827788649706457,
+    "AK8963": 0.019569471624266144,
+    "BMM150": 0.0019569471624266144,
+    "HMC5883": 0.08414872798434442,
+    "IST8308": 0.0136986301369863,
+    "IST8310": 0.42857142857142855,
+    "QMC5883L": 0.005870841487279843,
+    "UNKNOWN_0x00": 0.007827788649706457,
+    "UNKNOWN_0x11": 0.4187866927592955
+   },
+   "vehicles": 511
+  },
+  "PX4_FMU_V3B": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 35.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 2,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 2
+  },
+  "PX4_FMU_V4": {
+   "baro": {
+    "ICP201XX": 0.0014245014245014246,
+    "MS5607": 0.0014245014245014246,
+    "MS5611": 0.46153846153846156
+   },
+   "imu": {
+    "ICM20602": 0.6965811965811965,
+    "ICM20608G": 0.0811965811965812,
+    "ICM40609D": 0.0014245014245014246,
+    "ICM42688P": 0.11253561253561253,
+    "MPU6500": 0.10256410256410256,
+    "MPU9250": 0.005698005698005698
+   },
+   "imu_gyro_cutoff_median": 90.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 872,
+   "mag": {
+    "AK8963": 0.009971509971509971,
+    "HMC5883": 0.03561253561253561,
+    "IST8308": 0.002849002849002849,
+    "IST8310": 0.23931623931623933,
+    "LIS3MDL": 0.10113960113960115,
+    "QMC5883L": 0.6096866096866097
+   },
+   "vehicles": 702
+  },
+  "PX4_FMU_V4GBI6_G3": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "MPU6500": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 18,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 17
+  },
+  "PX4_FMU_V4GBI6_G4": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "MPU6500": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 13,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 11
+  },
+  "PX4_FMU_V4L": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ICM20608G": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 1,
+   "mag": {
+    "QMC5883L": 1.0
+   },
+   "vehicles": 1
+  },
+  "PX4_FMU_V5": {
+   "baro": {
+    "MS5611": 0.9595959595959596,
+    "UAVCAN": 0.0026936026936026937
+   },
+   "imu": {
+    "ADIS16477": 0.0006734006734006734,
+    "BMI055": 0.19932659932659932,
+    "BMI088": 0.00404040404040404,
+    "ICM20602": 0.569023569023569,
+    "ICM20689": 0.21548821548821548,
+    "ICM42670P": 0.00404040404040404,
+    "ICM42688P": 0.003367003367003367,
+    "ICM45686": 0.0013468013468013469,
+    "UNKNOWN_0x86": 0.0006734006734006734
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 3223,
+   "mag": {
+    "HMC5883": 0.012121212121212121,
+    "IST8310": 0.967003367003367,
+    "LIS3MDL": 0.0006734006734006734,
+    "QMC5883P": 0.0006734006734006734,
+    "RM3100": 0.0026936026936026937,
+    "UAVCAN": 0.012121212121212121
+   },
+   "vehicles": 1485
+  },
+  "PX4_FMU_V5X": {
+   "baro": {
+    "BMP388": 0.9095744680851063
+   },
+   "imu": {
+    "BMI088": 0.2074468085106383,
+    "ICM20602": 0.015957446808510637,
+    "ICM20649": 0.1595744680851064,
+    "ICM42688P": 0.03723404255319149,
+    "MPU6000": 0.17553191489361702,
+    "SCH16T": 0.3191489361702128
+   },
+   "imu_gyro_cutoff_median": 30.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 278,
+   "mag": {
+    "BMM150": 0.9095744680851063,
+    "RM3100": 0.005319148936170213
+   },
+   "vehicles": 188
+  },
+  "PX4_FMU_V6C": {
+   "baro": {
+    "BMP388": 0.0003800836183960471,
+    "BMP581": 0.0011402508551881414,
+    "ICP201XX": 0.0003800836183960471,
+    "MS5611": 0.9635119726339795,
+    "UNKNOWN_0x00": 0.0003800836183960471
+   },
+   "imu": {
+    "BMI055": 0.5625237552261497,
+    "BMI088": 0.15203344735841884,
+    "ICM20602": 0.0007601672367920942,
+    "ICM42688P": 0.24895477004941088,
+    "ICM45686": 0.0003800836183960471,
+    "LSM6DSK320X": 0.0007601672367920942,
+    "LSM6DSV": 0.0003800836183960471,
+    "MPU6000": 0.0003800836183960471,
+    "UNKNOWN_0x0A": 0.0003800836183960471,
+    "UNKNOWN_0x69": 0.0003800836183960471,
+    "UNKNOWN_0xE5": 0.0003800836183960471,
+    "UNKNOWN_0xF1": 0.0007601672367920942
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 5778,
+   "mag": {
+    "HMC5883": 0.006461421512732801,
+    "IIS2MDC": 0.0003800836183960471,
+    "IST8308": 0.002280501710376283,
+    "IST8310": 0.9296845305967313,
+    "QMC5883L": 0.01444317749904979,
+    "QMC5883P": 0.010262257696693273,
+    "RM3100": 0.003040668947168377,
+    "UAVCAN": 0.0007601672367920942,
+    "UNKNOWN_0x21": 0.0003800836183960471
+   },
+   "vehicles": 2631
+  },
+  "PX4_FMU_V6C_MIN": {
+   "baro": {},
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 30.0,
+   "imu_gyro_ratemax_median": 2000.0,
+   "logs": 3,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 1
+  },
+  "PX4_FMU_V6C_X650": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 3,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 1
+  },
+  "PX4_FMU_V6S": {
+   "baro": {
+    "BMP390": 1.0
+   },
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 15,
+   "mag": {
+    "BMM150": 0.875,
+    "BMM350": 0.125
+   },
+   "vehicles": 8
+  },
+  "PX4_FMU_V6SP": {
+   "baro": {
+    "ICP201XX": 1.0
+   },
+   "imu": {
+    "UNKNOWN_0x39": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 9,
+   "mag": {
+    "BMM150": 1.0
+   },
+   "vehicles": 3
+  },
+  "PX4_FMU_V6U": {
+   "baro": {
+    "BMP388": 1.0
+   },
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 600.0,
+   "logs": 3,
+   "mag": {
+    "BMM350": 0.5,
+    "IIS2MDC": 0.5
+   },
+   "vehicles": 2
+  },
+  "PX4_FMU_V6X": {
+   "baro": {
+    "BMP388": 0.19571192963166575,
+    "BMP390": 0.04123144584936778,
+    "BMP581": 0.0043980208905992305,
+    "ICP201XX": 0.7102803738317757,
+    "MS5611": 0.031335898845519516,
+    "MS5837": 0.0010995052226498076,
+    "SPA06": 0.003298515667949423,
+    "UAVCAN": 0.0010995052226498076,
+    "UNKNOWN_0x53": 0.003298515667949423
+   },
+   "imu": {
+    "ADIS16470": 0.02199010445299615,
+    "BMI088": 0.2462891698735569,
+    "ICM20602": 0.003298515667949423,
+    "ICM20649": 0.028587135788894998,
+    "ICM42670P": 0.029136888400219902,
+    "ICM42686P": 0.0005497526113249038,
+    "ICM42688P": 0.10720175920835624,
+    "ICM45686": 0.5211654755360088,
+    "IIM42652": 0.030786146234194612,
+    "IIM42653": 0.0005497526113249038,
+    "UNKNOWN_0x2F": 0.0043980208905992305,
+    "UNKNOWN_0x39": 0.0005497526113249038,
+    "UNKNOWN_0xE1": 0.0005497526113249038,
+    "UNKNOWN_0xE3": 0.0010995052226498076,
+    "UNKNOWN_0xE9": 0.0010995052226498076,
+    "UNKNOWN_0xEC": 0.0005497526113249038
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 4030,
+   "mag": {
+    "BMM150": 0.7416162726772952,
+    "BMM350": 0.0016492578339747114,
+    "HMC5883": 0.0021990104452996153,
+    "IST8308": 0.0021990104452996153,
+    "IST8310": 0.06597031335898845,
+    "LIS3MDL": 0.0010995052226498076,
+    "MMC5983MA": 0.0010995052226498076,
+    "QMC5883L": 0.0005497526113249038,
+    "RM3100": 0.1588785046728972,
+    "UAVCAN": 0.008796041781198461,
+    "UNKNOWN_0x0C": 0.0016492578339747114
+   },
+   "vehicles": 1819
+  },
+  "PX4_FMU_V6XHPM": {
+   "baro": {
+    "MS5837": 0.5,
+    "SPA06": 0.5
+   },
+   "imu": {
+    "BMI270": 0.5,
+    "UNKNOWN_0x55": 0.5
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 2,
+   "mag": {
+    "IIS2MDC": 0.5,
+    "MMC5983MA": 0.5
+   },
+   "vehicles": 2
+  },
+  "PX4_FMU_V6XHPM_SDT": {
+   "baro": {
+    "ICP201XX": 1.0
+   },
+   "imu": {
+    "IIM42653": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 4,
+   "mag": {
+    "RM3100": 1.0
+   },
+   "vehicles": 2
+  },
+  "PX4_FMU_V6XRT": {
+   "baro": {
+    "BMP388": 0.5158730158730159,
+    "BMP390": 0.4365079365079365,
+    "BMP581": 0.007936507936507936
+   },
+   "imu": {
+    "BMI088": 0.047619047619047616,
+    "ICM42686P": 0.7857142857142857,
+    "ICM42688P": 0.09523809523809523,
+    "ICM45686": 0.06349206349206349
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 289,
+   "mag": {
+    "BMM150": 0.7380952380952381,
+    "BMM350": 0.2619047619047619
+   },
+   "vehicles": 126
+  },
+  "PX4_FMU_V6XRT_CUSTOM1": {
+   "baro": {
+    "BMP388": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 3,
+   "mag": {
+    "BMM150": 1.0
+   },
+   "vehicles": 1
+  },
+  "PX4_FMU_V6X_LT": {
+   "baro": {
+    "BMP388": 1.0
+   },
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 3,
+   "mag": {
+    "HMC5883": 1.0
+   },
+   "vehicles": 1
+  },
+  "PX4_FMU_V6X_MAIRUIX": {
+   "baro": {
+    "ICP201XX": 1.0
+   },
+   "imu": {
+    "ICM42688P": 0.5,
+    "ICM45686": 0.5
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 6,
+   "mag": {
+    "RM3100": 1.0
+   },
+   "vehicles": 2
+  },
+  "PX4_FMU_V6X_MYBD": {
+   "baro": {
+    "BMP388": 1.0
+   },
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 1,
+   "mag": {
+    "HMC5883": 1.0
+   },
+   "vehicles": 1
+  },
+  "PX4_FMU_V6X_QGBF": {
+   "baro": {
+    "BMP388": 1.0
+   },
+   "imu": {
+    "BMI088": 0.5,
+    "ICM20602": 0.5
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 12,
+   "mag": {
+    "HMC5883": 0.25,
+    "QMC5883P": 0.75
+   },
+   "vehicles": 4
+  },
+  "PX4_FMU_V6X_REMORA": {
+   "baro": {
+    "BMP388": 1.0
+   },
+   "imu": {
+    "ICM45686": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 1,
+   "mag": {
+    "BMM150": 1.0
+   },
+   "vehicles": 1
+  },
+  "PX4_FMU_V6X_SEEEX25D": {
+   "baro": {
+    "BMP388": 1.0
+   },
+   "imu": {
+    "ICM20602": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 3,
+   "mag": {
+    "UNKNOWN_0x0C": 1.0
+   },
+   "vehicles": 1
+  },
+  "PX4_FMU_V6X_TECNOSKY": {
+   "baro": {
+    "ICP201XX": 1.0
+   },
+   "imu": {
+    "ICM45686": 0.3333333333333333,
+    "IIM42652": 0.6666666666666666
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 4,
+   "mag": {
+    "RM3100": 1.0
+   },
+   "vehicles": 3
+  },
+  "PX4_FTG_FMU_V5": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "BMI055": 0.5,
+    "ICM20602": 0.5
+   },
+   "imu_gyro_cutoff_median": 20.0,
+   "imu_gyro_ratemax_median": 600.0,
+   "logs": 4,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 2
+  },
+  "PX4_FTG_FMU_V6C": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "BMI055": 0.45454545454545453,
+    "ICM42688P": 0.5454545454545454
+   },
+   "imu_gyro_cutoff_median": 30.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 26,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 11
+  },
+  "PX4_MY427": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ICM20948": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 3,
+   "mag": {
+    "AK09916": 1.0
+   },
+   "vehicles": 1
+  },
+  "PX4_MYPX4_V1": {
+   "baro": {
+    "BMP388": 1.0
+   },
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 1,
+   "mag": {
+    "QMC5883P": 1.0
+   },
+   "vehicles": 1
+  },
+  "PX4_RASPBERRYPI": {
+   "baro": {
+    "BMP280": 1.0
+   },
+   "imu": {
+    "ICM45686": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 1,
+   "mag": {
+    "HMC5883": 1.0
+   },
+   "vehicles": 1
+  },
+  "PX4_T113": {
+   "baro": {
+    "BMP388": 1.0
+   },
+   "imu": {
+    "BMI088": 0.4,
+    "ICM20948": 0.6
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 5,
+   "mag": {
+    "BMM150": 0.4,
+    "IST8310": 0.6
+   },
+   "vehicles": 5
+  },
+  "PX4_VXWORKS": {
+   "baro": {
+    "BAROSIM": 0.5
+   },
+   "imu": {
+    "SIM": 0.5
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 2,
+   "mag": {
+    "MAGSIM": 0.5
+   },
+   "vehicles": 2
+  },
+  "RADIOLINK_PIX6": {
+   "baro": {
+    "SPA06": 0.7777777777777778
+   },
+   "imu": {
+    "BMI088": 0.4444444444444444,
+    "ICM42688P": 0.3333333333333333
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 17,
+   "mag": {
+    "HMC5883": 0.1111111111111111,
+    "IST8310": 0.6666666666666666
+   },
+   "vehicles": 9
+  },
+  "RASPBERRYPI_PICO": {
+   "baro": {
+    "DPS310": 1.0
+   },
+   "imu": {
+    "UNKNOWN_0xE9": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 50.0,
+   "logs": 3,
+   "mag": {
+    "HMC5883": 1.0
+   },
+   "vehicles": 1
+  },
+  "REDACTED\u0000\u0000\u0000": {
+   "baro": {},
+   "imu": {},
+   "imu_gyro_cutoff_median": 100.0,
+   "imu_gyro_ratemax_median": 2000.0,
+   "logs": 3,
+   "mag": {},
+   "vehicles": 1
+  },
+  "RENESAS_RZV": {
+   "baro": {
+    "BMP280": 1.0
+   },
+   "imu": {
+    "MPU9250": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 61,
+   "mag": {
+    "AK8963": 0.6885245901639344
+   },
+   "vehicles": 61
+  },
+  "RHINOSKY_SHEEPDOG_V1": {
+   "baro": {
+    "BMP388": 0.36363636363636365,
+    "BMP581": 0.18181818181818182,
+    "ICP201XX": 0.45454545454545453
+   },
+   "imu": {
+    "BMI088": 0.36363636363636365,
+    "ICM42688P": 0.45454545454545453,
+    "ICM45686": 0.09090909090909091,
+    "IIM42653": 0.09090909090909091
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 30,
+   "mag": {
+    "RM3100": 1.0
+   },
+   "vehicles": 11
+  },
+  "RK3588": {
+   "baro": {
+    "UNKNOWN_0x00": 0.5
+   },
+   "imu": {
+    "UNKNOWN_0x00": 0.5
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 200.0,
+   "logs": 2,
+   "mag": {
+    "UNKNOWN_0x00": 0.5
+   },
+   "vehicles": 2
+  },
+  "ROBOMASTER_A": {
+   "baro": {
+    "BMP280": 1.0
+   },
+   "imu": {
+    "MPU6500": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 3,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 1
+  },
+  "ROTOM_ASCEND": {
+   "baro": {
+    "BMP581": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 35.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 6,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 2
+  },
+  "RP2350-Elle-Dart": {
+   "baro": {},
+   "imu": {},
+   "imu_gyro_cutoff_median": null,
+   "imu_gyro_ratemax_median": null,
+   "logs": 1,
+   "mag": {},
+   "vehicles": 1
+  },
+  "RP2350-XFly-Eagle": {
+   "baro": {},
+   "imu": {},
+   "imu_gyro_cutoff_median": null,
+   "imu_gyro_ratemax_median": null,
+   "logs": 1,
+   "mag": {},
+   "vehicles": 1
+  },
+  "RY_V6X_MY": {
+   "baro": {
+    "ICP201XX": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 30.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 3,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 1
+  },
+  "SCOUT_CUBEORANGEPLUS": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ICM45686": 1.0
+   },
+   "imu_gyro_cutoff_median": 60.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 4,
+   "mag": {
+    "AK09916": 1.0
+   },
+   "vehicles": 2
+  },
+  "SCUMAKER_PILOTPI": {
+   "baro": {
+    "MS5611": 0.95
+   },
+   "imu": {
+    "ICM42605": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 20,
+   "mag": {
+    "IST8310": 0.95,
+    "QMC5883L": 0.05
+   },
+   "vehicles": 20
+  },
+  "SEEKER_H743_AIO": {
+   "baro": {
+    "DPS310": 0.2,
+    "SPL06": 0.8
+   },
+   "imu": {
+    "BMI270": 1.0
+   },
+   "imu_gyro_cutoff_median": 100.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 14,
+   "mag": {},
+   "vehicles": 5
+  },
+  "SERCHE_HATER": {
+   "baro": {
+    "MS5607": 1.0
+   },
+   "imu": {
+    "ICM45686": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 1,
+   "mag": {
+    "MMC5983MA": 1.0
+   },
+   "vehicles": 1
+  },
+  "SILIC_S7MINI_V2": {
+   "baro": {
+    "SPL06": 1.0
+   },
+   "imu": {
+    "BMI088": 0.9,
+    "ICM42688P": 0.1
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 22,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 10
+  },
+  "SIRALAB_CTRL_ZERO_H7": {
+   "baro": {
+    "DPS310": 1.0
+   },
+   "imu": {
+    "ICM20948": 1.0
+   },
+   "imu_gyro_cutoff_median": 35.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 1,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 1
+  },
+  "SIYI_N7": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "BMI088": 0.8125,
+    "ICM20689": 0.1875
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 36,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 16
+  },
+  "SKYBRUSH_H743": {
+   "baro": {
+    "DPS310": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 1,
+   "mag": {
+    "AK8963": 1.0
+   },
+   "vehicles": 1
+  },
+  "SKYPULSE_SKYPULSE_FMU_V1": {
+   "baro": {
+    "BMP390": 1.0
+   },
+   "imu": {
+    "BMI088": 0.3333333333333333,
+    "IIM42652": 0.6666666666666666
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 9,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 3
+  },
+  "SKYPUP_F407": {
+   "baro": {
+    "DPS310": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 5,
+   "mag": {
+    "IST8310": 0.5,
+    "QMC5883L": 0.5
+   },
+   "vehicles": 2
+  },
+  "SKYPUP_H743": {
+   "baro": {
+    "DPS310": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 27.5,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 5,
+   "mag": {
+    "QMC5883L": 1.0
+   },
+   "vehicles": 2
+  },
+  "SKY_DRONES_SMARTAP_AIRLINK": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ICM20602": 0.75,
+    "MPU9250": 0.25
+   },
+   "imu_gyro_cutoff_median": 30.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 8,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 4
+  },
+  "SKY_T3_MINI": {
+   "baro": {
+    "ICP201XX": 1.0
+   },
+   "imu": {
+    "IIM42653": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 3,
+   "mag": {
+    "IIS2MDC": 1.0
+   },
+   "vehicles": 1
+  },
+  "SKY_T900": {
+   "baro": {
+    "BMP581": 0.8333333333333334,
+    "UAVCAN": 0.16666666666666666
+   },
+   "imu": {
+    "SCH16T": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 14,
+   "mag": {
+    "IIS2MDC": 0.8333333333333334,
+    "UAVCAN": 0.16666666666666666
+   },
+   "vehicles": 6
+  },
+  "SKY_V6X_RT": {
+   "baro": {
+    "ICP201XX": 1.0
+   },
+   "imu": {
+    "SCH16T": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 2,
+   "mag": {
+    "RM3100": 1.0
+   },
+   "vehicles": 1
+  },
+  "SKY_V6X_V6X_RT": {
+   "baro": {
+    "ICP201XX": 1.0
+   },
+   "imu": {
+    "SCH16T": 1.0
+   },
+   "imu_gyro_cutoff_median": 30.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 1,
+   "mag": {
+    "RM3100": 1.0
+   },
+   "vehicles": 1
+  },
+  "SOLTECOR_ROS_H743_V1": {
+   "baro": {
+    "LPS22HB": 1.0
+   },
+   "imu": {
+    "LSM6DSV32X": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 1,
+   "mag": {
+    "IIS2MDC": 1.0
+   },
+   "vehicles": 1
+  },
+  "SSRC_HIMAYA_FMU2": {
+   "baro": {
+    "BMP390": 1.0
+   },
+   "imu": {
+    "ICM40609D": 1.0
+   },
+   "imu_gyro_cutoff_median": 35.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 2,
+   "mag": {
+    "BMM350": 1.0
+   },
+   "vehicles": 2
+  },
+  "SSRC_SALUKI_NXP93": {
+   "baro": {
+    "BMP390": 1.0
+   },
+   "imu": {
+    "BMI088": 0.5,
+    "ICM40609D": 0.5
+   },
+   "imu_gyro_cutoff_median": 32.5,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 5,
+   "mag": {
+    "BMM350": 1.0
+   },
+   "vehicles": 2
+  },
+  "SSRC_SALUKI_V3": {
+   "baro": {
+    "BMP390": 1.0
+   },
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 30.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 3,
+   "mag": {
+    "BMM350": 1.0
+   },
+   "vehicles": 1
+  },
+  "STALYA_NEXUS_V1": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 3,
+   "mag": {
+    "LIS3MDL": 1.0
+   },
+   "vehicles": 1
+  },
+  "STM32F427": {
+   "baro": {
+    "MS5607": 1.0
+   },
+   "imu": {
+    "MPU6000": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 3,
+   "mag": {
+    "QMC5883L": 1.0
+   },
+   "vehicles": 1
+  },
+  "SUNHAWK_V1_5": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "BMI088": 0.5,
+    "ICM42688P": 0.5
+   },
+   "imu_gyro_cutoff_median": 20.0,
+   "imu_gyro_ratemax_median": 600.0,
+   "logs": 2,
+   "mag": {
+    "RM3100": 1.0
+   },
+   "vehicles": 2
+  },
+  "SUNHAWK_V1_7": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "BMI088": 0.75,
+    "ICM42688P": 0.25
+   },
+   "imu_gyro_cutoff_median": 15.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 7,
+   "mag": {
+    "RM3100": 1.0
+   },
+   "vehicles": 4
+  },
+  "SUNHAWK_V2": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "IAM20680HP": 1.0
+   },
+   "imu_gyro_cutoff_median": 8.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 2,
+   "mag": {
+    "BMM150": 1.0
+   },
+   "vehicles": 1
+  },
+  "SVEHICLE_E2": {
+   "baro": {
+    "ICP201XX": 1.0
+   },
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 7,
+   "mag": {
+    "RM3100": 1.0
+   },
+   "vehicles": 3
+  },
+  "SVEHICLE_S1V7": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "MPU6000": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 1,
+   "mag": {
+    "RM3100": 1.0
+   },
+   "vehicles": 1
+  },
+  "SVEHICLE_VH2PRO": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 3,
+   "mag": {
+    "BMM150": 1.0
+   },
+   "vehicles": 1
+  },
+  "SWAN_MINT_V1": {
+   "baro": {
+    "BMP280": 0.3333333333333333
+   },
+   "imu": {
+    "ICM20602": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 1000.0,
+   "logs": 5,
+   "mag": {
+    "IST8310": 0.3333333333333333
+   },
+   "vehicles": 3
+  },
+  "SWEDEN_DYNAMICS_AIOV2": {
+   "baro": {
+    "BMP388": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 60.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 1,
+   "mag": {
+    "UAVCAN": 1.0
+   },
+   "vehicles": 1
+  },
+  "SYNTHETIC_NOT_HARDWARE": {
+   "baro": {},
+   "imu": {},
+   "imu_gyro_cutoff_median": null,
+   "imu_gyro_ratemax_median": null,
+   "logs": 1,
+   "mag": {},
+   "vehicles": 1
+  },
+  "TAP_V3": {
+   "baro": {
+    "UNKNOWN_0x55": 1.0
+   },
+   "imu": {
+    "ICM20602": 1.0
+   },
+   "imu_gyro_cutoff_median": 30.0,
+   "imu_gyro_ratemax_median": null,
+   "logs": 1,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 1
+  },
+  "TAP_V3_2": {
+   "baro": {
+    "UNKNOWN_0x55": 1.0
+   },
+   "imu": {},
+   "imu_gyro_cutoff_median": 65.0,
+   "imu_gyro_ratemax_median": null,
+   "logs": 1,
+   "mag": {},
+   "vehicles": 1
+  },
+  "TBS_LUCIDH7": {
+   "baro": {
+    "DPS310": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 2,
+   "mag": {
+    "QMC5883L": 1.0
+   },
+   "vehicles": 1
+  },
+  "TEAL_FMU_V5_MK1": {
+   "baro": {
+    "BMP388": 1.0
+   },
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 2000.0,
+   "logs": 5,
+   "mag": {
+    "BMM150": 1.0
+   },
+   "vehicles": 3
+  },
+  "TEAL_FMU_V6X_MK2": {
+   "baro": {
+    "BMP390": 1.0
+   },
+   "imu": {
+    "ICM42688P": 0.3333333333333333,
+    "ICM45686": 0.6666666666666666
+   },
+   "imu_gyro_cutoff_median": 30.0,
+   "imu_gyro_ratemax_median": 2000.0,
+   "logs": 3,
+   "mag": {
+    "BMM150": 0.3333333333333333,
+    "BMM350": 0.6666666666666666
+   },
+   "vehicles": 3
+  },
+  "TECTIVE_FMU_V6X": {
+   "baro": {
+    "BMP388": 1.0
+   },
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 30.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 1,
+   "mag": {
+    "BMM150": 1.0
+   },
+   "vehicles": 1
+  },
+  "TERRADRONE_KAKUTEH7X8": {
+   "baro": {
+    "SPA06": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 60.0,
+   "imu_gyro_ratemax_median": 2000.0,
+   "logs": 1,
+   "mag": {},
+   "vehicles": 1
+  },
+  "TERRADRONE_TERRADFC_V2": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 21,
+   "mag": {
+    "QMC5883L": 1.0
+   },
+   "vehicles": 12
+  },
+  "THEPEACH_M0": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ICM20602": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 6,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 2
+  },
+  "THEPEACH_M0_1": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ICM20602": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 3,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 1
+  },
+  "THEPEACH_P1": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ICM20602": 0.9,
+    "MPU9250": 0.1
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 13,
+   "mag": {
+    "AK8963": 0.1,
+    "MMC5983MA": 0.9
+   },
+   "vehicles": 10
+  },
+  "THUNDERTIGER_H7": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 1,
+   "mag": {
+    "LIS3MDL": 1.0
+   },
+   "vehicles": 1
+  },
+  "TMOTOR_VELOX_H7_SE": {
+   "baro": {},
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 80.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 1,
+   "mag": {},
+   "vehicles": 1
+  },
+  "TOLLE_LABS_AIRAVAT": {
+   "baro": {
+    "BMP581": 1.0
+   },
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 2000.0,
+   "logs": 5,
+   "mag": {
+    "BMM350": 1.0
+   },
+   "vehicles": 2
+  },
+  "TTCAT_FMU_V6X": {
+   "baro": {
+    "BMP388": 1.0
+   },
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 2,
+   "mag": {
+    "QMC5883P": 1.0
+   },
+   "vehicles": 2
+  },
+  "TTT_FLIGHT_CONTROLLER": {
+   "baro": {
+    "UNKNOWN_0xFD": 1.0
+   },
+   "imu": {
+    "ICM42686P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 4,
+   "mag": {
+    "IIS2MDC": 1.0
+   },
+   "vehicles": 2
+  },
+  "TUL_PYNQ_Z2": {
+   "baro": {
+    "BMP388": 1.0
+   },
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 2,
+   "mag": {
+    "BMM150": 1.0
+   },
+   "vehicles": 2
+  },
+  "TUOGAO_FLIGHT_CONTROL_V1": {
+   "baro": {
+    "SPL06": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 2000.0,
+   "logs": 10,
+   "mag": {
+    "HMC5883": 0.6,
+    "IST8310": 0.4
+   },
+   "vehicles": 5
+  },
+  "TUSTIN_MACH": {
+   "baro": {
+    "ICP201XX": 1.0
+   },
+   "imu": {
+    "ICM45686": 1.0
+   },
+   "imu_gyro_cutoff_median": 80.0,
+   "imu_gyro_ratemax_median": 600.0,
+   "logs": 4,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 2
+  },
+  "TWENTYFOUR_QX_AI_V1": {
+   "baro": {
+    "BMP390": 1.0
+   },
+   "imu": {
+    "ICM42686P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 1,
+   "mag": {},
+   "vehicles": 1
+  },
+  "UAT_Q100": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ICM20602": 0.9840848806366048,
+    "ICM42688P": 0.015915119363395226
+   },
+   "imu_gyro_cutoff_median": 30.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 1109,
+   "mag": {
+    "IIS2MDC": 0.9946949602122016,
+    "IST8310": 0.001326259946949602,
+    "UAVCAN": 0.003978779840848806
+   },
+   "vehicles": 754
+  },
+  "UAT_Q20": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ICM20602": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 100,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 62
+  },
+  "UCAS_YANQIH7": {
+   "baro": {
+    "BMP388": 1.0
+   },
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 2000.0,
+   "logs": 9,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 5
+  },
+  "UCAS_YANQI_QUADROTOR": {
+   "baro": {
+    "BMP388": 1.0
+   },
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 2000.0,
+   "logs": 2,
+   "mag": {
+    "QMC5883P": 1.0
+   },
+   "vehicles": 2
+  },
+  "UNIONSYS_A2": {
+   "baro": {
+    "SPL06": 0.3333333333333333
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 25.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 6,
+   "mag": {
+    "HMC5883": 1.0
+   },
+   "vehicles": 3
+  },
+  "UNIVER_GLOBAL_FC": {
+   "baro": {
+    "BMP388": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 70.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 2,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 2
+  },
+  "UNKNOWN": {
+   "baro": {
+    "BMP388": 0.027842227378190254,
+    "MS5607": 0.009280742459396751,
+    "MS5611": 0.009280742459396751,
+    "SPL06": 0.002320185614849188,
+    "UAVCAN": 0.002320185614849188,
+    "UNKNOWN_0x00": 0.004640371229698376
+   },
+   "imu": {
+    "BMI088": 0.03248259860788863,
+    "ICM20602": 0.004640371229698376,
+    "ICM20649": 0.002320185614849188,
+    "ICM42688P": 0.002320185614849188,
+    "MPU6000": 0.009280742459396751,
+    "UNKNOWN_0x00": 0.009280742459396751
+   },
+   "imu_gyro_cutoff_median": 30.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 437,
+   "mag": {
+    "AK09916": 0.002320185614849188,
+    "IST8310": 0.01160092807424594,
+    "QMC5883L": 0.009280742459396751,
+    "RM3100": 0.0069605568445475635,
+    "UAVCAN": 0.018561484918793503,
+    "UNKNOWN_0x00": 0.009280742459396751
+   },
+   "vehicles": 431
+  },
+  "UNMANNED_SYSTEMS_AIO": {
+   "baro": {
+    "BMP280": 1.0
+   },
+   "imu": {
+    "BMI270": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 1500.0,
+   "logs": 19,
+   "mag": {
+    "RM3100": 1.0
+   },
+   "vehicles": 8
+  },
+  "UPBEAT_BLUEMAG_PI": {
+   "baro": {
+    "BMP581": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 200.0,
+   "logs": 3,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 1
+  },
+  "UVIFY_CORE": {
+   "baro": {
+    "MS5607": 0.07407407407407407,
+    "MS5611": 0.9259259259259259
+   },
+   "imu": {
+    "MPU6500": 0.037037037037037035,
+    "MPU9250": 0.9629629629629629
+   },
+   "imu_gyro_cutoff_median": 20.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 32,
+   "mag": {
+    "AK8963": 0.037037037037037035,
+    "LIS3MDL": 0.9629629629629629
+   },
+   "vehicles": 27
+  },
+  "Unknown": {
+   "baro": {},
+   "imu": {},
+   "imu_gyro_cutoff_median": null,
+   "imu_gyro_ratemax_median": null,
+   "logs": 2,
+   "mag": {},
+   "vehicles": 2
+  },
+  "V3": {
+   "baro": {},
+   "imu": {
+    "UNKNOWN_0x00": 1.0
+   },
+   "imu_gyro_cutoff_median": 80.0,
+   "imu_gyro_ratemax_median": 1000.0,
+   "logs": 1,
+   "mag": {
+    "UNKNOWN_0x00": 1.0
+   },
+   "vehicles": 1
+  },
+  "VANTAGE_VESPER_765_EMMC": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ICM20689": 1.0
+   },
+   "imu_gyro_cutoff_median": 80.0,
+   "imu_gyro_ratemax_median": 0.0,
+   "logs": 8,
+   "mag": {
+    "IST8308": 1.0
+   },
+   "vehicles": 5
+  },
+  "VELES_X": {
+   "baro": {
+    "BMP388": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 1,
+   "mag": {
+    "LIS3MDL": 1.0
+   },
+   "vehicles": 1
+  },
+  "VERGEAERO_CUBEORANGE": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ICM20602": 0.5,
+    "ICM20649": 0.5
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 4,
+   "mag": {
+    "AK09916": 1.0
+   },
+   "vehicles": 4
+  },
+  "VERGEAERO_CUBEORANGEPLUS": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 1,
+   "mag": {
+    "AK09916": 1.0
+   },
+   "vehicles": 1
+  },
+  "VERGEAERO_X2": {
+   "baro": {
+    "DPS310": 1.0
+   },
+   "imu": {
+    "ICM42686P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 1,
+   "mag": {
+    "BMM150": 1.0
+   },
+   "vehicles": 1
+  },
+  "VKFLY_V12": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 35.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 6,
+   "mag": {
+    "UAVCAN": 1.0
+   },
+   "vehicles": 2
+  },
+  "VOLGA_A1": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "BMI088": 0.3333333333333333,
+    "ICM20689": 0.6666666666666666
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 4,
+   "mag": {
+    "RM3100": 1.0
+   },
+   "vehicles": 3
+  },
+  "WANHOO_H743": {
+   "baro": {
+    "SPL06": 1.0
+   },
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 80.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 1,
+   "mag": {
+    "QMC5883L": 1.0
+   },
+   "vehicles": 1
+  },
+  "WAYDOO_MASTER_V4": {
+   "baro": {},
+   "imu": {
+    "ICM42670P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 5,
+   "mag": {},
+   "vehicles": 3
+  },
+  "WEGSOL_V1_2": {
+   "baro": {
+    "UNKNOWN_0x00": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 3,
+   "mag": {
+    "MMC5983MA": 1.0
+   },
+   "vehicles": 1
+  },
+  "WGDRONES_DR001": {
+   "baro": {
+    "DPS310": 1.0
+   },
+   "imu": {
+    "ICM42688P": 0.9743589743589743,
+    "UNKNOWN_0xAB": 0.02564102564102564
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 145,
+   "mag": {
+    "IST8310": 0.07692307692307693,
+    "RM3100": 0.9230769230769231
+   },
+   "vehicles": 117
+  },
+  "WINDSHAPE_FMU_V6U": {
+   "baro": {
+    "ICP201XX": 1.0
+   },
+   "imu": {
+    "ICM45686": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 1,
+   "mag": {
+    "RM3100": 1.0
+   },
+   "vehicles": 1
+  },
+  "WINEGARD_KERSTEL_H743": {
+   "baro": {
+    "BMP581": 1.0
+   },
+   "imu": {
+    "ICM42605": 1.0
+   },
+   "imu_gyro_cutoff_median": 90.0,
+   "imu_gyro_ratemax_median": 2000.0,
+   "logs": 5,
+   "mag": {},
+   "vehicles": 3
+  },
+  "WINGSTAR_FOREST_TRACKER": {
+   "baro": {
+    "BMP581": 1.0
+   },
+   "imu": {
+    "IIM42652": 1.0
+   },
+   "imu_gyro_cutoff_median": 80.0,
+   "imu_gyro_ratemax_median": 2000.0,
+   "logs": 9,
+   "mag": {
+    "IST8310": 0.8333333333333334,
+    "RM3100": 0.16666666666666666
+   },
+   "vehicles": 6
+  },
+  "WINGSTAR_FOREST_TRACKER_V2": {
+   "baro": {
+    "BMP581": 1.0
+   },
+   "imu": {
+    "IIM42652": 1.0
+   },
+   "imu_gyro_cutoff_median": 80.0,
+   "imu_gyro_ratemax_median": 2000.0,
+   "logs": 3,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 1
+  },
+  "WINGTRA_GEN2": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ICM20602": 1.0
+   },
+   "imu_gyro_cutoff_median": 80.0,
+   "imu_gyro_ratemax_median": 250.0,
+   "logs": 1,
+   "mag": {
+    "UNKNOWN_0xC2": 1.0
+   },
+   "vehicles": 1
+  },
+  "WINGTRA_RAY_FTS": {
+   "baro": {
+    "BMP390": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 80.0,
+   "imu_gyro_ratemax_median": 250.0,
+   "logs": 1,
+   "mag": {
+    "UNKNOWN_0xC2": 1.0
+   },
+   "vehicles": 1
+  },
+  "WINMATE_WMFC": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ICM45686": 1.0
+   },
+   "imu_gyro_cutoff_median": 25.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 3,
+   "mag": {
+    "IST8308": 1.0
+   },
+   "vehicles": 2
+  },
+  "WOLFPX_H743_SLIM": {
+   "baro": {
+    "DPS310": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 16,
+   "mag": {
+    "AK09916": 0.375,
+    "IST8310": 0.375,
+    "UAVCAN": 0.25
+   },
+   "vehicles": 8
+  },
+  "WOOZOOM_ICT": {
+   "baro": {
+    "UNKNOWN_0x8A": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 30.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 9,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 7
+  },
+  "WOOZOOM_THEONE_H7": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ICM20689": 0.5,
+    "ICM42688P": 0.5
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 47,
+   "mag": {
+    "UNKNOWN_0x00": 1.0
+   },
+   "vehicles": 24
+  },
+  "WOOZOOM_VMC": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ICM20689": 1.0
+   },
+   "imu_gyro_cutoff_median": 30.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 4,
+   "mag": {
+    "UNKNOWN_0x00": 1.0
+   },
+   "vehicles": 2
+  },
+  "WUWEI_WFG100": {
+   "baro": {
+    "DPS310": 0.42857142857142855,
+    "SPL06": 0.42857142857142855
+   },
+   "imu": {
+    "ICM42605": 0.42857142857142855,
+    "ICM42688P": 0.5714285714285714
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 12,
+   "mag": {
+    "HMC5883": 0.2857142857142857,
+    "IST8310": 0.14285714285714285,
+    "QMC5883L": 0.2857142857142857,
+    "QMC5883P": 0.2857142857142857
+   },
+   "vehicles": 7
+  },
+  "WW_WFG100": {
+   "baro": {
+    "SPA06": 0.75,
+    "SPL06": 0.25
+   },
+   "imu": {
+    "ICM42605": 0.25,
+    "UNKNOWN_0x64": 0.75
+   },
+   "imu_gyro_cutoff_median": 25.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 8,
+   "mag": {
+    "QMC5883P": 1.0
+   },
+   "vehicles": 4
+  },
+  "X2": {
+   "baro": {},
+   "imu": {},
+   "imu_gyro_cutoff_median": null,
+   "imu_gyro_ratemax_median": null,
+   "logs": 1,
+   "mag": {},
+   "vehicles": 1
+  },
+  "XAL_FMU_V6X": {
+   "baro": {
+    "ICP201XX": 1.0
+   },
+   "imu": {
+    "ICM45686": 1.0
+   },
+   "imu_gyro_cutoff_median": 20.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 3,
+   "mag": {
+    "BMM150": 1.0
+   },
+   "vehicles": 1
+  },
+  "XC_FLY_XC_SLIM": {
+   "baro": {
+    "DPS310": 0.6,
+    "SPL06": 0.4
+   },
+   "imu": {
+    "BMI088": 0.8,
+    "ICM42688P": 0.2
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 2000.0,
+   "logs": 15,
+   "mag": {
+    "HMC5883": 0.2,
+    "IST8310": 0.8
+   },
+   "vehicles": 5
+  },
+  "XDYNAMICS_E2": {
+   "baro": {
+    "SPL06": 1.0
+   },
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 80.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 2,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 1
+  },
+  "XHFX_FMU_V6X": {
+   "baro": {
+    "BMP388": 1.0
+   },
+   "imu": {
+    "ICM45686": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 1,
+   "mag": {
+    "BMM150": 1.0
+   },
+   "vehicles": 1
+  },
+  "XLINK_FMU_X1_MINI": {
+   "baro": {
+    "ICP201XX": 1.0
+   },
+   "imu": {
+    "ICM40609D": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 2,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 2
+  },
+  "XT_HIPILOT_XT_XC01": {
+   "baro": {
+    "BMP388": 0.75
+   },
+   "imu": {
+    "BMI088": 0.75,
+    "ICM42688P": 0.25
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 6,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 4
+  },
+  "X_MAV_AP_H743R1": {
+   "baro": {
+    "DPS310": 0.5,
+    "SPL06": 0.5
+   },
+   "imu": {
+    "BMI270": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 2000.0,
+   "logs": 3,
+   "mag": {
+    "QMC5883P": 1.0
+   },
+   "vehicles": 2
+  },
+  "X_MAV_AP_H743V2": {
+   "baro": {
+    "DPS310": 1.0
+   },
+   "imu": {
+    "BMI088": 0.9180327868852459,
+    "ICM42688P": 0.08196721311475409
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 2000.0,
+   "logs": 156,
+   "mag": {
+    "IST8310": 0.8688524590163934,
+    "QMC5883P": 0.13114754098360656
+   },
+   "vehicles": 61
+  },
+  "X_MAV_AP_H743V3": {
+   "baro": {
+    "SPA06": 1.0
+   },
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 2000.0,
+   "logs": 1,
+   "mag": {
+    "QMC5883P": 1.0
+   },
+   "vehicles": 1
+  },
+  "YANHE_FMU_V5X": {
+   "baro": {
+    "BMP581": 1.0
+   },
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 2,
+   "mag": {
+    "BMM350": 1.0
+   },
+   "vehicles": 2
+  },
+  "YITONG_FC_V1": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 3,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 1
+  },
+  "YJUAV_A6SE_H743": {
+   "baro": {
+    "DPS310": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 3,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 1
+  },
+  "YJ_YSV2": {
+   "baro": {
+    "BMP388": 1.0
+   },
+   "imu": {
+    "ICM20689": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 2,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 1
+  },
+  "YP_FC_V1": {
+   "baro": {
+    "MS5611": 0.5454545454545454,
+    "UNKNOWN_0x05": 0.06060606060606061
+   },
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 33,
+   "mag": {
+    "LIS3MDL": 0.06060606060606061,
+    "RM3100": 0.9393939393939394
+   },
+   "vehicles": 33
+  },
+  "YUNBO_V2": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 1,
+   "mag": {
+    "RM3100": 1.0
+   },
+   "vehicles": 1
+  },
+  "YUNBO_V4": {
+   "baro": {
+    "BMP388": 1.0
+   },
+   "imu": {
+    "ICM42686P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 1,
+   "mag": {
+    "LSM9DS1_M": 1.0
+   },
+   "vehicles": 1
+  },
+  "YUNEEC_TAP_H850": {
+   "baro": {},
+   "imu": {
+    "ICM20602": 1.0
+   },
+   "imu_gyro_cutoff_median": 80.0,
+   "imu_gyro_ratemax_median": null,
+   "logs": 10,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 4
+  },
+  "YUNEEC_TAP_V2": {
+   "baro": {},
+   "imu": {
+    "ICM20602": 1.0
+   },
+   "imu_gyro_cutoff_median": 80.0,
+   "imu_gyro_ratemax_median": null,
+   "logs": 10,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 5
+  },
+  "YUNEEC_TAP_V3": {
+   "baro": {},
+   "imu": {
+    "ICM20602": 1.0
+   },
+   "imu_gyro_cutoff_median": 80.0,
+   "imu_gyro_ratemax_median": null,
+   "logs": 8,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 6
+  },
+  "YUNEEC_TYPHOON_H": {
+   "baro": {},
+   "imu": {
+    "MPU6000": 1.0
+   },
+   "imu_gyro_cutoff_median": 30.0,
+   "imu_gyro_ratemax_median": 0.0,
+   "logs": 1,
+   "mag": {
+    "HMC5883": 1.0
+   },
+   "vehicles": 1
+  },
+  "YUNYI_FCS_HPM": {
+   "baro": {},
+   "imu": {
+    "UNKNOWN_0x18": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 1,
+   "mag": {},
+   "vehicles": 1
+  },
+  "YUNYI_FK_V2": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "UNKNOWN_0x18": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 1,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 1
+  },
+  "ZEROONE_M9": {
+   "baro": {
+    "ICP201XX": 1.0
+   },
+   "imu": {
+    "IIM42653": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 3,
+   "mag": {
+    "RM3100": 1.0
+   },
+   "vehicles": 1
+  },
+  "ZEROONE_X6": {
+   "baro": {
+    "BMP581": 0.10126582278481013,
+    "ICP201XX": 0.8860759493670886
+   },
+   "imu": {
+    "BMI088": 0.16455696202531644,
+    "ICM45686": 0.740506329113924,
+    "IIM42652": 0.05063291139240506,
+    "IIM42653": 0.03164556962025317,
+    "SCH16T": 0.012658227848101266
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 349,
+   "mag": {
+    "BMM350": 0.10126582278481013,
+    "IST8310": 0.5126582278481012,
+    "RM3100": 0.379746835443038,
+    "UAVCAN": 0.006329113924050633
+   },
+   "vehicles": 158
+  },
+  "ZEROONE_X9": {
+   "baro": {
+    "ICP201XX": 1.0
+   },
+   "imu": {
+    "IIM42652": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 1,
+   "mag": {
+    "RM3100": 1.0
+   },
+   "vehicles": 1
+  },
+  "ZGD_V5": {
+   "baro": {
+    "BMP388": 1.0
+   },
+   "imu": {
+    "LSM9DS1": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 1,
+   "mag": {
+    "BMM150": 1.0
+   },
+   "vehicles": 1
+  },
+  "ZHIHE_H7": {
+   "baro": {
+    "DPS310": 1.0
+   },
+   "imu": {
+    "BMI088": 1.0
+   },
+   "imu_gyro_cutoff_median": 80.0,
+   "imu_gyro_ratemax_median": 1000.0,
+   "logs": 15,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 7
+  },
+  "ZKRT_V6X": {
+   "baro": {
+    "ICP201XX": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 1,
+   "mag": {
+    "RM3100": 1.0
+   },
+   "vehicles": 1
+  },
+  "ZKW_FMU_V6X": {
+   "baro": {
+    "ICP201XX": 1.0
+   },
+   "imu": {
+    "ICM45686": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 6,
+   "mag": {
+    "IST8310": 1.0
+   },
+   "vehicles": 2
+  },
+  "ZZ_731": {
+   "baro": {
+    "DPS310": 0.9444444444444444
+   },
+   "imu": {
+    "ICM20649": 1.0
+   },
+   "imu_gyro_cutoff_median": 30.0,
+   "imu_gyro_ratemax_median": 0.0,
+   "logs": 34,
+   "mag": {
+    "QMC5883L": 1.0
+   },
+   "vehicles": 18
+  },
+  "ZZ_743": {
+   "baro": {
+    "DPS310": 1.0
+   },
+   "imu": {
+    "BMI088": 0.6666666666666666,
+    "UNKNOWN_0x39": 0.3333333333333333
+   },
+   "imu_gyro_cutoff_median": 30.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 5,
+   "mag": {
+    "QMC5883L": 0.6666666666666666
+   },
+   "vehicles": 3
+  },
+  "basic_dev": {
+   "baro": {},
+   "imu": {},
+   "imu_gyro_cutoff_median": null,
+   "imu_gyro_ratemax_median": null,
+   "logs": 1,
+   "mag": {},
+   "vehicles": 1
+  },
+  "battery_pack_lcd_v3_stm32": {
+   "baro": {},
+   "imu": {},
+   "imu_gyro_cutoff_median": null,
+   "imu_gyro_ratemax_median": null,
+   "logs": 1,
+   "mag": {},
+   "vehicles": 1
+  },
+  "cuav_nora": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ICM20689": 0.6875,
+    "ICM42688P": 0.3125
+   },
+   "imu_gyro_cutoff_median": 25.0,
+   "imu_gyro_ratemax_median": 800.0,
+   "logs": 32,
+   "mag": {
+    "RM3100": 1.0
+   },
+   "vehicles": 32
+  },
+  "cuav_x7pro": {
+   "baro": {
+    "MS5611": 1.0
+   },
+   "imu": {
+    "ICM42688P": 1.0
+   },
+   "imu_gyro_cutoff_median": 40.0,
+   "imu_gyro_ratemax_median": 400.0,
+   "logs": 1,
+   "mag": {},
+   "vehicles": 1
+  },
+  "esp32s3": {
+   "baro": {},
+   "imu": {},
+   "imu_gyro_cutoff_median": null,
+   "imu_gyro_ratemax_median": null,
+   "logs": 1,
+   "mag": {},
+   "vehicles": 1
+  },
+  "fcs_v4_pvt1_m_sil": {
+   "baro": {},
+   "imu": {},
+   "imu_gyro_cutoff_median": null,
+   "imu_gyro_ratemax_median": null,
+   "logs": 1,
+   "mag": {},
+   "vehicles": 1
+  },
+  "px4_android": {
+   "baro": {},
+   "imu": {},
+   "imu_gyro_cutoff_median": null,
+   "imu_gyro_ratemax_median": null,
+   "logs": 1,
+   "mag": {},
+   "vehicles": 1
+  },
+  "seeed_xiao_esp32s3": {
+   "baro": {},
+   "imu": {},
+   "imu_gyro_cutoff_median": null,
+   "imu_gyro_ratemax_median": null,
+   "logs": 1,
+   "mag": {},
+   "vehicles": 1
+  },
+  "stm32f407_flash_store": {
+   "baro": {},
+   "imu": {},
+   "imu_gyro_cutoff_median": null,
+   "imu_gyro_ratemax_median": null,
+   "logs": 1,
+   "mag": {},
+   "vehicles": 1
+  },
+  "v2.16.5": {
+   "baro": {},
+   "imu": {},
+   "imu_gyro_cutoff_median": null,
+   "imu_gyro_ratemax_median": null,
+   "logs": 1,
+   "mag": {
+    "UNKNOWN_0x00": 1.0
+   },
+   "vehicles": 1
+  },
+  "v2.17.7": {
+   "baro": {},
+   "imu": {},
+   "imu_gyro_cutoff_median": null,
+   "imu_gyro_ratemax_median": null,
+   "logs": 1,
+   "mag": {
+    "UNKNOWN_0x00": 1.0
+   },
+   "vehicles": 1
+  },
+  "v2.20.6-dirty": {
+   "baro": {},
+   "imu": {},
+   "imu_gyro_cutoff_median": null,
+   "imu_gyro_ratemax_median": null,
+   "logs": 1,
+   "mag": {
+    "UNKNOWN_0x00": 1.0
+   },
+   "vehicles": 1
+  },
+  "vendor_fc": {
+   "baro": {},
+   "imu": {},
+   "imu_gyro_cutoff_median": null,
+   "imu_gyro_ratemax_median": null,
+   "logs": 1,
+   "mag": {},
+   "vehicles": 1
+  }
+ }
+}
