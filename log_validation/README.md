@@ -168,6 +168,11 @@ is `BAT1_CAPACITY`, else `BAT_CAPACITY`, and a log with an unset or non-positive
 capacity falls in the "unknown capacity" class (a logged `BAT1_CAPACITY` of -1 or 0
 wins over a `BAT_CAPACITY` value). A class with fewer than 5 vehicles is
 left out. The emitted Rust constants stay per cell count.
+A log whose median voltage per cell (by its logged cell count) lies outside 3.0 to 4.4 V
+is left out as a cell-count mismatch and counted. Each cell count deploys its own median
+resistance when it has at least 200 step events; a smaller class, and a cell count without
+a row, deploys the median over vehicles (each vehicle's median, then the median over
+vehicles). The fit also reports a held-out check per cell count.
 
 `batch_analyze`, `response` and `battery_fit` take `--jobs N` to run the logs in N
 worker processes (default 1); the output is the same for any N, and a log whose
