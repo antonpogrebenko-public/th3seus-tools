@@ -67,7 +67,7 @@ from .battery_extract import (  # noqa: F401
     load_battery_topics, load_extracted, load_named, read_obs_dirs, read_statuses, save_extracted,
 )
 from .battery_model import (  # noqa: F401
-    CELL_V_MAX, CELL_V_MIN,
+    CELL_COUNT_CHECK_V_MAX, CELL_COUNT_CHECK_V_MIN,
     MIN_R_OBSERVATIONS_PER_CLASS, BatteryFitResult, CellCountCheck, OcvCurve,
     PerCellRFit, StepCheck,
 )
@@ -537,11 +537,13 @@ STATUS_CELL_MISMATCH = "cell_count_mismatch"
 
 
 def cell_count_matches(data: LogBatteryData) -> bool:
-    """True when the median pack voltage per logged cell is within CELL_V_MIN to CELL_V_MAX."""
+    """True when the median pack voltage per logged cell is within the cell-count check range
+    (CELL_COUNT_CHECK_V_MIN to CELL_COUNT_CHECK_V_MAX)."""
     finite = data.v[np.isfinite(data.v)]
     if data.cell_count <= 0 or finite.size == 0:
         return False
-    return CELL_V_MIN <= float(np.median(finite)) / data.cell_count <= CELL_V_MAX
+    per_cell = float(np.median(finite)) / data.cell_count
+    return CELL_COUNT_CHECK_V_MIN <= per_cell <= CELL_COUNT_CHECK_V_MAX
 
 
 def _statuses_of(datas: Sequence[LogBatteryData], no_data: Mapping[str, str]) -> dict[str, str]:

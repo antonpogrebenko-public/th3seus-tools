@@ -18,8 +18,8 @@ from .battery_capacity import DEFAULT_CAPACITY_BOUNDS_MAH, CapacityClassRFit
 
 # Plausible per-cell voltage range (V) of a pack's median voltage; a log whose
 # median pack voltage divided by its cell count falls outside it has a wrong cell count.
-CELL_V_MIN: float = 3.0
-CELL_V_MAX: float = 4.4
+CELL_COUNT_CHECK_V_MIN: float = 3.0
+CELL_COUNT_CHECK_V_MAX: float = 4.4
 
 # Minimum number of step-event observations for a per-cell-count R median to be
 # trusted.  Cell counts below this fall back to the pooled median because their

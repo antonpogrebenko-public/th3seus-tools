@@ -190,7 +190,7 @@ def test_battery_outputs_and_sources_have_no_long_dashes(tmp_path):
     assert [d for t in texts for d in LONG_DASHES if d in t] == []
 
 
-def _with_both_fallbacks(result):
+def _with_low_n_and_low_median(result):
     """The result with a low-n class and a 200-plus-step class with a low median that is deployed."""
     fit = result.r_fits[0]
     low_n = dataclasses.replace(fit, low_n=True, n_observations=1)
@@ -202,7 +202,7 @@ def _with_both_fallbacks(result):
 
 def test_battery_outputs_and_sources_are_ascii(tmp_path):
     _, result = _corpus_result()
-    result = _with_both_fallbacks(result)
+    result = _with_low_n_and_low_median(result)
     md = _markdown(tmp_path, result)
     assert "low-n" in md and "implausible" not in md
     texts = [md, emit_rust_constants(result)]
@@ -214,7 +214,7 @@ def test_json_names_why_a_class_falls_back():
     _, result = _corpus_result()
     own = dataclasses.replace(result.r_fits[0], low_n=False)
     fits = result_to_dict(dataclasses.replace(
-        result, r_fits=[own, *_with_both_fallbacks(result).r_fits]))["r_fits"]
+        result, r_fits=[own, *_with_low_n_and_low_median(result).r_fits]))["r_fits"]
     assert [f["fallback_reason"] for f in fits] == [
         None, "low-n (fewer than 200 step events)", None]
 

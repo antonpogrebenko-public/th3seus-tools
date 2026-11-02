@@ -170,9 +170,10 @@ wins over a `BAT_CAPACITY` value). A class with fewer than 5 vehicles is
 left out. The emitted Rust constants stay per cell count.
 A log whose median voltage per cell (by its logged cell count) lies outside 3.0 to 4.4 V
 is left out as a cell-count mismatch and counted. Each cell count deploys its own median
-resistance when it has at least 200 step events; a smaller class, and a cell count without
-a row, deploys the median over vehicles (each vehicle's median, then the median over
-vehicles). The fit also reports a held-out check per cell count.
+resistance when it has at least 200 step events; a cell count with fewer step events, and
+a cell count without a row, deploys one value pooled over all fit vehicles of every cell
+count (each vehicle's median step resistance, then the median over vehicles). The fit also
+reports a held-out check per cell count.
 
 `batch_analyze`, `response` and `battery_fit` take `--jobs N` to run the logs in N
 worker processes (default 1); the output is the same for any N, and a log whose
@@ -393,6 +394,12 @@ and new columns, per MCU family; check them before deploying. Re-seeding also ch
 the gyro bias sigma and the baro, mag and GPS parameters measured in the still window,
 because the still window and the Allan fit now use `sensor_combined` (when the log has
 it) rather than `sensor_gyro`; compare those profile values with the deployed ones too.
+
+The battery table in `rust/battery_tables.rs` now deploys measured medians below 4
+mohm/cell as they are (the earlier plausibility floor is gone) and uses the median
+pooled over vehicles as the fallback and default, so copying it changes the simulated
+sag for most pack sizes and for cell counts without a row. Compare it with `hitl-physics`
+`src/battery.rs` and read the report's held-out check per cell count before deploying.
 
 The at-rest values (the noise densities, the gyro bias sigma, and the baro, mag and GPS
 values measured in the still window) now exclude armed and hover windows, which

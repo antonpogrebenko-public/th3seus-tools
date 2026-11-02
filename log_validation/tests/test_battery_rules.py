@@ -29,6 +29,40 @@ def test_cell_count_matches(cells, volts, ok):
     assert cell_count_matches(replace(d, cell_count=cells, v=np.full(d.v.size, volts))) is ok
 
 
+def test_the_median_decides_not_the_extremes():
+    d = make_data("x")
+    n = d.v.size
+    high = np.full(n, 15.2)
+    high[:8] = 18.5  # a few samples above 4.4 V per cell
+    low = np.full(n, 11.0)
+    low[:8] = 15.0  # median below 3.0 V per cell although some samples are in range
+    noisy = np.full(n, 15.2)
+    noisy[:3], noisy[3:6] = np.inf, np.nan
+    assert cell_count_matches(replace(d, cell_count=4, v=high)) is True
+    assert cell_count_matches(replace(d, cell_count=4, v=low)) is False
+    assert cell_count_matches(replace(d, cell_count=4, v=noisy)) is True
+
+
+def test_one_cell_pack_at_16_8_v_is_a_mismatch_and_left_out_of_the_fit():
+    d = make_data("m1")
+    mismatched = replace(d, cell_count=1, v=np.full(d.v.size, 16.8))
+    assert cell_count_matches(mismatched) is False
+    r = fit_extracted([make_data(f"a{k}") for k in range(8)] + [mismatched], {}, 0.2, 0)
+    assert r.cell_count_mismatch_count == 1
+    assert "m1" not in r.fit_log_ids and "m1" not in r.holdout_scored_log_ids
+
+
+def test_matching_pack_is_kept_in_the_fit():
+    datas = [make_data(f"a{k}") for k in range(8)]
+    assert all(14.5 < float(np.median(d.v)) < 15.9 for d in datas)  # the fakes' 4S packs
+    r = fit_extracted(datas, {}, 0.2, 0)
+    assert r.cell_count_mismatch_count == 0
+    kept = r.fit_log_ids[0]
+    without = fit_extracted([d for d in datas if d.log_id != kept], {}, 0.2, 0, no_data={kept: "unusable"})
+    steps = lambda res: next(f for f in res.r_fits if f.cell_count == 4).n_observations  # noqa: E731
+    assert steps(r) > steps(without)
+
+
 def test_no_finite_voltage_is_a_mismatch():
     d = make_data("x")
     assert cell_count_matches(replace(d, v=np.full(d.v.size, np.nan))) is False
@@ -44,7 +78,10 @@ def test_pack_logged_as_1s_is_left_out(tmp_path):
     assert result_to_dict(r)["cell_count_mismatch_count"] == 1
     out = tmp_path / "s.md"
     write_markdown_summary(r, out)
-    assert "cell count does not match the pack voltage" in out.read_text()
+    text = out.read_text()
+    assert "cell count does not match the pack voltage" in text
+    assert ("| Left out: cell count does not match the pack voltage "
+            "(median outside 3.0 to 4.4 V per cell) | 1 |") in text
 
 
 def test_mismatched_log_keeps_the_split():
@@ -165,6 +202,24 @@ def test_unrowed_cell_count_is_scored_with_the_vehicle_pooled_default():
     assert five.deployed_mohm_per_cell == r.pooled_r_over_vehicles_mohm_per_cell
 
 
+def test_headline_mae_of_an_unrowed_cell_count_uses_the_vehicle_pooled_default():
+    datas = ([make_data(f"a{k}", 4, 9.0) for k in range(6)]
+             + [make_data(f"b{k}", 4, 15.0) for k in range(3)] + [make_data("five", 5, 25.0)])
+    vehicles = {**{f"a{k}": "vA" for k in range(6)}, **{f"b{k}": f"vB{k}" for k in range(3)},
+                "five": "vF"}
+    for seed in range(60):
+        r = fit_extracted(datas, vehicles, 0.1, seed)
+        if list(r.holdout_scored_log_ids) == ["five"]:
+            break
+    else:
+        pytest.fail("no seed holds out only the 5S log")
+    (row,) = r.holdout_by_cell_count
+    assert row.cell_count == 5 and all(f.cell_count != 5 for f in r.r_fits)
+    assert r.overall_r_median_mohm_per_cell != pytest.approx(r.pooled_r_over_vehicles_mohm_per_cell, abs=1.0)
+    assert row.deployed_mohm_per_cell == r.pooled_r_over_vehicles_mohm_per_cell
+    assert r.holdout_median_mae_v_per_cell == row.median_mae_v_per_cell
+
+
 def test_caller_cannot_pass_the_fit_internal_mismatch_status():
     with pytest.raises(ValueError, match="cell_count_mismatch"):
         fit_extracted([make_data(f"a{k}") for k in range(8)], {}, 0.2, 0,
@@ -204,6 +259,9 @@ def test_fit_fills_the_check_per_cell_count_without_nan():
     r = fit_extracted([make_data(f"a{k}") for k in range(8)], {}, 0.2, 0)
     assert r.holdout_by_cell_count
     assert all(c.scored_logs > 0 for c in r.holdout_by_cell_count)
+    (only,) = r.holdout_by_cell_count  # all logs are 4S
+    assert only.median_mae_v_per_cell == r.holdout_median_mae_v_per_cell
+    assert only.scored_logs == r.holdout_scored_count
     doc = result_to_dict(r)
     json.dumps(doc, allow_nan=False)
     assert set(doc["holdout_by_cell_count"][0]) == {
@@ -215,7 +273,15 @@ def test_markdown_has_the_check_per_cell_count(tmp_path):
     r = fit_extracted([make_data(f"a{k}") for k in range(8)], {}, 0.2, 0)
     out = tmp_path / "s.md"
     write_markdown_summary(r, out)
-    assert "Held-out check per cell count" in out.read_text()
+    text = out.read_text()
+    assert "Held-out check per cell count" in text
+    (c,) = r.holdout_by_cell_count
+    assert (f"| {c.cell_count}S | {c.scored_logs} | {c.deployed_mohm_per_cell:.2f} | "
+            f"{c.median_mae_v_per_cell:.4f} | {c.median_signed_err_v_per_cell:.4f} |") in text
+    assert (f"Pooled median over vehicles: {r.pooled_r_over_vehicles_mohm_per_cell:.2f} mohm/cell "
+            f"({r.pooled_r_vehicles} vehicles)") in text
+    assert ("Medians over the scored held-out logs of each cell count, next to the resistance "
+            "deployed for it.") in " ".join(text.split())
 
 
 def test_markdown_signed_error_sentence_and_single_blank_lines(tmp_path):
@@ -228,3 +294,23 @@ def test_markdown_signed_error_sentence_and_single_blank_lines(tmp_path):
             "sits above these packs.") in " ".join(text.split())
     assert "\n\n\n" not in text
     assert "3.0 to 4.4 V per cell" in text
+
+
+KNOWN_REASONS = ["low-n (fewer than 200 step events)",
+                 "implausible (median below the 4 mohm/cell floor)"]
+
+
+@pytest.mark.parametrize("bad", [
+    "low-n\n fn injected() {}", "something else", "implausible\r\nfn x() {}", 7, ["low-n"]])
+def test_older_file_fallback_reason_must_be_a_known_one(bad):
+    doc = _battery_doc(rows=[(6, 3.27, 446961, True)], pooled_vehicles=None)
+    doc["r_fits"][0]["fallback_reason"] = bad
+    with pytest.raises(ValueError, match="fallback_reason"):
+        rust_constants_text(doc)
+
+
+@pytest.mark.parametrize("reason", KNOWN_REASONS)
+def test_older_file_known_fallback_reasons_still_render(reason):
+    doc = _battery_doc(rows=[(6, 3.27, 446961, True)], pooled_vehicles=None)
+    doc["r_fits"][0]["fallback_reason"] = reason
+    assert f"n=446961, {reason} -> pooled median" in rust_constants_text(doc)

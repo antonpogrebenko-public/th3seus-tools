@@ -107,14 +107,15 @@ def _pooled_lines(battery: Mapping[str, Any]) -> list[str]:
     return [f"Pooled median over steps: {steps}",
             "Pooled median over vehicles: "
             f"{_num(battery.get('pooled_r_over_vehicles_mohm_per_cell'), '.2f')} mohm per cell "
-            f"over {battery.get('pooled_r_vehicles', NA)} vehicles (the fallback)."]
+            f"over {battery.get('pooled_r_vehicles', NA)} vehicles (each vehicle's median over all "
+            "its step events, then the median over vehicles; the fallback)."]
 
 
 def _cell_count_check(battery: Mapping[str, Any]) -> list[str]:
-    lines = ["Held-out check per cell count: median over the scored held-out logs, with the "
-             "Deployed mohm. The signed error is predicted minus measured voltage per cell; "
-             "positive means the model predicts less sag than the packs show, or that the "
-             "open-circuit curve sits above these packs.", ""]
+    lines = ["Held-out check per cell count: medians over the scored held-out logs of each cell "
+             "count, next to the resistance deployed for it. The signed error is predicted "
+             "minus measured voltage per cell; positive means the model predicts less sag than the "
+             "packs show, or that the open-circuit curve sits above these packs.", ""]
     if "holdout_by_cell_count" not in battery:
         return ["The per-cell-count check is not in this battery fit file.", ""]
     rows = [[f"{c.get('cell_count')}S", str(c.get("scored_logs", NA)),

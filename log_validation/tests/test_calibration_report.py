@@ -281,7 +281,8 @@ def test_report_names_both_pools():
     battery = {**battery_dict(), "pooled_r_over_vehicles_mohm_per_cell": 7.25, "pooled_r_vehicles": 3}
     text = _battery_text(battery)
     assert "Pooled median over steps: 9.50 mohm per cell over 300 steps." in text
-    assert "Pooled median over vehicles: 7.25 mohm per cell over 3 vehicles (the fallback)." in text
+    assert ("Pooled median over vehicles: 7.25 mohm per cell over 3 vehicles (each vehicle's "
+            "median over all its step events, then the median over vehicles; the fallback).") in text
     assert "Pooled median: 9.50 mohm per cell over 300 steps." in _battery_text(battery_dict())
 
 

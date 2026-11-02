@@ -10,8 +10,8 @@ from typing import Any
 
 from .battery_capacity import MIN_CLASS_VEHICLES
 from .battery_model import (
-    CELL_V_MAX,
-    CELL_V_MIN,
+    CELL_COUNT_CHECK_V_MAX,
+    CELL_COUNT_CHECK_V_MIN,
     MIN_R_OBSERVATIONS_PER_CLASS,
     BatteryFitResult,
     PerCellRFit,
@@ -160,7 +160,8 @@ def _cell_count_check_lines(r: BatteryFitResult) -> list[str]:
     lines = [
         "## Held-out check per cell count",
         "",
-        "Median over the scored held-out logs of each cell count, with the Deployed R.  "
+        "Medians over the scored held-out logs of each cell count, next to the resistance "
+        "deployed for it.  "
         "The signed error is predicted minus measured voltage per cell; positive means "
         "the model predicts less sag than the packs show, or that the open-circuit curve "
         "sits above these packs.",
@@ -199,7 +200,7 @@ def write_markdown_summary(
         f"| SIM logs excluded | {r.sim_log_count} |",
         f"| Skipped (load error or no usable battery data) | {r.skipped_log_count} |",
         "| Left out: cell count does not match the pack voltage "
-        f"(median outside {CELL_V_MIN:.1f} to {CELL_V_MAX:.1f} V per cell) | "
+        f"(median outside {CELL_COUNT_CHECK_V_MIN:.1f} to {CELL_COUNT_CHECK_V_MAX:.1f} V per cell) | "
         f"{r.cell_count_mismatch_count} |",
         f"| Holdout (validation only) | {r.holdout_log_count} |",
         f"| Fit logs with at least one observation | {len(r.fit_log_ids)} |",
@@ -294,6 +295,12 @@ def _whole(record: Mapping[str, Any], key: str) -> int:
     return int(value)
 
 
+_KNOWN_OLD_REASONS = (
+    f"low-n (fewer than {MIN_R_OBSERVATIONS_PER_CLASS} step events)",
+    "implausible (median below the 4 mohm/cell floor)",
+)
+
+
 def _r_note(battery: Mapping[str, Any], f: Mapping[str, Any], n: int) -> str:
     """The comment of one R row; a file from before the vehicle-pooled median names its stored reason."""
     if not f["low_n"]:
@@ -301,7 +308,11 @@ def _r_note(battery: Mapping[str, Any], f: Mapping[str, Any], n: int) -> str:
     if "pooled_r_over_vehicles_mohm_per_cell" in battery:
         return f"n={n}, fewer than {MIN_R_OBSERVATIONS_PER_CLASS} step events -> pooled over vehicles"
     reason = f.get("fallback_reason")
-    return f"n={n}, {reason} -> pooled median" if reason else f"n={n} -> pooled median"
+    if reason is None:
+        return f"n={n} -> pooled median"
+    if reason not in _KNOWN_OLD_REASONS:  # the text goes into a Rust comment: only known strings
+        raise ValueError("battery fit: fallback_reason is not a known reason")
+    return f"n={n}, {reason} -> pooled median"
 
 
 def _r_table_lines(battery: Mapping[str, Any]) -> list[str]:
