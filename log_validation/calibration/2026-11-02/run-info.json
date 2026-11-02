@@ -44,7 +44,7 @@
   "battery_split_seed": 20260623,
   "gps_rest_min_s": 60.0,
   "jobs": 8,
-  "local_tool_commit": "e73a2939300fffcbfc181fb9c3a24aca6ca6b2a7",
+  "local_tool_commit": "9dc6dc2d789b9695c4b15d07ac3b35ed14bdd20c",
   "max_per_vehicle": 3,
   "noise_and_battery_set": "every log of the mirror that the catalog step could read and marked as real hardware (a log marked as simulated, or whose simulation flag is unknown, is left out); all vehicle types",
   "part_tables": {

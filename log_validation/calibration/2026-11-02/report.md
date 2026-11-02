@@ -12,7 +12,7 @@
   - `battery_split_seed`: 20260623
   - `gps_rest_min_s`: 60.0
   - `jobs`: 8
-  - `local_tool_commit`: "e73a2939300fffcbfc181fb9c3a24aca6ca6b2a7"
+  - `local_tool_commit`: "9dc6dc2d789b9695c4b15d07ac3b35ed14bdd20c"
   - `max_per_vehicle`: 3
   - `noise_and_battery_set`: "every log of the mirror that the catalog step could read and marked as real hardware (a log marked as simulated, or whose simulation flag is unknown, is left out); all vehicle types"
   - `part_tables`: {"allan_slope_tolerance": 0.15, "catalog_spellings": "none", "min_vehicles": 10, "sim_rate_baro_hz": 50.0, "sim_rate_mag_hz": 50.0}
@@ -265,7 +265,7 @@ Internal resistance per cell, from current steps. Deployed is the value the simu
 | 14S | 2.39 | 0.88 | 9.21 | 2.39 | 14365 | 38 | own fit |
 
 Pooled median over steps: 3.10 mohm per cell over 842356 steps.
-Pooled median over vehicles: 5.57 mohm per cell over 6380 vehicles (the fallback).
+Pooled median over vehicles: 5.57 mohm per cell over 6380 vehicles (each vehicle's median over all its step events, then the median over vehicles; the fallback).
 
 Internal resistance per cell count and pack capacity (the log's battery capacity parameter). Spread only: the simulator table stays per cell count.
 
@@ -320,7 +320,7 @@ Held-out checks:
 | Step check: median error (V per cell) | 0.02994 |
 | Step check: p75 error (V per cell) | 0.06441 |
 
-Held-out check per cell count: median over the scored held-out logs, with the Deployed mohm. The signed error is predicted minus measured voltage per cell; positive means the model predicts less sag than the packs show, or that the open-circuit curve sits above these packs.
+Held-out check per cell count: medians over the scored held-out logs of each cell count, next to the resistance deployed for it. The signed error is predicted minus measured voltage per cell; positive means the model predicts less sag than the packs show, or that the open-circuit curve sits above these packs.
 
 | Cells | Scored logs | Deployed mohm | Median error (V per cell) | Median signed error (V per cell) |
 |---|---|---|---|---|
