@@ -333,10 +333,10 @@ The calibration directory holds:
   and after the estimator fix, the battery fit with both held-out checks, the response
   distributions, the reference-airframe comparison, a summary of the randomization
   ranges, the gaps TH3SEUS does not model, and the counts of logs analyzed, skipped
-  and failed per pass with their reasons. A log counts as failed only when one of its
+  and failed per pass with their reasons. A log counts as analyzed when it is behind the
+  pass's numbers (listed in `log-ids/`); any other log counts as failed when one of its
   errors starts with a step label followed by `failed: ` or `unavailable: ` (such as
-  `analysis failed: ValueError`), or with `worker process died`; every other log that
-  gave no numbers counts as skipped.
+  `analysis failed: ValueError`), or with `worker process died`, and as skipped otherwise.
 - `ranges.csv`: the p5, p25, p50, p75 and p95 of every quantity, overall and per
   battery cell count and airframe ID, with the numbers of logs and vehicles. A class
   needs at least 5 vehicles; the overall row is given whenever one vehicle has a value.
@@ -408,7 +408,9 @@ The committed run is in [`calibration/2026-11-02/`](calibration/2026-11-02/repor
 and the battery, and 1,355 quadrotor logs for the response pass (the pass refuses the
 130 of them not logged at the rate controller's rate), at most 3 logs per vehicle in
 each set. Its `run-info.json` gives the parameters and commands. Its at-rest values come
-from disarmed still windows only, so 3,671 of the noise logs give them.
+from disarmed still windows only, so 3,671 of the noise logs give them. Its Counts
+section was rendered with the earlier failure rule, which also counted a failure word
+anywhere in a note: it shows 27 failed noise logs, 26 under the current rule.
 
 ## Tests
 
