@@ -7,9 +7,10 @@ from dataclasses import replace
 import numpy as np
 import pytest
 
-from log_validation.battery_fit import cell_count_matches, fit_extracted
-from log_validation.battery_output import result_to_dict, write_markdown_summary
+from log_validation.battery_fit import _LogObservations, _r_table, cell_count_matches, fit_extracted
+from log_validation.battery_output import result_to_dict, rust_constants_text, write_markdown_summary
 from log_validation.tests.battery_fakes import make_data
+from log_validation.tests.calibration_inputs import battery_dict
 
 
 @pytest.mark.parametrize("cells, volts, ok", [
@@ -61,3 +62,56 @@ def test_counts_partition_the_selected_logs():
         + r.cell_count_mismatch_count)
     assert total == len(datas) + len(no_data)
     assert r.cell_count_mismatch_count == 4 and r.sim_log_count == 2 and r.skipped_log_count == 2
+
+
+def _obs(log_id, cells, r_obs):
+    return _LogObservations(log_id, cells, list(r_obs), [])
+
+
+def _battery_doc(rows, pooled_vehicles):
+    """A dict shaped like result_to_dict; rows are (cells, deployed, n, low_n)."""
+    doc = battery_dict()
+    doc["r_fits"] = [
+        {"cell_count": c, "median_mohm_per_cell": d, "deployed_mohm_per_cell": d,
+         "n_observations": n, "low_n": low} for c, d, n, low in rows]
+    if pooled_vehicles is not None:
+        doc["pooled_r_over_vehicles_mohm_per_cell"], doc["pooled_r_vehicles"] = pooled_vehicles
+    return doc
+
+
+def test_low_resistance_is_deployed():  # 6S packs at 3.2 mohm/cell, enough steps
+    datas = [make_data(f"s{k:02d}", 6, 3.2) for k in range(16)]
+    r = fit_extracted(datas, {}, 0.2, 0)
+    six = next(f for f in r.r_fits if f.cell_count == 6)
+    assert six.n_observations >= 200 and not six.low_n
+    assert six.deployed_mohm_per_cell == six.median_mohm_per_cell
+    assert six.deployed_mohm_per_cell == pytest.approx(3.2, rel=0.05)
+
+
+def test_pooled_over_vehicles():
+    obs = [_obs("a", 6, [2.0] * 1000), _obs("b", 4, [8.0] * 10), _obs("c", 4, [8.0] * 10)]
+    rows, by_steps, n_steps, by_vehicles, n_vehicles = _r_table(obs, {"a": "vA", "b": "vB", "c": "vC"})
+    assert (by_steps, by_vehicles, n_vehicles) == (2.0, 8.0, 3)
+
+
+def test_few_steps_deploy_the_vehicle_pooled_median():
+    obs = [_obs("a", 6, [2.0] * 1000), _obs("b", 4, [8.0] * 10), _obs("c", 4, [8.0] * 10)]
+    rows, *_ = _r_table(obs, {"a": "vA", "b": "vB", "c": "vC"})
+    four = next(f for f in rows if f.cell_count == 4)
+    assert four.low_n and four.deployed_mohm_per_cell == 8.0
+    six = next(f for f in rows if f.cell_count == 6)
+    assert not six.low_n and six.deployed_mohm_per_cell == 2.0
+
+
+def test_rust_comments_name_the_fallback():  # dict shaped like result_to_dict
+    text = rust_constants_text(_battery_doc(rows=[(6, 3.2, 446961, False), (9, 5.9, 7, True)],
+                                            pooled_vehicles=(5.99, 3)))
+    assert "(6, 3.2000),  // n=446961\n" in text
+    assert "(9, 5.9000),  // n=7, fewer than 200 step events -> pooled over vehicles" in text
+    assert "FITTED_R_DEFAULT_MOHM_PER_CELL: f64 = 5.9900;  // pooled over 3 vehicles" in text
+    assert "LOW-N" not in text
+
+
+def test_rust_default_from_an_older_battery_file():
+    doc = _battery_doc(rows=[(4, 9.0, 300, False)], pooled_vehicles=None)  # no new keys
+    assert "f64 = 9.5000;  // pooled over step events, n=300" in rust_constants_text(doc)

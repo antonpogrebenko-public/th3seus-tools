@@ -26,15 +26,6 @@ CELL_V_MAX: float = 4.4
 # sample is too small to be stable across runs.
 MIN_R_OBSERVATIONS_PER_CLASS: int = 200
 
-# Plausibility floor for a per-cell internal resistance (mohm/cell).  A real
-# consumer LiPo cell does not sit below ~4 mohm/cell; high-cell-count packs are
-# NOT 4x lower resistance per cell than low-cell packs.  When a class's fitted
-# median falls below this floor it indicates unreliable data (few packs, biased
-# current sensing, observed for 12S, which fits ~2 mohm/cell).  Such classes
-# fall back to the pooled median.  Held-out validation confirmed the sub-floor
-# 12S value badly under-predicts sag, so this fallback is corrective, not cosmetic.
-R_PLAUSIBLE_FLOOR_MOHM_PER_CELL: float = 4.0
-
 
 # ---------------------------------------------------------------------------
 # Public types
@@ -47,8 +38,9 @@ class PerCellRFit:
 
     ``deployed_mohm_per_cell`` is the value actually used downstream (report,
     validation, Rust): it equals ``median_mohm_per_cell`` when the class has
-    enough observations, otherwise it falls back to the pooled median.
-    ``low_n`` flags when the fallback was applied.  The percentiles are over
+    at least ``MIN_R_OBSERVATIONS_PER_CLASS`` step events, otherwise it falls
+    back to the median pooled over vehicles.  ``low_n`` flags when the
+    fallback was applied (a measured low resistance is deployed as it is).  The percentiles are over
     the class's step events; ``n_vehicles`` counts the distinct vehicles of
     the logs behind them (a log without a vehicle counts as its own).
     """
@@ -139,3 +131,5 @@ class BatteryFitResult:
     r_fits_by_capacity: tuple[CapacityClassRFit, ...] = ()  # per cell count and capacity class
     capacity_bounds_mah: tuple[float, ...] = DEFAULT_CAPACITY_BOUNDS_MAH
     cell_count_mismatch_count: int = 0
+    pooled_r_over_vehicles_mohm_per_cell: float | None = None
+    pooled_r_vehicles: int = 0

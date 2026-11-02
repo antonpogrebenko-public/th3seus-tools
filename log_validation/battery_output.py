@@ -11,7 +11,6 @@ from typing import Any
 from .battery_capacity import MIN_CLASS_VEHICLES
 from .battery_model import (
     MIN_R_OBSERVATIONS_PER_CLASS,
-    R_PLAUSIBLE_FLOOR_MOHM_PER_CELL,
     BatteryFitResult,
     PerCellRFit,
 )
@@ -22,9 +21,19 @@ def fallback_reason(f: PerCellRFit) -> str | None:
     """Why a class deploys the pooled median, or None when it deploys its own fit."""
     if not f.low_n:
         return None
-    if f.n_observations < MIN_R_OBSERVATIONS_PER_CLASS:
-        return f"low-n (fewer than {MIN_R_OBSERVATIONS_PER_CLASS} step events)"
-    return f"implausible (median below the {R_PLAUSIBLE_FLOOR_MOHM_PER_CELL:g} mohm/cell floor)"
+    return f"low-n (fewer than {MIN_R_OBSERVATIONS_PER_CLASS} step events)"
+
+
+def _pooled_vehicles_lines(r: BatteryFitResult) -> list[str]:
+    if r.pooled_r_over_vehicles_mohm_per_cell is None:
+        return []
+    return [
+        f"Pooled median over vehicles: {r.pooled_r_over_vehicles_mohm_per_cell:.2f} mohm/cell "
+        f"({r.pooled_r_vehicles} vehicles); a cell count with fewer than "
+        f"{MIN_R_OBSERVATIONS_PER_CLASS} step events, and any cell count without a row, "
+        "deploys it (the **Deployed** column is what Rust uses).",
+        "",
+    ]
 
 
 def result_to_dict(r: BatteryFitResult) -> dict:
@@ -56,6 +65,8 @@ def result_to_dict(r: BatteryFitResult) -> dict:
         "r_fits_by_capacity": [asdict(f) for f in r.r_fits_by_capacity],
         "overall_r_median_mohm_per_cell": r.overall_r_median_mohm_per_cell,
         "overall_r_n": r.overall_r_n,
+        "pooled_r_over_vehicles_mohm_per_cell": r.pooled_r_over_vehicles_mohm_per_cell,
+        "pooled_r_vehicles": r.pooled_r_vehicles,
         "ocv_curve": {
             "soc_knots": r.ocv_curve.soc_knots,
             "v_per_cell_knots": r.ocv_curve.v_per_cell_knots,
@@ -173,13 +184,10 @@ def write_markdown_summary(
         "",
         "## Internal Resistance",
         "",
-        f"Overall pooled median: **{r.overall_r_median_mohm_per_cell:.2f} mohm/cell** "
-        f"(n={r.overall_r_n} step events)",
+        f"Pooled median over step events: {r.overall_r_median_mohm_per_cell:.2f} mohm/cell "
+        f"(n={r.overall_r_n} steps).",
         "",
-        f"A class falls back to the pooled median (the **Deployed** column, which "
-        f"is what Rust uses) when it has fewer than {MIN_R_OBSERVATIONS_PER_CLASS} "
-        f"step events OR its fitted median is implausibly low "
-        f"(< {R_PLAUSIBLE_FLOOR_MOHM_PER_CELL:.0f} mohm/cell, a sign of biased data).",
+        *_pooled_vehicles_lines(r),
         "",
         "| Cell count | Median (mohm/cell) | p10 | p90 | Deployed (mohm/cell) | IQR "
         "| n step events | Vehicles | fallback reason |",
@@ -188,7 +196,7 @@ def write_markdown_summary(
     for f in r.r_fits:
         iqr = f"{f.p25_mohm_per_cell:.2f} to {f.p75_mohm_per_cell:.2f}"
         why = fallback_reason(f)
-        reason = "none" if why is None else f"{why} -> pooled"
+        reason = "none" if why is None else f"{why} -> pooled over vehicles"
         lines.append(
             f"| {f.cell_count}S | {f.median_mohm_per_cell:.2f} | "
             f"{f.p10_mohm_per_cell:.2f} | {f.p90_mohm_per_cell:.2f} | "
@@ -236,8 +244,9 @@ def write_markdown_summary(
         "- **Monotone enforcement:** isotonic regression (pool-adjacent-violators) applied to "
         "bin medians before Rust porting.",
         f"- **Low-n classes:** any cell-count class with < {MIN_R_OBSERVATIONS_PER_CLASS} "
-        "step events (e.g. 12S, with very few packs in the corpus) is too noisy to trust and "
-        "falls back to the pooled median.  The **Deployed** column reflects this and matches Rust.",
+        "step events is too noisy to trust and falls back to the median pooled over vehicles; "
+        "a measured low resistance is deployed as it is.  "
+        "The **Deployed** column reflects this and matches Rust.",
         "",
     ]
     lines += _per_log_lines(r)
@@ -270,11 +279,23 @@ def _r_table_lines(battery: Mapping[str, Any]) -> list[str]:
     ]
     for f in battery["r_fits"]:
         n = _whole(f, "n_observations")
-        note = f"n={n} LOW-N -> pooled median" if f["low_n"] else f"n={n}"
+        note = (f"n={n}, fewer than {MIN_R_OBSERVATIONS_PER_CLASS} step events -> pooled over vehicles"
+                if f["low_n"] else f"n={n}")
         lines.append(
             f"    ({_whole(f, 'cell_count')}, {f['deployed_mohm_per_cell']:.4f}),  // {note}"
         )
     return lines + ["];"]
+
+
+def _default_line(battery: Mapping[str, Any]) -> str:
+    """The default-R declaration: the vehicle-pooled median, or, for a file from before
+    it was written, the step-pooled one."""
+    head = "const FITTED_R_DEFAULT_MOHM_PER_CELL: f64 = "
+    pooled = battery.get("pooled_r_over_vehicles_mohm_per_cell")
+    if pooled is None:
+        return (f"{head}{battery['overall_r_median_mohm_per_cell']:.4f};  "
+                f"// pooled over step events, n={_whole(battery, 'overall_r_n')}")
+    return f"{head}{pooled:.4f};  // pooled over {_whole(battery, 'pooled_r_vehicles')} vehicles"
 
 
 def rust_constants_text(battery: Mapping[str, Any]) -> str:
@@ -287,11 +308,7 @@ def rust_constants_text(battery: Mapping[str, Any]) -> str:
     """
     lines = _r_table_lines(battery)
     lines.append("")
-    lines.append(
-        f"const FITTED_R_DEFAULT_MOHM_PER_CELL: f64 = "
-        f"{battery['overall_r_median_mohm_per_cell']:.4f};  "
-        f"// pooled, n={_whole(battery, 'overall_r_n')}"
-    )
+    lines.append(_default_line(battery))
     lines.append("")
     lines.append("const OCV_TABLE: &[(f64, f64)] = &[")
     ocv = battery["ocv_curve"]

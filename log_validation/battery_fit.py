@@ -68,7 +68,7 @@ from .battery_extract import (  # noqa: F401
 )
 from .battery_model import (  # noqa: F401
     CELL_V_MAX, CELL_V_MIN,
-    MIN_R_OBSERVATIONS_PER_CLASS, R_PLAUSIBLE_FLOOR_MOHM_PER_CELL, BatteryFitResult, OcvCurve,
+    MIN_R_OBSERVATIONS_PER_CLASS, BatteryFitResult, OcvCurve,
     PerCellRFit, StepCheck,
 )
 from .battery_output import emit_rust_constants, result_to_dict, write_markdown_summary
@@ -379,24 +379,21 @@ def _vehicle_key(log_id: str, vehicle_of: Mapping[str, str]) -> tuple[str, str]:
 
 
 def _per_cell_fit(
-    cell_count: int, r_vals: list[float], n_vehicles: int, overall_r_median: float
+    cell_count: int, r_vals: list[float], n_vehicles: int, fallback: float
 ) -> PerCellRFit:
     vals = np.array(r_vals)
     median = float(np.median(vals))
-    # A class is "unreliable" if it has too few observations OR its fitted
-    # median is physically implausible (below the per-cell floor).  Either
-    # way it falls back to the pooled median.  This is deterministic and
-    # drives report, validation, and Rust identically.
-    too_few = len(vals) < MIN_R_OBSERVATIONS_PER_CLASS
-    implausible = median < R_PLAUSIBLE_FLOOR_MOHM_PER_CELL
-    low_n = too_few or implausible
+    # A class with too few step events deploys the median pooled over vehicles;
+    # a measured median is deployed as it is, however low.  This is
+    # deterministic and drives report, validation, and Rust identically.
+    low_n = len(vals) < MIN_R_OBSERVATIONS_PER_CLASS
     return PerCellRFit(
         cell_count=cell_count,
         median_mohm_per_cell=median,
         p25_mohm_per_cell=float(np.percentile(vals, 25)),
         p75_mohm_per_cell=float(np.percentile(vals, 75)),
         n_observations=len(vals),
-        deployed_mohm_per_cell=overall_r_median if low_n else median,
+        deployed_mohm_per_cell=fallback if low_n else median,
         low_n=low_n,
         p10_mohm_per_cell=float(np.percentile(vals, 10)),
         p90_mohm_per_cell=float(np.percentile(vals, 90)),
@@ -406,10 +403,12 @@ def _per_cell_fit(
 
 def _r_table(
     observations: Sequence[_LogObservations], vehicle_of: Mapping[str, str]
-) -> tuple[list[PerCellRFit], float, int]:
-    """(rows per cell count, pooled median, pooled n).
+) -> tuple[list[PerCellRFit], float, int, float, int]:
+    """(rows per cell count, median pooled over step events, step count, median
+    pooled over vehicles, vehicle count).
 
-    The pooled median is computed first so low-n classes can fall back to it.
+    The vehicle-pooled median is a vehicle's median step resistance, then the
+    median over vehicles; it is computed first so low-n classes fall back to it.
     """
     with_r = [o for o in observations if o.r_obs]
     cells = sorted({o.cell_count for o in with_r})
@@ -422,8 +421,12 @@ def _r_table(
         cc: {_vehicle_key(o.log_id, vehicle_of) for o in with_r if o.cell_count == cc}
         for cc in cells
     }
-    rows = [_per_cell_fit(cc, r_by_cc[cc], len(vehicles[cc]), overall) for cc in cells]
-    return rows, overall, len(all_r_vals)
+    r_by_vehicle: dict[tuple[str, str], list[float]] = {}
+    for o in with_r:
+        r_by_vehicle.setdefault(_vehicle_key(o.log_id, vehicle_of), []).extend(o.r_obs)
+    by_vehicles = float(np.median([np.median(v) for v in r_by_vehicle.values()]))
+    rows = [_per_cell_fit(cc, r_by_cc[cc], len(vehicles[cc]), by_vehicles) for cc in cells]
+    return rows, overall, len(all_r_vals), by_vehicles, len(r_by_vehicle)
 
 
 def _per_log_r(
@@ -444,9 +447,9 @@ def _per_log_r(
 def _deployed_r(cell_count: int, r_fits: Sequence[PerCellRFit], overall: float) -> float:
     """Mirror the deployed Rust lookup EXACTLY.
 
-    The per-class deployed value (median, or pooled fallback for low-n
-    classes); for cell counts absent from the table, the pooled median
-    (which equals Rust's FITTED_R_DEFAULT_MOHM_PER_CELL).
+    The per-class deployed value (median, or the vehicle-pooled fallback for
+    low-n classes); for cell counts absent from the table, ``overall``, the
+    median pooled over vehicles (Rust's FITTED_R_DEFAULT_MOHM_PER_CELL).
     """
     return next((f.deployed_mohm_per_cell for f in r_fits if f.cell_count == cell_count), overall)
 
@@ -546,13 +549,13 @@ def fit_extracted(
     fit_ids, holdout_ids = split_logs(list(statuses), vehicle_of, holdout_frac, seed)
     by_id = {d.log_id: d for d in datas}
     observations = [_observe(by_id[i]) for i in fit_ids if i in by_id]
-    r_fits, overall, overall_n = _r_table(observations, vehicle_of)
+    r_fits, overall, overall_n, by_vehicles, n_vehicles = _r_table(observations, vehicle_of)
     ocv_curve = _build_ocv_curve([p for o in observations for p in o.ocv_obs])
 
     scored = [by_id[i] for i in holdout_ids if i in by_id]
     holdout_maes = [
         mae for mae in (
-            _holdout_mae(d, ocv_curve, _deployed_r(d.cell_count, r_fits, overall)) for d in scored
+            _holdout_mae(d, ocv_curve, _deployed_r(d.cell_count, r_fits, by_vehicles)) for d in scored
         ) if mae is not None
     ]
     if not holdout_maes:
@@ -560,7 +563,7 @@ def fit_extracted(
     maes = np.array(holdout_maes)
     median_mae = float(np.median(maes))
     def deployed(cells: int) -> float:
-        return _deployed_r(cells, r_fits, overall)
+        return _deployed_r(cells, r_fits, by_vehicles)
 
     scored_by_steps = {d.log_id for d in scored if step_check([d], deployed, {}).n_steps}
     scored_by_mae = {
@@ -596,6 +599,8 @@ def fit_extracted(
         r_fits_by_capacity=capacity_class_fits(observations, vehicle_of, capacity_bounds),
         capacity_bounds_mah=tuple(capacity_bounds),
         cell_count_mismatch_count=len(mismatched),
+        pooled_r_over_vehicles_mohm_per_cell=by_vehicles,
+        pooled_r_vehicles=n_vehicles,
     )
 
 
@@ -760,7 +765,9 @@ def _run_fit(args: argparse.Namespace) -> int:
         file=sys.stderr,
     )
     print(
-        f"Overall R median: {result.overall_r_median_mohm_per_cell:.2f} mOhm/cell (n={result.overall_r_n})",
+        f"Overall R median: {result.overall_r_median_mohm_per_cell:.2f} mOhm/cell (n={result.overall_r_n}) | "
+        f"pooled over vehicles: {result.pooled_r_over_vehicles_mohm_per_cell:.2f} mOhm/cell "
+        f"({result.pooled_r_vehicles} vehicles)",
         file=sys.stderr,
     )
     print(

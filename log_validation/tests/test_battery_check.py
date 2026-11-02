@@ -191,19 +191,20 @@ def test_battery_outputs_and_sources_have_no_long_dashes(tmp_path):
 
 
 def _with_both_fallbacks(result):
-    """The result with a low-n class and a below-floor class, so both reasons render."""
+    """The result with a low-n class and a 200-plus-step class with a low median that is deployed."""
     fit = result.r_fits[0]
     low_n = dataclasses.replace(fit, low_n=True, n_observations=1)
-    below_floor = dataclasses.replace(fit, cell_count=fit.cell_count + 8, low_n=True,
-                                      n_observations=10_000, median_mohm_per_cell=1.0)
-    return dataclasses.replace(result, r_fits=[low_n, below_floor])
+    low_median = dataclasses.replace(fit, cell_count=fit.cell_count + 8, low_n=False,
+                                     n_observations=10_000, median_mohm_per_cell=3.3,
+                                     deployed_mohm_per_cell=3.3)
+    return dataclasses.replace(result, r_fits=[low_n, low_median])
 
 
 def test_battery_outputs_and_sources_are_ascii(tmp_path):
     _, result = _corpus_result()
     result = _with_both_fallbacks(result)
     md = _markdown(tmp_path, result)
-    assert "low-n" in md and "implausible" in md
+    assert "low-n" in md and "implausible" not in md
     texts = [md, emit_rust_constants(result)]
     texts += [Path(m.__file__).read_text(encoding="utf-8") for m in (battery_output, battery_model)]
     assert [sorted({c for c in t if ord(c) > 127}) for t in texts] == [[], [], [], []]
@@ -215,16 +216,17 @@ def test_json_names_why_a_class_falls_back():
     fits = result_to_dict(dataclasses.replace(
         result, r_fits=[own, *_with_both_fallbacks(result).r_fits]))["r_fits"]
     assert [f["fallback_reason"] for f in fits] == [
-        None, "low-n (fewer than 200 step events)",
-        "implausible (median below the 4 mohm/cell floor)"]
+        None, "low-n (fewer than 200 step events)", None]
 
 
 @pytest.mark.parametrize("key, bad", [
     ("split_seed", "42\nfn injected() {}"), ("real_log_count", 8.5), ("sim_log_count", None),
-    ("overall_r_n", True)])
+    ("overall_r_n", True), ("pooled_r_vehicles", 2.5)])
 def test_rust_constants_refuse_a_count_that_is_not_a_whole_number(key, bad):
     _, result = _corpus_result()
     battery = {**result_to_dict(result), key: bad}
+    if key == "overall_r_n":  # an older file: the step count is the one written
+        battery["pooled_r_over_vehicles_mohm_per_cell"] = None
     with pytest.raises(ValueError, match=f"{key} is not a whole number"):
         battery_output.rust_constants_text(battery)
 
