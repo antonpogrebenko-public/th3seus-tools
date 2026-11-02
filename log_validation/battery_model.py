@@ -16,6 +16,11 @@ from .battery_capacity import DEFAULT_CAPACITY_BOUNDS_MAH, CapacityClassRFit
 # Resistance-table thresholds (used by the fit and quoted in the Markdown)
 # ---------------------------------------------------------------------------
 
+# Plausible per-cell voltage range (V) of a pack's median voltage; a log whose
+# median pack voltage divided by its cell count falls outside it has a wrong cell count.
+CELL_V_MIN: float = 3.0
+CELL_V_MAX: float = 4.4
+
 # Minimum number of step-event observations for a per-cell-count R median to be
 # trusted.  Cell counts below this fall back to the pooled median because their
 # sample is too small to be stable across runs.
@@ -103,7 +108,10 @@ class BatteryFitResult:
     observation, and ``holdout_logs_not_scored`` the usable holdout-side logs
     in neither score (not in ``holdout_scored_log_ids``), so every selected log
     is in exactly one of: fit_log_ids, holdout_scored_log_ids, those two
-    counts, sim_log_count and skipped_log_count.
+    counts, sim_log_count, skipped_log_count and cell_count_mismatch_count.
+    ``cell_count_mismatch_count`` counts the real logs left out because the
+    logged cell count does not match the pack voltage; they count in
+    ``real_log_count`` and, when held out, in ``holdout_log_ids``.
     """
 
     real_log_count: int
@@ -130,3 +138,4 @@ class BatteryFitResult:
     holdout_logs_not_scored: int  # usable holdout-side logs scored by neither check
     r_fits_by_capacity: tuple[CapacityClassRFit, ...] = ()  # per cell count and capacity class
     capacity_bounds_mah: tuple[float, ...] = DEFAULT_CAPACITY_BOUNDS_MAH
+    cell_count_mismatch_count: int = 0

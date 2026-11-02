@@ -33,6 +33,7 @@ def result_to_dict(r: BatteryFitResult) -> dict:
         "real_log_count": r.real_log_count,
         "sim_log_count": r.sim_log_count,
         "skipped_log_count": r.skipped_log_count,
+        "cell_count_mismatch_count": r.cell_count_mismatch_count,
         "logs_without_manifest_row": r.logs_without_manifest_row,
         "split_seed": r.split_seed,
         "r_fits": [
@@ -162,6 +163,8 @@ def write_markdown_summary(
         f"| Real logs (fit and holdout) | {r.real_log_count} |",
         f"| SIM logs excluded | {r.sim_log_count} |",
         f"| Skipped (load error or no usable battery data) | {r.skipped_log_count} |",
+        "| Left out: cell count does not match the pack voltage "
+        f"(median outside 3.0 to 4.4 V per cell) | {r.cell_count_mismatch_count} |",
         f"| Holdout (validation only) | {r.holdout_log_count} |",
         f"| Fit logs with at least one observation | {len(r.fit_log_ids)} |",
         f"| Usable fit logs without a step or OCV sample | {r.fit_logs_without_samples} |",

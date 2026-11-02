@@ -67,6 +67,7 @@ from .battery_extract import (  # noqa: F401
     load_battery_topics, load_extracted, load_named, read_obs_dirs, read_statuses, save_extracted,
 )
 from .battery_model import (  # noqa: F401
+    CELL_V_MAX, CELL_V_MIN,
     MIN_R_OBSERVATIONS_PER_CLASS, R_PLAUSIBLE_FLOOR_MOHM_PER_CELL, BatteryFitResult, OcvCurve,
     PerCellRFit, StepCheck,
 )
@@ -498,12 +499,23 @@ def step_check(
     )
 
 
+STATUS_CELL_MISMATCH = "cell_count_mismatch"
+
+
+def cell_count_matches(data: LogBatteryData) -> bool:
+    """True when the median pack voltage per logged cell is within CELL_V_MIN to CELL_V_MAX."""
+    finite = data.v[np.isfinite(data.v)]
+    if data.cell_count <= 0 or finite.size == 0:
+        return False
+    return CELL_V_MIN <= float(np.median(finite)) / data.cell_count <= CELL_V_MAX
+
+
 def _statuses_of(datas: Sequence[LogBatteryData], no_data: Mapping[str, str]) -> dict[str, str]:
     ids = [d.log_id for d in datas] + list(no_data)
     repeated = sorted(i for i, n in Counter(ids).items() if n > 1)
     if repeated:
         raise ValueError(f"log ID given more than once: {', '.join(repeated[:5])}")
-    unknown = sorted(set(no_data.values()) - NO_DATA_STATUSES)
+    unknown = sorted(set(no_data.values()) - NO_DATA_STATUSES - {STATUS_CELL_MISMATCH})
     if unknown:
         raise ValueError(f"unknown extract status: {', '.join(unknown)}")
     return {**{d.log_id: STATUS_OK for d in datas}, **no_data}
@@ -528,7 +540,9 @@ def fit_extracted(
     give no observation and no score.  ``vehicle_of`` (empty without a
     manifest) makes the split hold out whole vehicles and names the vehicles.
     """
-    statuses = _statuses_of(datas, no_data or {})
+    mismatched = {d.log_id: STATUS_CELL_MISMATCH for d in datas if not cell_count_matches(d)}
+    datas = [d for d in datas if d.log_id not in mismatched]
+    statuses = _statuses_of(datas, {**(no_data or {}), **mismatched})
     fit_ids, holdout_ids = split_logs(list(statuses), vehicle_of, holdout_frac, seed)
     by_id = {d.log_id: d for d in datas}
     observations = [_observe(by_id[i]) for i in fit_ids if i in by_id]
@@ -552,14 +566,14 @@ def fit_extracted(
     scored_by_mae = {
         d.log_id for d in scored if _holdout_mae(d, ocv_curve, deployed(d.cell_count)) is not None
     }
-    real = (STATUS_OK, STATUS_UNUSABLE)  # loaded and not simulation, as before
+    real = (STATUS_OK, STATUS_UNUSABLE, STATUS_CELL_MISMATCH)  # loaded and not simulation, as before
     holdout_real = [i for i in holdout_ids if statuses[i] in real]
     fit_log_ids = [o.log_id for o in observations if o.r_obs or o.ocv_obs]
     holdout_scored_log_ids = tuple(sorted(scored_by_steps | scored_by_mae))
     return BatteryFitResult(
         real_log_count=sum(1 for s in statuses.values() if s in real),
         sim_log_count=sum(1 for s in statuses.values() if s == STATUS_SIM),
-        skipped_log_count=sum(1 for s in statuses.values() if s not in (STATUS_OK, STATUS_SIM)),
+        skipped_log_count=sum(1 for s in statuses.values() if s not in (STATUS_OK, STATUS_SIM, STATUS_CELL_MISMATCH)),
         r_fits=r_fits,
         overall_r_median_mohm_per_cell=overall,
         overall_r_n=overall_n,
@@ -581,6 +595,7 @@ def fit_extracted(
         holdout_logs_not_scored=len(scored) - len(holdout_scored_log_ids),
         r_fits_by_capacity=capacity_class_fits(observations, vehicle_of, capacity_bounds),
         capacity_bounds_mah=tuple(capacity_bounds),
+        cell_count_mismatch_count=len(mismatched),
     )
 
 
