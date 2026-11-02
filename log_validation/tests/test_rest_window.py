@@ -199,3 +199,23 @@ def test_entry_error_without_arming_topics_through_batch_analyze(tmp_path):
     note = next(e for e in entry.errors if e.startswith("imu.stationary_window:"))
     assert "actuator_armed" in note and "vehicle_status" in note
     assert "gps.eph_median_m" in entry.measurements
+
+
+def test_log_of_50_ms(tmp_path):
+    rng = np.random.default_rng(13)
+    combined = {"timestamp": ts_us(50, 1000.0),
+                "gyro_integral_dt": np.full(50, 1000.0),
+                "accelerometer_integral_dt": np.full(50, 1000.0)}
+    for i in range(3):
+        combined[f"gyro_rad[{i}]"] = rng.normal(0, 1e-3, 50)
+        combined[f"accelerometer_m_s2[{i}]"] = np.full(50, 9.81 if i == 2 else 0.0)
+    log = FakeULog({"sensor_combined": combined, **_armed([0], [0]),
+                    "vehicle_gps_position": _gps(np.random.default_rng(13), 10)},
+                   params={"CAL_GYRO0_ID": 0x3C000A, "SYS_AUTOSTART": 4001,
+                           "IMU_GYRO_RATEMAX": 400},
+                   info={"ver_hw": "PX4_FMU_V5"})
+    entry = _entry(tmp_path, log)
+    assert "imu.stationary_window: no disarmed quiet >=3s run" in entry.errors
+    assert not any(e.startswith("analysis failed") for e in entry.errors)
+    assert entry.measurements["gps.eph_median_m"] == pytest.approx(GPS_EPH_M)
+    assert not any(key in entry.measurements for key in AT_REST_KEYS)

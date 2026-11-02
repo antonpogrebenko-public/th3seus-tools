@@ -27,12 +27,16 @@ DEFAULT_MIN_DURATION_S = 3.0
 
 
 def _smoothed_magnitude(t_s: np.ndarray, gyro_xyz: np.ndarray, smooth_s: float) -> np.ndarray:
-    """Magnitude of the per-axis moving average (noise averaged toward zero)."""
+    """Magnitude of the per-axis moving average (noise averaged toward zero).
+
+    One value per sample. A stream shorter than `smooth_s` is averaged over
+    its whole length.
+    """
     g = np.asarray(gyro_xyz, float)
     diffs = np.diff(np.asarray(t_s, float))
     diffs = diffs[diffs > 0]
     dt = float(np.median(diffs)) if diffs.size else 0.0
-    win = max(1, int(round(smooth_s / dt))) if dt > 0 else 1
+    win = max(1, min(int(round(smooth_s / dt)), len(g))) if dt > 0 else 1
     if win <= 1:
         return np.linalg.norm(g, axis=1)
     kernel = np.ones(win) / win
