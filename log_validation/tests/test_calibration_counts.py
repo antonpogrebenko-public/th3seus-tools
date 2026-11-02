@@ -2,17 +2,21 @@
 
 from __future__ import annotations
 
-from dataclasses import replace
+from dataclasses import asdict, replace
+from pathlib import Path
 
 import numpy as np
 import pytest
 
 from log_validation.battery_fit import fit_extracted
+from log_validation import response
+from log_validation.batch_analyze import _died_result, analyze_log
 from log_validation.battery_output import result_to_dict
 from log_validation.calibration_counts import battery_counts, entry_counts, normalize_reason
 from log_validation.calibration_ranges import log_id_lists
 from log_validation.tests.battery_fakes import CORPUS, make_data
 from log_validation.tests.calibration_inputs import battery_dict, noise_entries, response_entries
+from log_validation.tests.response_fakes import quad_log
 
 
 def test_numbers_and_parenthesized_details_give_one_key():
@@ -152,9 +156,34 @@ def _one(errors, contributing=()):
     DRV_FAILED_NOTE,
     "roll: fit failed (too few samples to fit)",
     "ESC RPM: no ESC fitted (esc[0]: fit failed (too few samples to fit))",
+    "roll: fit failed: singular matrix",
+    "parts: gps lookup unavailable: KeyError",
 ])
 def test_a_note_that_mentions_a_failure_counts_as_skipped(error):
     assert _one([error]) == (0, 1, 0)
+
+
+def test_failure_texts_the_passes_write_count_as_failed(monkeypatch):
+    def unreadable(path):
+        raise OSError(f"cannot open {path}")
+
+    def broken(*_args, **_kwargs):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(response, "detect_flight_segments", broken)
+    results = [
+        analyze_log(Path("n1.ulg"), loader=unreadable),
+        response.analyze_response(quad_log(), "r1", "veh1", response.ResponseGates()),
+        _died_result((Path("n2.ulg"), "veh2", unreadable, 30.0)),
+    ]
+    entries = [{**asdict(r), "log_id": f"log{i}"} for i, r in enumerate(results)]
+    assert [e["errors"][0] for e in entries] == [
+        "load failed: OSError",
+        "flight segments failed: RuntimeError (effectiveness, hover, noise and motor lag "
+        "not measured)",
+        "worker process died"]
+    counts = entry_counts("noise", entries, [])
+    assert (counts.failed, counts.skipped, counts.analyzed) == (3, 0, 0)
 
 
 @pytest.mark.parametrize("error", [

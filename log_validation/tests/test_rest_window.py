@@ -218,4 +218,6 @@ def test_log_of_50_ms(tmp_path):
     assert "imu.stationary_window: no disarmed quiet >=3s run" in entry.errors
     assert not any(e.startswith("analysis failed") for e in entry.errors)
     assert entry.measurements["gps.eph_median_m"] == pytest.approx(GPS_EPH_M)
+    assert entry.measurements["gps.fix_type_mode"] == 3.0
+    assert entry.measurements["param.IMU_GYRO_RATEMAX"] == 400.0
     assert not any(key in entry.measurements for key in AT_REST_KEYS)
