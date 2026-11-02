@@ -2,7 +2,9 @@
 
 An entry is *analyzed* when its log ID is in the pass's contributing list (see
 `calibration_report.log_id_lists`). Any other entry is *failed* when one of its
-error texts says a step failed (see `FAILURE_PATTERN`) and *skipped* otherwise.
+error texts starts with a step label followed by `failed: ` or `unavailable: `, or
+with `worker process died` (see `FAILURE_PATTERN`), and *skipped* otherwise; a
+word elsewhere in a note, such as a topic's field list, does not count.
 The battery result keeps only totals, so its counts come from those totals; they
 partition the logs the battery pass read (see `battery_counts`).
 """
@@ -14,7 +16,7 @@ from collections import Counter
 from dataclasses import dataclass
 from typing import Any, Mapping, Sequence
 
-FAILURE_PATTERN = re.compile(r"failed|worker process died|unavailable")
+FAILURE_PATTERN = re.compile(r"worker process died|[A-Za-z][\w .-]* (?:failed|unavailable): ")
 _PARENTHESIZED = re.compile(r"\([^()]*\)")
 # The list of names ulog_loader appends to a missing topic or field, such as
 # "Available topics: ['sensor_accel', 'sensor_gyro']"; it differs from log to log.
@@ -65,7 +67,7 @@ def entry_counts(name: str, entries: Sequence[Mapping[str, Any]],
         reasons.update({normalize_reason(e) for e in errors})
         if entry.get("log_id") in contributed:
             analyzed += 1
-        elif any(FAILURE_PATTERN.search(e) for e in errors):
+        elif any(FAILURE_PATTERN.match(e) for e in errors):
             failed += 1
         else:
             skipped += 1

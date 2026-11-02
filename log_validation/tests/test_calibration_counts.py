@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import replace
 
 import numpy as np
+import pytest
 
 from log_validation.battery_fit import fit_extracted
 from log_validation.battery_output import result_to_dict
@@ -136,3 +137,36 @@ def test_each_battery_total_has_its_reason_row_most_common_first():
                               ("load error or no usable battery data", 2),
                               ("simulation log excluded", 1))
     assert (counts.analyzed, counts.skipped, counts.failed) == (0, 15, None)
+
+
+DRV_FAILED_NOTE = ("gps.speed_accuracy_median_m_s: \"field 's_variance_m_s' not in topic "
+                   "'vehicle_gps_position'. Available fields: ['drv_failed', 'eph']\"")
+
+
+def _one(errors, contributing=()):
+    counts = entry_counts("noise", [{"log_id": "a", "errors": errors}], list(contributing))
+    return counts.analyzed, counts.skipped, counts.failed
+
+
+@pytest.mark.parametrize("error", [
+    DRV_FAILED_NOTE,
+    "roll: fit failed (too few samples to fit)",
+    "ESC RPM: no ESC fitted (esc[0]: fit failed (too few samples to fit))",
+])
+def test_a_note_that_mentions_a_failure_counts_as_skipped(error):
+    assert _one([error]) == (0, 1, 0)
+
+
+@pytest.mark.parametrize("error", [
+    "load failed: OSError", "parameters unavailable: KeyError",
+    "hardware extraction failed: ValueError", "part identification failed: KeyError",
+    "analysis failed: ValueError", "gyro rate parameters unavailable: KeyError",
+    "flight segments failed: IndexError", "battery scaling failed: ValueError",
+    "motor lag failed: ValueError", "cell count failed: KeyError", "worker process died",
+])
+def test_every_failure_form_the_passes_write_counts_as_failed(error):
+    assert _one([error, "gps.eph_median_m: no GPS topic"]) == (0, 0, 1)
+
+
+def test_a_contributing_log_with_a_failure_text_is_analyzed():
+    assert _one(["analysis failed: ValueError"], contributing=["a"]) == (1, 0, 0)

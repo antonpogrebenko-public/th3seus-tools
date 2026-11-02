@@ -333,7 +333,10 @@ The calibration directory holds:
   and after the estimator fix, the battery fit with both held-out checks, the response
   distributions, the reference-airframe comparison, a summary of the randomization
   ranges, the gaps TH3SEUS does not model, and the counts of logs analyzed, skipped
-  and failed per pass with their reasons.
+  and failed per pass with their reasons. A log counts as failed only when one of its
+  errors starts with a step label followed by `failed: ` or `unavailable: ` (such as
+  `analysis failed: ValueError`), or with `worker process died`; every other log that
+  gave no numbers counts as skipped.
 - `ranges.csv`: the p5, p25, p50, p75 and p95 of every quantity, overall and per
   battery cell count and airframe ID, with the numbers of logs and vehicles. A class
   needs at least 5 vehicles; the overall row is given whenever one vehicle has a value.
