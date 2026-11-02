@@ -48,6 +48,11 @@ def test_actuator_armed_wins_over_vehicle_status():
     assert m.all()
 
 
+def test_vehicle_status_does_not_override_an_armed_actuator_armed():
+    m = arming.disarmed_mask(FakeULog({**_armed([0], [1]), **_status([0], [1])}), T)
+    assert not m.any()
+
+
 @pytest.mark.parametrize(
     "state,disarmed",
     [(0, True), (1, True), (2, False), (3, False), (4, False), (5, False)],
@@ -83,3 +88,17 @@ def test_spin_down_after_a_disarm_is_not_disarmed_vehicle_status():
 def test_series_that_starts_disarmed_loses_nothing():
     m = arming.disarmed_mask(FakeULog(_armed([0], [0])), np.array([5.0]))
     assert m.tolist() == [True]
+
+
+def test_each_disarm_starts_its_own_settle_time():
+    m = arming.disarmed_mask(
+        FakeULog(_armed([0, 10, 40, 60], [1, 0, 1, 0])), np.array([25.0, 65.0, 75.0])
+    )
+    assert m.tolist() == [True, False, True]
+
+
+def test_repeated_messages_of_the_same_state_do_not_restart_the_settle_time():
+    m = arming.disarmed_mask(
+        FakeULog(_armed([0, 2, 4, 10, 12, 14], [0, 0, 1, 1, 0, 0])), np.array([3.0, 23.0])
+    )
+    assert m.tolist() == [True, True]
