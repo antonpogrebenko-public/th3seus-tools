@@ -413,9 +413,10 @@ The committed run is in [`calibration/2026-11-02/`](calibration/2026-11-02/repor
 and the battery, and 1,355 quadrotor logs for the response pass (the pass refuses the
 130 of them not logged at the rate controller's rate), at most 3 logs per vehicle in
 each set. Its `run-info.json` gives the parameters and commands. Its at-rest values come
-from disarmed still windows only, so 3,671 of the noise logs give them. Its Counts
-section was rendered with the earlier failure rule, which also counted a failure word
-anywhere in a note: it shows 27 failed noise logs, 26 under the current rule.
+from disarmed still windows only, so 3,671 of the noise logs give them. Its report was
+re-rendered locally with the tool commit `run-info.json` names as `local_tool_commit`,
+from the same per-log results and extracted battery observations, so its battery values
+and counts follow the current rules.
 
 ## Tests
 
