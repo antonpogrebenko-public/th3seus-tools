@@ -662,6 +662,27 @@ def test_battery_table_shows_why_a_class_falls_back():
     assert rows["| 6S"].endswith("| pooled median |")
 
 
+def test_battery_table_names_the_pool_when_the_file_has_the_vehicle_pooled_median():
+    battery = battery_dict()
+    own = battery["r_fits"][0]
+    low = {**own, "cell_count": 8, "low_n": True,
+           "fallback_reason": "low-n (fewer than 200 step events)"}
+    battery["r_fits"] = [own, low]
+    battery["pooled_r_over_vehicles_mohm_per_cell"] = 6.0
+    battery["pooled_r_vehicles"] = 3
+    text = render_report([], battery, [], airframes_dict(), [], run_info())
+    row = next(line for line in text.splitlines() if line.startswith("| 8S | "))
+    assert row.endswith("| pooled over vehicles: low-n (fewer than 200 step events) |")
+
+
+def test_signed_error_sentence_gives_the_caveat():
+    battery = {**battery_dict(), "holdout_by_cell_count": []}
+    text = render_report([], battery, [], airframes_dict(), [], run_info())
+    assert ("The signed error is predicted minus measured voltage per cell; positive means "
+            "the model predicts less sag than the packs show, or that the open-circuit curve "
+            "sits above these packs.") in " ".join(text.split())
+
+
 def test_reference_airframes_section_names_its_logs():
     text = render_report([], battery_dict(), [], airframes_dict(), [], run_info())
     section = " ".join(text.split("## Reference airframes")[1].split("## ")[0].split())

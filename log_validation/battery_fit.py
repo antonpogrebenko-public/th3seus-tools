@@ -549,7 +549,7 @@ def _statuses_of(datas: Sequence[LogBatteryData], no_data: Mapping[str, str]) ->
     repeated = sorted(i for i, n in Counter(ids).items() if n > 1)
     if repeated:
         raise ValueError(f"log ID given more than once: {', '.join(repeated[:5])}")
-    unknown = sorted(set(no_data.values()) - NO_DATA_STATUSES - {STATUS_CELL_MISMATCH})
+    unknown = sorted(set(no_data.values()) - NO_DATA_STATUSES)
     if unknown:
         raise ValueError(f"unknown extract status: {', '.join(unknown)}")
     return {**{d.log_id: STATUS_OK for d in datas}, **no_data}
@@ -574,9 +574,10 @@ def fit_extracted(
     give no observation and no score.  ``vehicle_of`` (empty without a
     manifest) makes the split hold out whole vehicles and names the vehicles.
     """
-    mismatched = {d.log_id: STATUS_CELL_MISMATCH for d in datas if not cell_count_matches(d)}
+    given = _statuses_of(datas, no_data or {})  # the inputs as given; the mismatch status is ours
+    mismatched = {d.log_id for d in datas if not cell_count_matches(d)}
     datas = [d for d in datas if d.log_id not in mismatched]
-    statuses = _statuses_of(datas, {**(no_data or {}), **mismatched})
+    statuses = {**given, **dict.fromkeys(mismatched, STATUS_CELL_MISMATCH)}
     fit_ids, holdout_ids = split_logs(list(statuses), vehicle_of, holdout_frac, seed)
     by_id = {d.log_id: d for d in datas}
     observations = [_observe(by_id[i]) for i in fit_ids if i in by_id]
@@ -629,7 +630,7 @@ def fit_extracted(
         holdout_logs_not_scored=len(scored) - len(holdout_scored_log_ids),
         r_fits_by_capacity=capacity_class_fits(observations, vehicle_of, capacity_bounds),
         capacity_bounds_mah=tuple(capacity_bounds),
-        cell_count_mismatch_count=len(mismatched),
+        cell_count_mismatch_count=sum(1 for s in statuses.values() if s == STATUS_CELL_MISMATCH),
         pooled_r_over_vehicles_mohm_per_cell=by_vehicles,
         pooled_r_vehicles=n_vehicles,
         holdout_by_cell_count=holdout_by_cell_count(scored, ocv_curve, deployed),
@@ -793,7 +794,8 @@ def _run_fit(args: argparse.Namespace) -> int:
         )
     print(
         f"Real logs: {result.real_log_count} | SIM excluded: {result.sim_log_count} | "
-        f"Skipped: {result.skipped_log_count}",
+        f"Skipped: {result.skipped_log_count} | "
+        f"Cell count mismatch: {result.cell_count_mismatch_count}",
         file=sys.stderr,
     )
     print(

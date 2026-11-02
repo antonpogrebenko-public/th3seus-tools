@@ -69,11 +69,14 @@ def _noise(noise: Sequence[dict]) -> list[str]:
     return lines
 
 
-def _deployed_from(fit: Mapping[str, Any]) -> str:
-    """"own fit", or "pooled median" with the fit's fallback reason when the JSON has one."""
+def _deployed_from(fit: Mapping[str, Any], by_vehicles: bool) -> str:
+    """"own fit"; else the pool a fallback row deploys: over vehicles when the JSON has that
+    median, else "pooled median" with the fit's fallback reason when the JSON has one."""
     if not fit.get("low_n"):
         return "own fit"
     reason = fit.get("fallback_reason")
+    if by_vehicles:
+        return f"pooled over vehicles: {reason}" if reason else "pooled over vehicles"
     return f"pooled median: {reason}" if reason else "pooled median"
 
 
@@ -110,7 +113,8 @@ def _pooled_lines(battery: Mapping[str, Any]) -> list[str]:
 def _cell_count_check(battery: Mapping[str, Any]) -> list[str]:
     lines = ["Held-out check per cell count: median over the scored held-out logs, with the "
              "Deployed mohm. The signed error is predicted minus measured voltage per cell; "
-             "positive means the model predicts too little sag.", ""]
+             "positive means the model predicts less sag than the packs show, or that the "
+             "open-circuit curve sits above these packs.", ""]
     if "holdout_by_cell_count" not in battery:
         return ["The per-cell-count check is not in this battery fit file.", ""]
     rows = [[f"{c.get('cell_count')}S", str(c.get("scored_logs", NA)),
@@ -123,10 +127,11 @@ def _cell_count_check(battery: Mapping[str, Any]) -> list[str]:
 
 def _battery(battery: Mapping[str, Any]) -> list[str]:
     fits = battery.get("r_fits") or []
+    by_vehicles = battery.get("pooled_r_over_vehicles_mohm_per_cell") is not None
     rows = [[f"{f.get('cell_count')}S", _num(f.get("median_mohm_per_cell"), ".2f"),
              _num(f.get("p10_mohm_per_cell"), ".2f"), _num(f.get("p90_mohm_per_cell"), ".2f"),
              _num(f.get("deployed_mohm_per_cell"), ".2f"), str(f.get("n_observations", NA)),
-             str(f.get("n_vehicles", NA)), _deployed_from(f)]
+             str(f.get("n_vehicles", NA)), _deployed_from(f, by_vehicles)]
             for f in fits]
     lines = ["Internal resistance per cell, from current steps. Deployed is the value the "
              "simulator uses.", "",

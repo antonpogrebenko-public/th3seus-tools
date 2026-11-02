@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import replace
 
 import numpy as np
 import pytest
-
-import json
 
 from log_validation.battery_fit import (
     _LogObservations,
@@ -121,9 +120,61 @@ def test_rust_comments_name_the_fallback():  # dict shaped like result_to_dict
     assert "LOW-N" not in text
 
 
+def test_rust_comments_of_an_older_battery_file():
+    reason = "implausible (median below the 4 mohm/cell floor)"
+    doc = _battery_doc(rows=[(6, 3.27, 446961, True), (9, 5.9, 7, True)], pooled_vehicles=None)
+    doc["r_fits"][0]["fallback_reason"] = reason
+    lines = rust_constants_text(doc).splitlines()
+    line6 = next(x for x in lines if x.startswith("    (6,"))
+    assert f"n=446961, {reason} -> pooled median" in line6
+    assert "fewer than 200" not in line6
+    assert next(x for x in lines if x.startswith("    (9,")).endswith("// n=7 -> pooled median")
+
+
 def test_rust_default_from_an_older_battery_file():
     doc = _battery_doc(rows=[(4, 9.0, 300, False)], pooled_vehicles=None)  # no new keys
     assert "f64 = 9.5000;  // pooled over step events, n=300" in rust_constants_text(doc)
+
+
+def test_pooled_over_vehicles_takes_each_vehicles_median_over_all_its_steps():
+    obs = [_obs("a", 4, [2.0] * 100), _obs("b", 4, [8.0] * 10), _obs("c", 4, [4.0] * 10),
+           _obs("d", 4, [9.0] * 10)]
+    *_, by_vehicles, n_vehicles = _r_table(obs, {"a": "v1", "b": "v1", "c": "v2", "d": "v3"})
+    assert (by_vehicles, n_vehicles) == (4.0, 3)  # v1's median is 2.0, not its log medians' 5.0
+
+
+@pytest.mark.parametrize("n, low", [(199, True), (200, False)])
+def test_the_200_step_boundary(n, low):
+    obs = [_obs("a", 6, [2.0] * 1000), _obs("b", 4, [6.0] * n)]
+    rows, _, _, by_vehicles, _ = _r_table(obs, {"a": "vA", "b": "vB"})
+    four = next(f for f in rows if f.cell_count == 4)
+    assert four.low_n is low
+    assert four.deployed_mohm_per_cell == (by_vehicles if low else 6.0)
+
+
+def test_unrowed_cell_count_is_scored_with_the_vehicle_pooled_default():
+    datas = [make_data(f"a{k:02d}") for k in range(10)] + [make_data("five", 5)]
+    for seed in range(60):
+        r = fit_extracted(datas, {}, 0.3, seed)
+        if "five" in r.holdout_log_ids and "five" in r.holdout_scored_log_ids:
+            break
+    else:
+        pytest.fail("no seed holds out the 5S log")
+    assert all(f.cell_count != 5 for f in r.r_fits)
+    five = next(c for c in r.holdout_by_cell_count if c.cell_count == 5)
+    assert five.deployed_mohm_per_cell == r.pooled_r_over_vehicles_mohm_per_cell
+
+
+def test_caller_cannot_pass_the_fit_internal_mismatch_status():
+    with pytest.raises(ValueError, match="cell_count_mismatch"):
+        fit_extracted([make_data(f"a{k}") for k in range(8)], {}, 0.2, 0,
+                      no_data={"x": "cell_count_mismatch"})
+
+
+def test_mismatched_log_also_in_no_data_is_given_more_than_once():
+    datas = [make_data(f"a{k}") for k in range(8)] + [replace(make_data("m1"), cell_count=1)]
+    with pytest.raises(ValueError, match="given more than once"):
+        fit_extracted(datas, {}, 0.2, 0, no_data={"m1": "unusable"})
 
 
 OCV = OcvCurve([0.0, 1.0], [3.5, 4.2], 2)
@@ -165,3 +216,15 @@ def test_markdown_has_the_check_per_cell_count(tmp_path):
     out = tmp_path / "s.md"
     write_markdown_summary(r, out)
     assert "Held-out check per cell count" in out.read_text()
+
+
+def test_markdown_signed_error_sentence_and_single_blank_lines(tmp_path):
+    r = fit_extracted([make_data(f"a{k}") for k in range(8)], {}, 0.2, 0)
+    out = tmp_path / "s.md"
+    write_markdown_summary(r, out)
+    text = out.read_text()
+    assert ("The signed error is predicted minus measured voltage per cell; positive means "
+            "the model predicts less sag than the packs show, or that the open-circuit curve "
+            "sits above these packs.") in " ".join(text.split())
+    assert "\n\n\n" not in text
+    assert "3.0 to 4.4 V per cell" in text

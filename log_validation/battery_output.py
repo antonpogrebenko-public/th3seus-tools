@@ -10,6 +10,8 @@ from typing import Any
 
 from .battery_capacity import MIN_CLASS_VEHICLES
 from .battery_model import (
+    CELL_V_MAX,
+    CELL_V_MIN,
     MIN_R_OBSERVATIONS_PER_CLASS,
     BatteryFitResult,
     PerCellRFit,
@@ -159,8 +161,9 @@ def _cell_count_check_lines(r: BatteryFitResult) -> list[str]:
         "## Held-out check per cell count",
         "",
         "Median over the scored held-out logs of each cell count, with the Deployed R.  "
-        "The signed error is predicted minus measured voltage per cell: positive means "
-        "the model predicts too little sag.",
+        "The signed error is predicted minus measured voltage per cell; positive means "
+        "the model predicts less sag than the packs show, or that the open-circuit curve "
+        "sits above these packs.",
         "",
         "| Cells | Scored logs | Deployed mohm | Median error (V/cell) | Median signed error (V/cell) |",
         "|---|---|---|---|---|",
@@ -196,7 +199,8 @@ def write_markdown_summary(
         f"| SIM logs excluded | {r.sim_log_count} |",
         f"| Skipped (load error or no usable battery data) | {r.skipped_log_count} |",
         "| Left out: cell count does not match the pack voltage "
-        f"(median outside 3.0 to 4.4 V per cell) | {r.cell_count_mismatch_count} |",
+        f"(median outside {CELL_V_MIN:.1f} to {CELL_V_MAX:.1f} V per cell) | "
+        f"{r.cell_count_mismatch_count} |",
         f"| Holdout (validation only) | {r.holdout_log_count} |",
         f"| Fit logs with at least one observation | {len(r.fit_log_ids)} |",
         f"| Usable fit logs without a step or OCV sample | {r.fit_logs_without_samples} |",
@@ -209,7 +213,6 @@ def write_markdown_summary(
         f"(n={r.overall_r_n} steps).",
         "",
         *_pooled_vehicles_lines(r),
-        "",
         "| Cell count | Median (mohm/cell) | p10 | p90 | Deployed (mohm/cell) | IQR "
         "| n step events | Vehicles | fallback reason |",
         "|---|---|---|---|---|---|---|---|---|",
@@ -291,6 +294,16 @@ def _whole(record: Mapping[str, Any], key: str) -> int:
     return int(value)
 
 
+def _r_note(battery: Mapping[str, Any], f: Mapping[str, Any], n: int) -> str:
+    """The comment of one R row; a file from before the vehicle-pooled median names its stored reason."""
+    if not f["low_n"]:
+        return f"n={n}"
+    if "pooled_r_over_vehicles_mohm_per_cell" in battery:
+        return f"n={n}, fewer than {MIN_R_OBSERVATIONS_PER_CLASS} step events -> pooled over vehicles"
+    reason = f.get("fallback_reason")
+    return f"n={n}, {reason} -> pooled median" if reason else f"n={n} -> pooled median"
+
+
 def _r_table_lines(battery: Mapping[str, Any]) -> list[str]:
     lines = [
         "// FITTED_R_TABLE: deployed per-cell R (mohm/cell), keyed by cell count.",
@@ -301,10 +314,8 @@ def _r_table_lines(battery: Mapping[str, Any]) -> list[str]:
     ]
     for f in battery["r_fits"]:
         n = _whole(f, "n_observations")
-        note = (f"n={n}, fewer than {MIN_R_OBSERVATIONS_PER_CLASS} step events -> pooled over vehicles"
-                if f["low_n"] else f"n={n}")
         lines.append(
-            f"    ({_whole(f, 'cell_count')}, {f['deployed_mohm_per_cell']:.4f}),  // {note}"
+            f"    ({_whole(f, 'cell_count')}, {f['deployed_mohm_per_cell']:.4f}),  // {_r_note(battery, f, n)}"
         )
     return lines + ["];"]
 
