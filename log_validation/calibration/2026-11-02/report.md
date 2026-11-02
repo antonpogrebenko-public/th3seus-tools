@@ -12,7 +12,7 @@
   - `battery_split_seed`: 20260623
   - `gps_rest_min_s`: 60.0
   - `jobs`: 8
-  - `local_tool_commit`: "9f8a749b6ebb95d5b78255742cb74db94b987f49"
+  - `local_tool_commit`: "2c5f4197a3341d1f0ce69c4253293a9ecf99d669"
   - `max_per_vehicle`: 3
   - `noise_and_battery_set`: "every log of the mirror that the catalog step could read and marked as real hardware (a log marked as simulated, or whose simulation flag is unknown, is left out); all vehicle types"
   - `part_tables`: {"allan_slope_tolerance": 0.15, "catalog_spellings": "none", "min_vehicles": 10, "sim_rate_baro_hz": 50.0, "sim_rate_mag_hz": 50.0}
@@ -250,21 +250,22 @@ Internal resistance per cell, from current steps. Deployed is the value the simu
 
 | Cells | Median mohm | p10 | p90 | Deployed mohm | Steps | Vehicles | Deployed from |
 |---|---|---|---|---|---|---|---|
-| 1S | 19.85 | 11.60 | 47.53 | 19.85 | 35260 | 304 | own fit |
-| 2S | 14.57 | 4.42 | 50.09 | 14.57 | 5840 | 323 | own fit |
-| 3S | 8.90 | 2.49 | 31.23 | 8.90 | 16015 | 452 | own fit |
-| 4S | 6.09 | 1.58 | 23.51 | 6.09 | 139149 | 2057 | own fit |
-| 5S | 5.45 | 1.02 | 16.63 | 5.45 | 1082 | 37 | own fit |
-| 6S | 3.22 | 1.21 | 11.21 | 3.27 | 446961 | 3066 | pooled median: implausible (median below the 4 mohm/cell floor) |
-| 7S | 3.37 | 1.00 | 14.68 | 3.27 | 1355 | 35 | pooled median: implausible (median below the 4 mohm/cell floor) |
-| 8S | 3.25 | 1.19 | 9.83 | 3.27 | 21915 | 101 | pooled median: implausible (median below the 4 mohm/cell floor) |
-| 9S | 9.80 | 4.21 | 36.87 | 3.27 | 7 | 1 | pooled median: low-n (fewer than 200 step events) |
-| 10S | 3.81 | 1.52 | 8.39 | 3.27 | 667 | 14 | pooled median: implausible (median below the 4 mohm/cell floor) |
-| 12S | 2.16 | 0.92 | 4.90 | 3.27 | 198042 | 593 | pooled median: implausible (median below the 4 mohm/cell floor) |
-| 13S | 3.80 | 2.36 | 5.08 | 3.27 | 17009 | 39 | pooled median: implausible (median below the 4 mohm/cell floor) |
-| 14S | 2.38 | 0.87 | 9.19 | 3.27 | 14471 | 41 | pooled median: implausible (median below the 4 mohm/cell floor) |
+| 1S | 8.37 | 3.36 | 19.10 | 5.57 | 169 | 3 | pooled median: low-n (fewer than 200 step events) |
+| 2S | 13.44 | 4.32 | 36.73 | 13.44 | 4732 | 299 | own fit |
+| 3S | 8.74 | 2.40 | 30.95 | 8.74 | 13839 | 419 | own fit |
+| 4S | 6.08 | 1.56 | 23.66 | 6.08 | 130805 | 1899 | own fit |
+| 5S | 5.70 | 1.08 | 17.16 | 5.70 | 1046 | 35 | own fit |
+| 6S | 3.21 | 1.21 | 11.05 | 3.21 | 441198 | 3004 | own fit |
+| 7S | 3.37 | 1.00 | 14.68 | 3.37 | 1355 | 35 | own fit |
+| 8S | 3.26 | 1.20 | 9.84 | 3.26 | 21839 | 99 | own fit |
+| 9S | 9.80 | 4.21 | 36.87 | 5.57 | 7 | 1 | pooled median: low-n (fewer than 200 step events) |
+| 10S | 3.89 | 1.59 | 9.00 | 3.89 | 487 | 10 | own fit |
+| 12S | 2.15 | 0.92 | 4.86 | 2.15 | 195505 | 588 | own fit |
+| 13S | 3.80 | 2.36 | 5.08 | 3.80 | 17009 | 39 | own fit |
+| 14S | 2.39 | 0.88 | 9.21 | 2.39 | 14365 | 38 | own fit |
 
-Pooled median: 3.27 mohm per cell over 897773 steps.
+Pooled median over steps: 3.10 mohm per cell over 842356 steps.
+Pooled median over vehicles: 5.57 mohm per cell over 6380 vehicles (the fallback).
 
 Internal resistance per cell count and pack capacity (the log's battery capacity parameter). Spread only: the simulator table stays per cell count.
 
@@ -272,57 +273,68 @@ Capacity class bounds (mAh): 1000, 2500, 5000, 10000, 20000.
 
 | Cells | Capacity (mAh) | Median mohm | p10 | p90 | Steps | Vehicles |
 |---|---|---|---|---|---|---|
-| 1S | 2500-5000 | 17.52 | 12.30 | 27.18 | 208 | 7 |
-| 1S | 5000-10000 | 15.98 | 8.79 | 27.97 | 1411 | 32 |
-| 1S | 10000-20000 | 17.40 | 11.45 | 34.85 | 3020 | 10 |
-| 1S | >=20000 | 24.65 | 12.38 | 57.69 | 10577 | 28 |
-| 1S | unknown capacity | 19.31 | 11.59 | 37.74 | 20038 | 231 |
 | 2S | 1000-2500 | 12.49 | 2.17 | 15.70 | 180 | 14 |
-| 2S | 2500-5000 | 13.05 | 5.78 | 25.22 | 3154 | 119 |
-| 2S | unknown capacity | 26.71 | 3.12 | 65.73 | 2448 | 185 |
+| 2S | 2500-5000 | 13.02 | 5.78 | 25.12 | 3142 | 113 |
+| 2S | unknown capacity | 21.45 | 2.69 | 65.08 | 1393 | 168 |
 | 3S | <1000 | 3.53 | 2.14 | 22.67 | 56 | 5 |
 | 3S | 1000-2500 | 26.23 | 4.33 | 59.82 | 313 | 11 |
-| 3S | 2500-5000 | 8.31 | 3.23 | 20.54 | 1140 | 31 |
+| 3S | 2500-5000 | 11.03 | 3.94 | 22.96 | 837 | 26 |
 | 3S | 5000-10000 | 8.08 | 3.57 | 41.57 | 260 | 5 |
-| 3S | unknown capacity | 8.69 | 2.36 | 31.15 | 13976 | 404 |
-| 4S | <1000 | 7.28 | 3.39 | 14.06 | 718 | 14 |
+| 3S | unknown capacity | 8.29 | 2.22 | 30.51 | 12141 | 376 |
+| 4S | <1000 | 7.34 | 3.49 | 14.09 | 709 | 13 |
 | 4S | 1000-2500 | 7.08 | 1.41 | 29.13 | 430 | 15 |
-| 4S | 2500-5000 | 9.68 | 2.03 | 31.15 | 6146 | 166 |
-| 4S | 5000-10000 | 5.46 | 2.00 | 17.31 | 5269 | 137 |
-| 4S | 10000-20000 | 4.81 | 2.65 | 14.29 | 7865 | 28 |
+| 4S | 2500-5000 | 9.67 | 2.03 | 31.15 | 6143 | 164 |
+| 4S | 5000-10000 | 5.43 | 2.00 | 17.15 | 5230 | 135 |
+| 4S | 10000-20000 | 4.57 | 2.60 | 13.67 | 7596 | 27 |
 | 4S | >=20000 | 2.51 | 1.26 | 4.86 | 1620 | 9 |
-| 4S | unknown capacity | 6.22 | 1.51 | 24.11 | 117101 | 1712 |
-| 5S | unknown capacity | 5.66 | 0.91 | 20.14 | 811 | 30 |
+| 4S | unknown capacity | 6.24 | 1.49 | 24.34 | 109077 | 1559 |
+| 5S | unknown capacity | 5.94 | 0.95 | 20.45 | 775 | 28 |
 | 6S | <1000 | 3.85 | 1.32 | 6.48 | 405 | 6 |
-| 6S | 1000-2500 | 2.11 | 1.01 | 6.15 | 1317 | 23 |
-| 6S | 2500-5000 | 3.09 | 1.39 | 14.29 | 5966 | 74 |
-| 6S | 5000-10000 | 3.74 | 1.58 | 12.01 | 21274 | 238 |
-| 6S | 10000-20000 | 3.89 | 1.12 | 10.53 | 17212 | 145 |
-| 6S | >=20000 | 2.54 | 1.28 | 5.15 | 45279 | 149 |
-| 6S | unknown capacity | 3.31 | 1.18 | 11.89 | 355508 | 2475 |
+| 6S | 1000-2500 | 2.30 | 1.15 | 6.70 | 1134 | 21 |
+| 6S | 2500-5000 | 3.10 | 1.40 | 14.25 | 5926 | 73 |
+| 6S | 5000-10000 | 3.72 | 1.58 | 11.98 | 20979 | 237 |
+| 6S | 10000-20000 | 3.98 | 1.14 | 10.63 | 16840 | 143 |
+| 6S | >=20000 | 2.53 | 1.27 | 5.12 | 45071 | 146 |
+| 6S | unknown capacity | 3.30 | 1.19 | 11.68 | 350843 | 2422 |
 | 7S | unknown capacity | 3.15 | 0.98 | 15.29 | 1280 | 34 |
-| 8S | unknown capacity | 3.31 | 1.20 | 10.00 | 21155 | 92 |
-| 10S | unknown capacity | 3.70 | 1.48 | 7.62 | 649 | 12 |
-| 12S | 2500-5000 | 3.31 | 1.27 | 9.39 | 1948 | 8 |
+| 8S | unknown capacity | 3.32 | 1.21 | 10.01 | 21095 | 91 |
+| 10S | unknown capacity | 3.81 | 1.55 | 8.19 | 469 | 8 |
+| 12S | 2500-5000 | 2.97 | 1.25 | 7.19 | 1402 | 7 |
 | 12S | 5000-10000 | 2.95 | 1.38 | 6.77 | 3187 | 18 |
 | 12S | 10000-20000 | 1.91 | 1.06 | 3.85 | 4821 | 58 |
-| 12S | >=20000 | 2.08 | 0.89 | 4.01 | 80820 | 148 |
-| 12S | unknown capacity | 2.21 | 0.94 | 5.08 | 107266 | 368 |
+| 12S | >=20000 | 2.07 | 0.88 | 3.97 | 80119 | 147 |
+| 12S | unknown capacity | 2.20 | 0.94 | 5.07 | 105976 | 365 |
 | 13S | unknown capacity | 3.80 | 2.36 | 5.08 | 17009 | 39 |
-| 14S | >=20000 | 2.74 | 1.01 | 9.84 | 7863 | 13 |
-| 14S | unknown capacity | 2.13 | 0.77 | 8.29 | 6608 | 29 |
+| 14S | >=20000 | 2.78 | 1.03 | 9.90 | 7763 | 12 |
+| 14S | unknown capacity | 2.13 | 0.77 | 8.29 | 6602 | 27 |
 
 Held-out checks:
 
 | Check | Value |
 |---|---|
-| Held-out logs with a voltage error (MAE) | 3504 of 7147 real held-out logs, usable or not |
-| Voltage MAE, median (V per cell) | 0.08932 |
-| Voltage MAE, p75 (V per cell) | 0.1653 |
+| Held-out logs with a voltage error (MAE) | 3276 of 7147 real held-out logs, usable or not |
+| Voltage MAE, median (V per cell) | 0.08223 |
+| Voltage MAE, p75 (V per cell) | 0.1429 |
 | Target of 0.1 V per cell | met |
-| Step check: steps (vehicles) | 441218 (1811) |
-| Step check: median error (V per cell) | 0.0344 |
-| Step check: p75 error (V per cell) | 0.07351 |
+| Step check: steps (vehicles) | 402215 (1650) |
+| Step check: median error (V per cell) | 0.02994 |
+| Step check: p75 error (V per cell) | 0.06441 |
+
+Held-out check per cell count: median over the scored held-out logs, with the Deployed mohm. The signed error is predicted minus measured voltage per cell; positive means the model predicts too little sag.
+
+| Cells | Scored logs | Deployed mohm | Median error (V per cell) | Median signed error (V per cell) |
+|---|---|---|---|---|
+| 2S | 147 | 13.44 | 0.1260 | 0.1240 |
+| 3S | 235 | 8.74 | 0.0897 | -0.0173 |
+| 4S | 1022 | 6.08 | 0.0789 | 0.0135 |
+| 5S | 26 | 5.70 | 0.1049 | 0.0708 |
+| 6S | 1497 | 3.21 | 0.0762 | 0.0153 |
+| 7S | 11 | 3.37 | 0.1226 | 0.1226 |
+| 8S | 45 | 3.26 | 0.0747 | -0.0188 |
+| 10S | 6 | 3.89 | 0.3524 | 0.3524 |
+| 12S | 242 | 2.15 | 0.0948 | 0.0208 |
+| 13S | 15 | 3.80 | 0.0590 | -0.0476 |
+| 14S | 30 | 2.39 | 0.1404 | -0.0110 |
 
 ## Vehicle response
 
@@ -376,7 +388,7 @@ The full table, with the cell-count and airframe classes, is in `ranges.csv`. Ov
 | Quantity | Logs | Vehicles | p5 | p25 | p50 | p75 | p95 | Class rows |
 |---|---|---|---|---|---|---|---|---|
 | accel.accel_noise_density | 3671 | 2435 | 0.0004896 | 0.0007408 | 0.001274 | 0.00229 | 0.01012 | 44 |
-| battery.r_mohm_per_cell | 12170 | 6917 | 1.552 | 3.123 | 5.994 | 13.16 | 31.28 | 12 |
+| battery.r_mohm_per_cell | 11126 | 6380 | 1.538 | 3.029 | 5.611 | 11.74 | 28.36 | 11 |
 | effectiveness.pitch | 398 | 251 | 66.44 | 135.3 | 195.8 | 325.4 | 586.3 | 11 |
 | effectiveness.roll | 406 | 256 | 72.52 | 145.1 | 221.5 | 336.7 | 744.4 | 10 |
 | effectiveness.yaw | 36 | 30 | 13.04 | 44.38 | 66.24 | 177 | 637.9 | 3 |
@@ -425,7 +437,7 @@ The full table, with the cell-count and airframe classes, is in `ranges.csv`. Ov
 
 ### Noise
 
-Analyzed 3692, skipped 32249, failed 27.
+Analyzed 3692, skipped 32250, failed 26.
 
 | Reason (details removed, numbers as N) | Logs |
 |---|---|
@@ -480,14 +492,15 @@ Analyzed 3692, skipped 32249, failed 27.
 
 ### Battery
 
-Analyzed 18007, skipped 18467, failed n/a. Failed logs are counted with skipped.
+Analyzed 16573, skipped 19901, failed n/a. Failed logs are counted with skipped.
 
 | Reason (details removed, numbers as N) | Logs |
 |---|---|
 | load error or no usable battery data | 15845 |
-| fit log without a usable step or OCV sample | 1837 |
+| cell count does not match the pack voltage | 2035 |
+| fit log without a usable step or OCV sample | 1316 |
 | log without a manifest row, left out | 506 |
-| holdout log not scored | 230 |
+| holdout log not scored | 150 |
 | simulation log excluded | 49 |
 
 ### Response
