@@ -77,6 +77,7 @@ def entry_counts(name: str, entries: Sequence[Mapping[str, Any]],
 # Battery reason rows and the battery JSON total each one counts.
 BATTERY_REASONS = (("simulation log excluded", "sim_log_count"),
                    ("load error or no usable battery data", "skipped_log_count"),
+                   ("cell count does not match the pack voltage", "cell_count_mismatch_count"),
                    ("fit log without a usable step or OCV sample", "fit_logs_without_samples"),
                    ("holdout log not scored", "holdout_logs_not_scored"),
                    ("log without a manifest row, left out", "logs_without_manifest_row"))

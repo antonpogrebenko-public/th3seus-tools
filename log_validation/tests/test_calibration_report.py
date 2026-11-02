@@ -256,6 +256,40 @@ def test_report_labels_the_airframe_lag_as_an_upper_bound():
     assert "| lag | body-rate lag minus filter delay (upper bound on motor lag) |" in text
 
 
+def _check_row(cells, scored, deployed, mae, signed):
+    return {"cell_count": cells, "scored_logs": scored, "deployed_mohm_per_cell": deployed,
+            "median_mae_v_per_cell": mae, "median_signed_err_v_per_cell": signed}
+
+
+def _battery_text(battery):
+    return render_report([], battery, [], airframes_dict(), [], run_info())
+
+
+def test_report_has_a_row_per_cell_count_in_the_check():
+    battery = {**battery_dict(), "holdout_by_cell_count": [
+        _check_row(4, 12, 9.5, 0.031, 0.012), _check_row(6, 5, 5.9, 0.044, -0.021)]}
+    text = _battery_text(battery)
+    assert "| 4S | 12 | 9.50 | 0.0310 | 0.0120 |" in text
+    assert "| 6S | 5 | 5.90 | 0.0440 | -0.0210 |" in text
+
+
+def test_report_says_when_the_check_per_cell_count_is_missing():
+    assert "The per-cell-count check is not in this battery fit file." in _battery_text(battery_dict())
+
+
+def test_report_names_both_pools():
+    battery = {**battery_dict(), "pooled_r_over_vehicles_mohm_per_cell": 7.25, "pooled_r_vehicles": 3}
+    text = _battery_text(battery)
+    assert "Pooled median over steps: 9.50 mohm per cell over 300 steps." in text
+    assert "Pooled median over vehicles: 7.25 mohm per cell over 3 vehicles (the fallback)." in text
+    assert "Pooled median: 9.50 mohm per cell over 300 steps." in _battery_text(battery_dict())
+
+
+def test_counts_row_for_cell_count_mismatches():
+    text = _battery_text({**battery_dict(), "cell_count_mismatch_count": 800})
+    assert "| cell count does not match the pack voltage | 800 |" in text
+
+
 INPUTS = {"manifest_rows": 10, "rows_without_log": 1, "logs_without_row": 2, "capped_out": 3,
           "download_failed": 4}
 

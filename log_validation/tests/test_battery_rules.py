@@ -7,9 +7,18 @@ from dataclasses import replace
 import numpy as np
 import pytest
 
-from log_validation.battery_fit import _LogObservations, _r_table, cell_count_matches, fit_extracted
+import json
+
+from log_validation.battery_fit import (
+    _LogObservations,
+    _r_table,
+    cell_count_matches,
+    fit_extracted,
+    holdout_by_cell_count,
+)
+from log_validation.battery_model import OcvCurve
 from log_validation.battery_output import result_to_dict, rust_constants_text, write_markdown_summary
-from log_validation.tests.battery_fakes import make_data
+from log_validation.tests.battery_fakes import R_3S_MOHM, make_data
 from log_validation.tests.calibration_inputs import battery_dict
 
 
@@ -115,3 +124,44 @@ def test_rust_comments_name_the_fallback():  # dict shaped like result_to_dict
 def test_rust_default_from_an_older_battery_file():
     doc = _battery_doc(rows=[(4, 9.0, 300, False)], pooled_vehicles=None)  # no new keys
     assert "f64 = 9.5000;  // pooled over step events, n=300" in rust_constants_text(doc)
+
+
+OCV = OcvCurve([0.0, 1.0], [3.5, 4.2], 2)
+
+
+def test_under_predicted_sag_is_positive():
+    rows = holdout_by_cell_count([make_data("h1", 4, 12.0), make_data("h2", 4, 12.0)], OCV, lambda c: 9.0)
+    (four,) = rows
+    assert (four.cell_count, four.scored_logs, four.deployed_mohm_per_cell) == (4, 2, 9.0)
+    assert four.median_signed_err_v_per_cell > 0
+
+
+def test_over_predicted_sag_is_negative():
+    (four,) = holdout_by_cell_count([make_data("h1", 4, 12.0)], OCV, lambda c: 15.0)
+    assert four.median_signed_err_v_per_cell < 0
+
+
+def test_one_row_per_cell_count_and_none_for_unscored():
+    f1 = make_data("f1", 6)
+    flat = replace(f1, remaining=np.full(f1.v.size, 0.5))
+    rows = holdout_by_cell_count(
+        [make_data("h1", 4), make_data("h2", 4), make_data("h3", 3, R_3S_MOHM), flat], OCV, lambda c: 9.0)
+    assert [(r.cell_count, r.scored_logs) for r in rows] == [(3, 1), (4, 2)]
+
+
+def test_fit_fills_the_check_per_cell_count_without_nan():
+    r = fit_extracted([make_data(f"a{k}") for k in range(8)], {}, 0.2, 0)
+    assert r.holdout_by_cell_count
+    assert all(c.scored_logs > 0 for c in r.holdout_by_cell_count)
+    doc = result_to_dict(r)
+    json.dumps(doc, allow_nan=False)
+    assert set(doc["holdout_by_cell_count"][0]) == {
+        "cell_count", "scored_logs", "deployed_mohm_per_cell",
+        "median_mae_v_per_cell", "median_signed_err_v_per_cell"}
+
+
+def test_markdown_has_the_check_per_cell_count(tmp_path):
+    r = fit_extracted([make_data(f"a{k}") for k in range(8)], {}, 0.2, 0)
+    out = tmp_path / "s.md"
+    write_markdown_summary(r, out)
+    assert "Held-out check per cell count" in out.read_text()

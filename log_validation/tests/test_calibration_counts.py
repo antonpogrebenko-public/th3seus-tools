@@ -78,6 +78,7 @@ def _quiet(log_id: str):
 def _fit_doc() -> dict:
     datas = [make_data(i, 3 if i.startswith("c3") else 4) for i in REAL_IDS]
     datas += [_quiet(i) for i in QUIET_IDS]
+    datas.append(replace(make_data("m01", 4), cell_count=1))  # a 4S pack logged as 1S
     result = fit_extracted(datas, {}, no_data=NO_DATA, logs_without_manifest_row=WITHOUT_ROW)
     return result_to_dict(result)
 
@@ -85,13 +86,14 @@ def _fit_doc() -> dict:
 def test_battery_counts_partition_the_logs_the_pass_read():
     doc = _fit_doc()
     counts = battery_counts(doc, log_id_lists([], doc, [])["battery"])
-    read = len(REAL_IDS) + len(QUIET_IDS) + len(NO_DATA) + WITHOUT_ROW
+    read = len(REAL_IDS) + len(QUIET_IDS) + len(NO_DATA) + WITHOUT_ROW + 1
     assert counts.analyzed + counts.skipped == read
     assert sum(n for _, n in counts.reasons) == counts.skipped
     reasons = dict(counts.reasons)
     assert reasons["simulation log excluded"] == 2
     assert reasons["load error or no usable battery data"] == 3
     assert reasons["log without a manifest row, left out"] == WITHOUT_ROW
+    assert reasons["cell count does not match the pack voltage"] == 1
     quiet = (reasons["fit log without a usable step or OCV sample"]
              + reasons["holdout log not scored"])
     assert quiet == len(QUIET_IDS)  # every quiet log, on either side, in exactly one row

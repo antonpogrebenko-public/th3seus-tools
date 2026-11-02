@@ -84,6 +84,7 @@ def result_to_dict(r: BatteryFitResult) -> dict:
         "holdout_scored_log_ids": list(r.holdout_scored_log_ids),
         "fit_logs_without_samples": r.fit_logs_without_samples,
         "holdout_logs_not_scored": r.holdout_logs_not_scored,
+        "holdout_by_cell_count": [asdict(c) for c in r.holdout_by_cell_count],
         "step_check": {
             "n_steps": r.step_check.n_steps,
             "n_vehicles": r.step_check.n_vehicles,
@@ -150,6 +151,26 @@ def _capacity_lines(r: BatteryFitResult) -> list[str]:
             f"{f.n_vehicles} |"
         )
     return lines
+
+
+def _cell_count_check_lines(r: BatteryFitResult) -> list[str]:
+    """The held-out check per cell count, with a sentence on the sign of the error."""
+    lines = [
+        "## Held-out check per cell count",
+        "",
+        "Median over the scored held-out logs of each cell count, with the Deployed R.  "
+        "The signed error is predicted minus measured voltage per cell: positive means "
+        "the model predicts too little sag.",
+        "",
+        "| Cells | Scored logs | Deployed mohm | Median error (V/cell) | Median signed error (V/cell) |",
+        "|---|---|---|---|---|",
+    ]
+    lines += [
+        f"| {c.cell_count}S | {c.scored_logs} | {c.deployed_mohm_per_cell:.2f} | "
+        f"{c.median_mae_v_per_cell:.4f} | {c.median_signed_err_v_per_cell:.4f} |"
+        for c in r.holdout_by_cell_count
+    ]
+    return lines + [""]
 
 
 def write_markdown_summary(
@@ -232,6 +253,7 @@ def write_markdown_summary(
         f"| Step check: p75 error (V/cell) | {_fmt(sc.p75_err_v_per_cell)} |",
         f"| Target < 0.1 V/cell | {'PASS' if r.validation_target_met else 'FAIL'} |",
         "",
+        *_cell_count_check_lines(r),
         "## Method Notes",
         "",
         "- **R_internal:** regressed from rapid current-step events (`|dI| > 5 A`, `dt < 2 s`).  "

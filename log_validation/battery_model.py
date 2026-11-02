@@ -87,6 +87,22 @@ class StepCheck:
 
 
 @dataclass(frozen=True)
+class CellCountCheck:
+    """Held-out voltage check of the deployed R for one cell count.
+
+    Medians over the scored holdout logs of that cell count.  The signed error is
+    (predicted - measured) per cell: positive when the model predicts a higher
+    voltage than measured, that is, it under-predicts the sag.
+    """
+
+    cell_count: int
+    scored_logs: int
+    deployed_mohm_per_cell: float
+    median_mae_v_per_cell: float
+    median_signed_err_v_per_cell: float
+
+
+@dataclass(frozen=True)
 class BatteryFitResult:
     """Aggregate output of the battery fitting pipeline.
 
@@ -133,3 +149,4 @@ class BatteryFitResult:
     cell_count_mismatch_count: int = 0
     pooled_r_over_vehicles_mohm_per_cell: float | None = None
     pooled_r_vehicles: int = 0
+    holdout_by_cell_count: tuple[CellCountCheck, ...] = ()

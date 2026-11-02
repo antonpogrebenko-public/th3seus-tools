@@ -68,7 +68,7 @@ from .battery_extract import (  # noqa: F401
 )
 from .battery_model import (  # noqa: F401
     CELL_V_MAX, CELL_V_MIN,
-    MIN_R_OBSERVATIONS_PER_CLASS, BatteryFitResult, OcvCurve,
+    MIN_R_OBSERVATIONS_PER_CLASS, BatteryFitResult, CellCountCheck, OcvCurve,
     PerCellRFit, StepCheck,
 )
 from .battery_output import emit_rust_constants, result_to_dict, write_markdown_summary
@@ -468,6 +468,37 @@ def _holdout_mae(data: LogBatteryData, ocv: OcvCurve, r_mohm_per_cell: float) ->
     return float(np.median(finite)) if finite.size else None
 
 
+def _signed_error(data: LogBatteryData, ocv: OcvCurve, r_mohm_per_cell: float) -> float:
+    """Median (predicted - measured) V/cell over the log's finite samples; nan without any."""
+    soc = data.remaining
+    v_pred = _predict_terminal_voltage(soc, data.i, data.cell_count, ocv, r_mohm_per_cell)
+    errors = (v_pred - data.v) / data.cell_count
+    finite = errors[np.isfinite(errors)]
+    return float(np.median(finite)) if finite.size else float("nan")
+
+
+def holdout_by_cell_count(
+    scored: Sequence[LogBatteryData], ocv: OcvCurve, deployed: Callable[[int], float]
+) -> tuple[CellCountCheck, ...]:
+    """The held-out voltage check per cell count, ascending; a cell count with no scored log has no row."""
+    per_count: dict[int, list[tuple[float, float]]] = {}
+    for d in scored:
+        r = deployed(d.cell_count)
+        mae = _holdout_mae(d, ocv, r)
+        if mae is not None:
+            per_count.setdefault(d.cell_count, []).append((mae, _signed_error(d, ocv, r)))
+    return tuple(
+        CellCountCheck(
+            cell_count=cells,
+            scored_logs=len(pairs),
+            deployed_mohm_per_cell=deployed(cells),
+            median_mae_v_per_cell=float(np.median([m for m, _ in pairs])),
+            median_signed_err_v_per_cell=float(np.median([s for _, s in pairs])),
+        )
+        for cells, pairs in sorted(per_count.items())
+    )
+
+
 def _step_errors(data: LogBatteryData, r_mohm_per_cell: float) -> np.ndarray:
     """Per-cell voltage-change errors over the steps of one log (adjacent sample pairs)."""
     with np.errstate(invalid="ignore"):
@@ -601,6 +632,7 @@ def fit_extracted(
         cell_count_mismatch_count=len(mismatched),
         pooled_r_over_vehicles_mohm_per_cell=by_vehicles,
         pooled_r_vehicles=n_vehicles,
+        holdout_by_cell_count=holdout_by_cell_count(scored, ocv_curve, deployed),
     )
 
 

@@ -96,6 +96,31 @@ def _capacity_rows(battery: Mapping[str, Any]) -> list[str]:
                            "Vehicles"], rows)
 
 
+def _pooled_lines(battery: Mapping[str, Any]) -> list[str]:
+    steps = (f"{_num(battery.get('overall_r_median_mohm_per_cell'), '.2f')} "
+             f"mohm per cell over {battery.get('overall_r_n', NA)} steps.")
+    if battery.get("pooled_r_over_vehicles_mohm_per_cell") is None:
+        return [f"Pooled median: {steps}"]
+    return [f"Pooled median over steps: {steps}",
+            "Pooled median over vehicles: "
+            f"{_num(battery.get('pooled_r_over_vehicles_mohm_per_cell'), '.2f')} mohm per cell "
+            f"over {battery.get('pooled_r_vehicles', NA)} vehicles (the fallback)."]
+
+
+def _cell_count_check(battery: Mapping[str, Any]) -> list[str]:
+    lines = ["Held-out check per cell count: median over the scored held-out logs, with the "
+             "Deployed mohm. The signed error is predicted minus measured voltage per cell; "
+             "positive means the model predicts too little sag.", ""]
+    if "holdout_by_cell_count" not in battery:
+        return ["The per-cell-count check is not in this battery fit file.", ""]
+    rows = [[f"{c.get('cell_count')}S", str(c.get("scored_logs", NA)),
+             _num(c.get("deployed_mohm_per_cell"), ".2f"), _num(c.get("median_mae_v_per_cell"), ".4f"),
+             _num(c.get("median_signed_err_v_per_cell"), ".4f")]
+            for c in battery["holdout_by_cell_count"] or []]
+    return lines + _table(["Cells", "Scored logs", "Deployed mohm", "Median error (V per cell)",
+                           "Median signed error (V per cell)"], rows)
+
+
 def _battery(battery: Mapping[str, Any]) -> list[str]:
     fits = battery.get("r_fits") or []
     rows = [[f"{f.get('cell_count')}S", _num(f.get("median_mohm_per_cell"), ".2f"),
@@ -107,8 +132,7 @@ def _battery(battery: Mapping[str, Any]) -> list[str]:
              "simulator uses.", "",
              *_table(["Cells", "Median mohm", "p10", "p90", "Deployed mohm", "Steps", "Vehicles",
                       "Deployed from"], rows),
-             f"Pooled median: {_num(battery.get('overall_r_median_mohm_per_cell'), '.2f')} "
-             f"mohm per cell over {battery.get('overall_r_n', NA)} steps.", "",
+             *_pooled_lines(battery), "",
              *_capacity_rows(battery)]
     step = battery.get("step_check") or {}
     met = "met" if battery.get("validation_target_met") else "not met"
@@ -121,7 +145,8 @@ def _battery(battery: Mapping[str, Any]) -> list[str]:
         ["Target of 0.1 V per cell", met],
         ["Step check: steps (vehicles)", f"{step.get('n_steps', NA)} ({step.get('n_vehicles', NA)})"],
         ["Step check: median error (V per cell)", _num(step.get("median_err_v_per_cell"))],
-        ["Step check: p75 error (V per cell)", _num(step.get("p75_err_v_per_cell"))]])]
+        ["Step check: p75 error (V per cell)", _num(step.get("p75_err_v_per_cell"))]]),
+        *_cell_count_check(battery)]
 
 
 def _range_cells(r: RangeRow, points: Sequence[str]) -> list[str]:
