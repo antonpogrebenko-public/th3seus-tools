@@ -353,6 +353,16 @@ def test_one_fix_class_per_gps_entry(fix_class):
         emit_part_source("gps", _m8n_tables_with(fix_class), RUN)
 
 
+@pytest.mark.parametrize("fix_class", [None, "dgps"])
+def test_an_unknown_fix_class_on_every_measured_row_is_refused(fix_class):
+    tables = build_part_tables(_gps_entries("UBX_8", 10))
+    rows = tuple(dataclasses.replace(r, fix_class=fix_class)
+                 if r.variant == "UbloxM8N" and r.proposed is not None else r
+                 for r in tables.rows)
+    with pytest.raises(ValueError, match="UbloxM8N.*unknown fix class|unknown fix class.*UbloxM8N"):
+        emit_part_source("gps", PartTables(rows=rows, log_ids=tables.log_ids), RUN)
+
+
 CHANGED_WHEN_UNMEASURED = {
     "Mpu6500": None,
     "Dps310": None,
@@ -422,8 +432,28 @@ def test_no_datasheet_derived_and_short_doc_lines():
 
 def test_a_long_doc_line_is_refused():
     spec = dataclasses.replace(PARTS["baro"], doc=("x" * 120,))
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="baro"):
         _doc_lines(spec, RUN)
+
+
+def _baro_doc_lines(*doc):
+    return _doc_lines(dataclasses.replace(PARTS["baro"], doc=doc), RUN)
+
+
+def test_a_two_line_doc_with_sources_rewrites_the_sources_line():
+    out = _baro_doc_lines("Datasheet-derived altitude noise.", "Sources: X")
+    assert "    /// hitl-physics 0.13.1 sources: X" in out
+    assert "    /// Altitude noise." in out
+
+
+def test_only_a_line_starting_with_sources_is_rewritten():
+    out = _baro_doc_lines("Altitude noise.", "", "See Sources: X")
+    assert out[-1] == "    /// See Sources: X"
+
+
+def test_a_leftover_datasheet_derived_phrase_is_refused():
+    with pytest.raises(ValueError, match="baro"):
+        _baro_doc_lines("Altitude noise.", "", "Datasheet-derived figures.")
 
 
 @pytest.mark.skipif(shutil.which("rustfmt") is None, reason="rustfmt is not installed")

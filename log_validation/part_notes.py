@@ -21,6 +21,7 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Mapping
 
+from log_validation.th3seus_model import HITL_PHYSICS_VERSION
 from log_validation.th3seus_parts import variant
 
 G = "gyro_noise_density"
@@ -117,7 +118,8 @@ COMPARISONS: Mapping[str, Mapping[str, tuple[str, ...]]] = _ro({
 
 
 def _unclassified(part_type: str, name: str) -> ValueError:
-    return ValueError(f"{part_type}: the 0.13.1 comment of {name} is not fully classified")
+    return ValueError(f"{part_type}: the hitl-physics {HITL_PHYSICS_VERSION} comment of {name} "
+                      "is not fully classified in part_notes.py")
 
 
 def _check_complete(

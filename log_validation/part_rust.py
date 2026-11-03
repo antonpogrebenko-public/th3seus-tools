@@ -199,11 +199,14 @@ def _doc_lines(spec: PartType, run_date: str) -> list[str]:
     lines = [summary[:1].upper() + summary[1:], "",
              'A value with a "was" comment is the median over vehicles measured from real PX4 logs in',
              f"run {run_date}; every other value is the hitl-physics {HITL_PHYSICS_VERSION} table value."]
-    if len(spec.doc) > 2:
-        rest = list(spec.doc[2:])
-        rest[0] = rest[0].replace("Sources:", f"hitl-physics {HITL_PHYSICS_VERSION} sources:", 1)
-        lines += ["", *rest]
+    sources = f"hitl-physics {HITL_PHYSICS_VERSION} sources:"
+    rest = list(spec.doc[2:] if len(spec.doc) > 1 and spec.doc[1] == "" else spec.doc[1:])
+    if rest:
+        lines += ["", *(sources + r.removeprefix("Sources:") if r.startswith("Sources:") else r
+                        for r in rest)]
     out = [f"{I1}/// {line}".rstrip() for line in lines]
+    if any("Datasheet-derived" in line for line in out):
+        raise ValueError(f"{spec.key}: doc line still says 'Datasheet-derived'")
     too_long = [line for line in out if len(line) > MAX_DOC_LINE]
     if too_long:
         raise ValueError(f"{spec.key}: doc line over {MAX_DOC_LINE} characters: {too_long[0]!r}")
