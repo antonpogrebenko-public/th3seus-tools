@@ -63,7 +63,7 @@ impl GpsChipset {
                 ttff_hot_s: 1.0,
                 max_satellites: 33,
             },
-            // u-blox M10; lower power, single-band; measured over standalone 3D fixes
+            // u-blox M10; single-band; measured over standalone 3D fixes
             GpsChipset::UbloxM10 => GpsProfile {
                 // was 1.0 (hitl-physics 0.13.1); median of 47 vehicles, run 2026-11-02
                 horizontal_noise_sigma_m: 2.074,

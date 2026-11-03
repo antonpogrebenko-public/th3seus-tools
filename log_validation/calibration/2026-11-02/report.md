@@ -12,7 +12,7 @@
   - `battery_split_seed`: 20260623
   - `gps_rest_min_s`: 60.0
   - `jobs`: 8
-  - `local_tool_commit`: "68a8087df756bad41eb8e2a4c3e94bd1bccffe7b"
+  - `local_tool_commit`: "d7981748df2ce01e7b9e9bfaea34a88dcc406d67"
   - `max_per_vehicle`: 3
   - `noise_and_battery_set`: "every log of the mirror that the catalog step could read and marked as real hardware (a log marked as simulated, or whose simulation flag is unknown, is left out); all vehicle types"
   - `part_tables`: {"allan_slope_tolerance": 0.15, "catalog_spellings": "none", "min_vehicles": 10, "sim_rate_baro_hz": 50.0, "sim_rate_mag_hz": 50.0}
