@@ -35,6 +35,7 @@ RESERVED_VARIANTS = frozenset({"Self", "None", OTHER})
 EXPONENT = re.compile(r"e([+-])0*(\d+)")
 I1, I2, I3, I4 = "    ", "        ", "            ", "                "
 GPS = "gps"
+MAX_DOC_LINE = 100
 FIX_CLASS_NOTES: Mapping[str, str] = MappingProxyType({
     FIX_CLASS_STANDALONE_3D: "measured over standalone 3D fixes",
     FIX_CLASS_RTK_FIXED: "measured over RTK fixed solutions"})
@@ -192,8 +193,21 @@ def _enum_lines(spec: PartType, new: Sequence[str]) -> list[str]:
     return [DERIVE, f"pub enum {spec.enum} {{"] + [f"{I1}{n}," for n in names] + ["}"]
 
 
-def _doc_lines(spec: PartType) -> list[str]:
-    return [f"{I1}/// {line}".rstrip() for line in spec.doc]
+def _doc_lines(spec: PartType, run_date: str) -> list[str]:
+    """The profile function doc: the mirrored summary and sources, with the provenance rebuilt."""
+    summary = spec.doc[0].removeprefix("Datasheet-derived ")
+    lines = [summary[:1].upper() + summary[1:], "",
+             'A value with a "was" comment is the median over vehicles measured from real PX4 logs in',
+             f"run {run_date}; every other value is the hitl-physics {HITL_PHYSICS_VERSION} table value."]
+    if len(spec.doc) > 2:
+        rest = list(spec.doc[2:])
+        rest[0] = rest[0].replace("Sources:", f"hitl-physics {HITL_PHYSICS_VERSION} sources:", 1)
+        lines += ["", *rest]
+    out = [f"{I1}/// {line}".rstrip() for line in lines]
+    too_long = [line for line in out if len(line) > MAX_DOC_LINE]
+    if too_long:
+        raise ValueError(f"{spec.key}: doc line over {MAX_DOC_LINE} characters: {too_long[0]!r}")
+    return out
 
 
 def emit_part_source(part_type: str, tables: PartTables, run_date: str) -> str:
@@ -208,7 +222,7 @@ def emit_part_source(part_type: str, tables: PartTables, run_date: str) -> str:
         "// real PX4 logs (median over vehicles).",
         "",
     ]
-    body = (_enum_lines(spec, new) + ["", f"impl {spec.enum} {{"] + _doc_lines(spec)
+    body = (_enum_lines(spec, new) + ["", f"impl {spec.enum} {{"] + _doc_lines(spec, run_date)
             + [f"{I1}pub fn {spec.profile_fn}(&self) -> {returns} {{", f"{I2}match self {{"]
             + _arms(spec, tables, run_date) + [f"{I2}}}", f"{I1}}}", "}"])
     return "\n".join(header + body) + "\n"
