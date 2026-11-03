@@ -295,6 +295,7 @@ def _whole(record: Mapping[str, Any], key: str) -> int:
     return int(value)
 
 
+RUSTFMT_MAX_WIDTH = 100  # rustfmt's default max_width
 _KNOWN_OLD_REASONS = (
     f"low-n (fewer than {MIN_R_OBSERVATIONS_PER_CLASS} step events)",
     "implausible (median below the 4 mohm/cell floor)",
@@ -329,6 +330,11 @@ def _r_table_lines(battery: Mapping[str, Any]) -> list[str]:
         entry = f"({_whole(f, 'cell_count')}, {f['deployed_mohm_per_cell']:.4f}),"
         rows.append((entry, _r_note(battery, f, n)))
     width = max((len(entry) for entry, _ in rows), default=0)  # rustfmt aligns the comments
+    # rustfmt 1.9.0 gives up aligning the whole table when a padded row would pass 100 columns
+    too_wide = any(len(entry) < width and len(f"    {entry:<{width}} // {note}") > RUSTFMT_MAX_WIDTH
+                   for entry, note in rows)
+    if too_wide:
+        width = 0
     lines.extend(f"    {entry:<{width}} // {note}" for entry, note in rows)
     return lines + ["];"]
 

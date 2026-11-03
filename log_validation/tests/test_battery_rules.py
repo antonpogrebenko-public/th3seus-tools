@@ -172,6 +172,33 @@ def test_rust_constants_are_stable_under_rustfmt(tmp_path):
     assert done.returncode == 0, done.stdout
 
 
+def _long_row_doc():
+    # the 6S line is 101 columns with one pad space (n has 78 digits), the 12S row is wider
+    return _battery_doc(rows=[(12, 13.4364, 5, False), (6, 3.2146, 10 ** 77, False),
+                              (7, 3.2146, 3, False)], pooled_vehicles=(5.5699, 6380))
+
+
+def test_rust_comments_are_not_aligned_when_a_padded_row_would_pass_100_columns():
+    # observed with rustfmt 1.9.0: one row that would pass 100 columns once padded drops the
+    # alignment of the whole table to a single space
+    text = rust_constants_text(_long_row_doc())
+    assert "    (12, 13.4364), // n=5\n" in text
+    assert "    (6, 3.2146), // n=" + "1" + "0" * 77 + "\n" in text
+    assert "    (7, 3.2146), // n=3\n" in text
+
+
+@pytest.mark.skipif(shutil.which("rustfmt") is None, reason="rustfmt is not installed")
+def test_long_battery_rows_are_stable_under_rustfmt(tmp_path):
+    doc = _long_row_doc()
+    doc["ocv_curve"] = {"soc_knots": [k / 10 for k in range(11)],
+                        "v_per_cell_knots": [3.3 + 0.09 * k for k in range(11)]}
+    path = tmp_path / "battery_tables.rs"
+    path.write_text(rust_constants_text(doc) + "\n")
+    done = subprocess.run(["rustfmt", "--edition", "2021", "--check", str(path)],
+                          capture_output=True, text=True)
+    assert done.returncode == 0, done.stdout
+
+
 def test_rust_comments_name_the_fallback():  # dict shaped like result_to_dict
     text = rust_constants_text(_battery_doc(rows=[(6, 3.2, 446961, False), (9, 5.9, 7, True)],
                                             pooled_vehicles=(5.99, 3)))
