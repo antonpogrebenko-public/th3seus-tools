@@ -85,7 +85,7 @@ NOTES: Mapping[str, Mapping[str, tuple[Note, ...]]] = _ro({
             Note("25 Hz max", (R,)),
             Note("4-constellation"),
         ),
-        "UbloxM10": (Note("u-blox M10"), Note("lower power, single-band")),
+        "UbloxM10": (Note("u-blox M10"), Note("single-band")),
         "UbloxF9P": (
             Note("u-blox ZED-F9P"),
             Note("0.01 m RTK fixed", (H,)),
@@ -113,7 +113,7 @@ COMPARISONS: Mapping[str, Mapping[str, tuple[str, ...]]] = _ro({
     },
     "baro": {"Dps310": ("best in class",)},
     "mag": {"Rm3100": ("high-performance fluxgate-class",)},
-    "gps": {"UbloxM10": ("similar accuracy to M9N",)},
+    "gps": {"UbloxM10": ("similar accuracy to M9N", "lower power")},
 })
 
 

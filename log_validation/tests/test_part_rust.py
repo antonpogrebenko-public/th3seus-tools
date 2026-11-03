@@ -368,7 +368,7 @@ CHANGED_WHEN_UNMEASURED = {
     "Dps310": None,
     "Icm42688p": "0.0028 deg/s/sqrt(Hz); 70 ug/sqrt(Hz); modern flagship",
     "Rm3100": "~0.013 mGauss",
-    "UbloxM10": "u-blox M10; lower power, single-band",
+    "UbloxM10": "u-blox M10; single-band",
 }
 
 
