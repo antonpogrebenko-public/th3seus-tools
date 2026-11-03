@@ -20,30 +20,29 @@ pub enum MagChip {
 }
 
 impl MagChip {
-    /// Datasheet-derived noise profile, or `None` for a build without a mag.
+    /// Noise profile, or `None` for a build without a mag.
+    ///
+    /// A value with a "was" comment is the median over vehicles measured from real PX4 logs in
+    /// run 2026-11-02; every other value is the hitl-physics 0.13.1 table value.
     pub fn mag_profile(&self) -> Option<MagProfile> {
         match self {
-            // ~0.6 mGauss noise
             MagChip::Hmc5883 => Some(MagProfile {
                 // was 0.0006 (hitl-physics 0.13.1); median of 15 vehicles, run 2026-11-02
                 noise_sigma_gauss: 0.003405,
             }),
-            // ~0.5 mGauss; cheap, temperature-unstable
+            // cheap, temperature-unstable
             MagChip::Qmc5883 => Some(MagProfile {
                 // was 0.0005 (hitl-physics 0.13.1); median of 98 vehicles, run 2026-11-02
                 noise_sigma_gauss: 0.003216,
             }),
-            // ~0.3 mGauss
             MagChip::Ist8310 => Some(MagProfile {
                 // was 0.0003 (hitl-physics 0.13.1); median of 410 vehicles, run 2026-11-02
                 noise_sigma_gauss: 0.002705,
             }),
-            // ~0.013 mGauss - high-performance fluxgate-class
             MagChip::Rm3100 => Some(MagProfile {
                 // was 0.000013 (hitl-physics 0.13.1); median of 104 vehicles, run 2026-11-02
                 noise_sigma_gauss: 0.001544,
             }),
-            // ~0.32 mGauss
             MagChip::Lis3mdl => Some(MagProfile {
                 // was 0.00032 (hitl-physics 0.13.1); median of 26 vehicles, run 2026-11-02
                 noise_sigma_gauss: 0.008952,

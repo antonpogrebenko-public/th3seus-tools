@@ -16,7 +16,10 @@ pub enum BaroChip {
 }
 
 impl BaroChip {
-    /// Datasheet-derived altitude noise standard deviation.
+    /// Altitude noise standard deviation.
+    ///
+    /// A value with a "was" comment is the median over vehicles measured from real PX4 logs in
+    /// run 2026-11-02; every other value is the hitl-physics 0.13.1 table value.
     pub fn baro_profile(&self) -> BaroProfile {
         match self {
             BaroChip::Bmp280 => BaroProfile {
@@ -26,7 +29,6 @@ impl BaroChip {
                 // was 0.08 (hitl-physics 0.13.1); median of 78 vehicles, run 2026-11-02
                 noise_sigma_m: 0.1059,
             },
-            // best in class
             BaroChip::Dps310 => BaroProfile {
                 noise_sigma_m: 0.05,
             },

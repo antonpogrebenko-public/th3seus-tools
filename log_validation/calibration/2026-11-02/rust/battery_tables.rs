@@ -2,7 +2,7 @@
 // Canonical run, split seed=20260623, 35919 real logs, 49 SIM excluded.
 const FITTED_R_TABLE: &[(u8, f64)] = &[
     (1, 5.5699),  // n=169, fewer than 200 step events -> pooled over vehicles
-    (2, 13.4364),  // n=4732
+    (2, 13.4364), // n=4732
     (3, 8.7361),  // n=13839
     (4, 6.0839),  // n=130805
     (5, 5.6962),  // n=1046
@@ -10,13 +10,13 @@ const FITTED_R_TABLE: &[(u8, f64)] = &[
     (7, 3.3744),  // n=1355
     (8, 3.2586),  // n=21839
     (9, 5.5699),  // n=7, fewer than 200 step events -> pooled over vehicles
-    (10, 3.8934),  // n=487
-    (12, 2.1526),  // n=195505
-    (13, 3.7978),  // n=17009
-    (14, 2.3914),  // n=14365
+    (10, 3.8934), // n=487
+    (12, 2.1526), // n=195505
+    (13, 3.7978), // n=17009
+    (14, 2.3914), // n=14365
 ];
 
-const FITTED_R_DEFAULT_MOHM_PER_CELL: f64 = 5.5699;  // pooled over 6380 vehicles
+const FITTED_R_DEFAULT_MOHM_PER_CELL: f64 = 5.5699; // pooled over 6380 vehicles
 
 const OCV_TABLE: &[(f64, f64)] = &[
     (0.0250, 3.5657),

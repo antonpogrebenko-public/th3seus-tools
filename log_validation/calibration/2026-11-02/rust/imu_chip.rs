@@ -30,14 +30,17 @@ pub enum ImuChip {
 }
 
 impl ImuChip {
-    /// Datasheet-derived noise profile for this IMU chipset.
+    /// Noise profile for this IMU chipset.
     ///
-    /// Sources: InvenSense MPU-6000/6500/ICM-20689/ICM-42688P datasheets;
+    /// A value with a "was" comment is the median over vehicles measured from real PX4 logs in
+    /// run 2026-11-02; every other value is the hitl-physics 0.13.1 table value.
+    ///
+    /// hitl-physics 0.13.1 sources: InvenSense MPU-6000/6500/ICM-20689/ICM-42688P datasheets;
     /// Bosch BMI270; STMicroelectronics LSM6DSO. Bias drift values are
     /// empirical from PX4 EKF2 tuning recommendations.
     pub fn imu_profile(&self) -> ImuProfile {
         match self {
-            // 0.05 deg/s/sqrt(Hz), 650 ug/sqrt(Hz) - legacy reference, used in tests
+            // used in tests
             ImuChip::Mpu6000 => ImuProfile {
                 // was 8.726646e-4 (hitl-physics 0.13.1); median of 70 vehicles, run 2026-11-02
                 gyro_noise_density: 7.141e-5,
@@ -46,14 +49,12 @@ impl ImuChip {
                 gyro_bias_sigma: 1e-4,
                 gyro_bias_tau: 100.0,
             },
-            // Slightly noisier than MPU6000
             ImuChip::Mpu6500 => ImuProfile {
                 gyro_noise_density: 9.4e-4,
                 accel_noise_density: 6.86e-3,
                 gyro_bias_sigma: 1e-4,
                 gyro_bias_tau: 100.0,
             },
-            // 0.005 deg/s/sqrt(Hz), 80 ug/sqrt(Hz)
             ImuChip::Icm20689 => ImuProfile {
                 // was 8.73e-5 (hitl-physics 0.13.1); median of 149 vehicles, run 2026-11-02
                 gyro_noise_density: 9.295e-5,
@@ -62,7 +63,7 @@ impl ImuChip {
                 gyro_bias_sigma: 5e-5,
                 gyro_bias_tau: 200.0,
             },
-            // 0.0028 deg/s/sqrt(Hz), 70 ug/sqrt(Hz) - modern flagship, ~17x quieter than MPU6000
+            // modern flagship
             ImuChip::Icm42688p => ImuProfile {
                 // was 4.88e-5 (hitl-physics 0.13.1); median of 373 vehicles, run 2026-11-02
                 gyro_noise_density: 7.997e-5,
@@ -71,7 +72,6 @@ impl ImuChip {
                 gyro_bias_sigma: 5e-5,
                 gyro_bias_tau: 200.0,
             },
-            // 0.008 deg/s/sqrt(Hz), 250 ug/sqrt(Hz)
             ImuChip::Bmi270 => ImuProfile {
                 // was 1.40e-4 (hitl-physics 0.13.1); median of 33 vehicles, run 2026-11-02
                 gyro_noise_density: 0.0001092,

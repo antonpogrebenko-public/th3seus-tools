@@ -16,15 +16,18 @@ pub enum GpsChipset {
 }
 
 impl GpsChipset {
-    /// Datasheet-derived GPS receiver profile.
+    /// GPS receiver profile.
     ///
-    /// Sources: u-blox M8/M9/M10/F9P product summaries; Septentrio Mosaic-X5
+    /// A value with a "was" comment is the median over vehicles measured from real PX4 logs in
+    /// run 2026-11-02; every other value is the hitl-physics 0.13.1 table value.
+    ///
+    /// hitl-physics 0.13.1 sources: u-blox M8/M9/M10/F9P product summaries; Septentrio Mosaic-X5
     /// brochure; Here3 (CubePilot) docs. CEP values are typical autonomous
     /// performance - RTK figures are post-base-station-correction (F9P,
     /// Mosaic). TTFF values are from the respective product specs.
     pub fn gps_profile(&self) -> GpsProfile {
         match self {
-            // u-blox NEO-M8N: 2.5 m CEP, 18 Hz max (5 Hz default), GPS+GLONASS
+            // u-blox NEO-M8N; GPS+GLONASS; measured over standalone 3D fixes
             GpsChipset::UbloxM8N => GpsProfile {
                 // was 1.5 (hitl-physics 0.13.1); median of 302 vehicles, run 2026-11-02
                 horizontal_noise_sigma_m: 1.198,
@@ -42,7 +45,7 @@ impl GpsChipset {
                 ttff_hot_s: 1.0,
                 max_satellites: 22,
             },
-            // u-blox NEO-M9N: 1.5 m CEP, 25 Hz max, 4-constellation
+            // u-blox NEO-M9N; 4-constellation; measured over standalone 3D fixes
             GpsChipset::UbloxM9N => GpsProfile {
                 // was 0.9 (hitl-physics 0.13.1); median of 1100 vehicles, run 2026-11-02
                 horizontal_noise_sigma_m: 0.8705,
@@ -60,7 +63,7 @@ impl GpsChipset {
                 ttff_hot_s: 1.0,
                 max_satellites: 33,
             },
-            // u-blox M10: similar accuracy to M9N, lower power, single-band
+            // u-blox M10; lower power, single-band; measured over standalone 3D fixes
             GpsChipset::UbloxM10 => GpsProfile {
                 // was 1.0 (hitl-physics 0.13.1); median of 47 vehicles, run 2026-11-02
                 horizontal_noise_sigma_m: 2.074,
@@ -77,7 +80,7 @@ impl GpsChipset {
                 ttff_hot_s: 1.0,
                 max_satellites: 32,
             },
-            // u-blox ZED-F9P: 0.01 m RTK fixed, 1.5 m standalone, 8 Hz typical
+            // u-blox ZED-F9P; measured over RTK fixed solutions
             GpsChipset::UbloxF9P => GpsProfile {
                 // was 0.014 (hitl-physics 0.13.1); median of 359 vehicles, run 2026-11-02
                 horizontal_noise_sigma_m: 0.0141,
@@ -95,7 +98,7 @@ impl GpsChipset {
                 ttff_hot_s: 1.0,
                 max_satellites: 60,
             },
-            // Septentrio Mosaic-X5: 0.006 m RTK, 100 Hz, survey-grade
+            // Septentrio Mosaic-X5; 100 Hz; survey-grade; measured over RTK fixed solutions
             GpsChipset::SeptentrioMosaic => GpsProfile {
                 // was 0.006 (hitl-physics 0.13.1); median of 11 vehicles, run 2026-11-02
                 horizontal_noise_sigma_m: 0.01,
@@ -126,7 +129,7 @@ impl GpsChipset {
                 ttff_hot_s: 1.0,
                 max_satellites: 33,
             },
-            // PX4 log names UBX_7; new in run 2026-11-02
+            // PX4 log names UBX_7; new in run 2026-11-02; measured over standalone 3D fixes
             GpsChipset::Ubx7 => GpsProfile {
                 // was 1.5 (Other); median of 16 vehicles, run 2026-11-02
                 horizontal_noise_sigma_m: 2.042,
