@@ -13,13 +13,15 @@ from __future__ import annotations
 import math
 import re
 from collections.abc import Mapping, Sequence
+from types import MappingProxyType
 
+from .part_notes import existing_arm_comment
 from .part_rows import STATUS_CANDIDATE, PartRow, PartTables
 from .th3seus_parts import (
-    HITL_DAEMON_VERSION, HITL_PHYSICS_VERSION, OTHER, PARTS, PartType, Variant, current_literal,
-    daemon_parse, normalize, variant)
+    FIX_CLASS_RTK_FIXED, FIX_CLASS_STANDALONE_3D, HITL_DAEMON_VERSION, HITL_PHYSICS_VERSION,
+    OTHER, PARTS, PartType, Variant, current_literal, daemon_parse, normalize, variant)
 
-__all__ = ["ALIASES_FILE", "RUST_FILES", "emit_daemon_aliases", "emit_part_source",
+__all__ = ["ALIASES_FILE", "FIX_CLASS_NOTES", "RUST_FILES", "emit_daemon_aliases", "emit_part_source",
            "emit_rust_files", "is_plain", "rust_f64"]
 
 RUST_FILES = {"imu": "imu_chip.rs", "baro": "baro_chip.rs", "mag": "mag_chip.rs",
@@ -33,6 +35,9 @@ RESERVED_VARIANTS = frozenset({"Self", "None", OTHER})
 EXPONENT = re.compile(r"e([+-])0*(\d+)")
 I1, I2, I3, I4 = "    ", "        ", "            ", "                "
 GPS = "gps"
+FIX_CLASS_NOTES: Mapping[str, str] = MappingProxyType({
+    FIX_CLASS_STANDALONE_3D: "measured over standalone 3D fixes",
+    FIX_CLASS_RTK_FIXED: "measured over RTK fixed solutions"})
 
 
 def is_plain(text: str) -> bool:
@@ -117,6 +122,37 @@ def _arm(spec: PartType, name: str, base: Variant, comment: str, rows: Mapping[s
             + [f"{I3}{closer}"])
 
 
+def _fix_class_note(part: str, name: str, rows: Mapping[str, PartRow]) -> str:
+    """The GPS fix-class note of an arm with a proposal; "" for another part or no proposal.
+
+    ValueError when the proposed rows come from two classes or from one that has no note."""
+    if part != GPS:
+        return ""
+    classes = {r.fix_class for r in rows.values() if r.proposed is not None}
+    if not classes:
+        return ""
+    if len(classes) > 1:
+        raise ValueError(f"gps: {name} has proposed values from fix classes "
+                         f"{sorted(map(str, classes))}")
+    (cls,) = classes
+    if cls not in FIX_CLASS_NOTES:
+        raise ValueError(f"gps: {name} has proposed values from an unknown fix class {cls!r}")
+    return FIX_CLASS_NOTES[cls]
+
+
+def _existing_comment(spec: PartType, name: str, rows: Mapping[str, PartRow]) -> str:
+    measured = frozenset(f for f, r in rows.items() if r.proposed is not None)
+    pieces = (existing_arm_comment(spec.key, name, measured),
+              _fix_class_note(spec.key, name, rows))
+    return "; ".join(p for p in pieces if p)
+
+
+def _new_comment(spec: PartType, name: str, rows: Mapping[str, PartRow], run_date: str) -> str:
+    names = ", ".join(_comment_names(spec.key, rows))
+    pieces = (f"PX4 log names {names}; new in run {run_date}", _fix_class_note(spec.key, name, rows))
+    return "; ".join(p for p in pieces if p)
+
+
 def _other_comment(spec: PartType, base: Variant, rows: Mapping[str, PartRow]) -> str:
     """With a proposal, Other is TH3SEUS's fallback entry: the median over every vehicle of
     the part type, whatever its part (GPS: the logs with a standalone 3D fix)."""
@@ -135,12 +171,12 @@ def _arms(spec: PartType, tables: PartTables, run_date: str) -> list[str]:
     for base in spec.variants:
         if base.name == OTHER:
             continue
-        lines += _arm(spec, base.name, base, base.comment, rows.get(base.name, {}),
-                      old_existing, run_date)
+        arm_rows = rows.get(base.name, {})
+        lines += _arm(spec, base.name, base, _existing_comment(spec, base.name, arm_rows),
+                      arm_rows, old_existing, run_date)
     other = next(v for v in spec.variants if v.name == OTHER)
     for name in _new_variants(tables, spec.key):
-        names = ", ".join(_comment_names(spec.key, rows[name]))
-        lines += _arm(spec, name, other, f"PX4 log names {names}; new in run {run_date}",
+        lines += _arm(spec, name, other, _new_comment(spec, name, rows[name], run_date),
                       rows[name], OTHER, run_date)
     if spec.no_profile_variants:
         lines += [f"{I3}{spec.enum}::None => None,"]

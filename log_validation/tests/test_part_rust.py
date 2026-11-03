@@ -8,7 +8,9 @@ import pytest
 
 from log_validation.part_rows import STATUS_CANDIDATE, PartTables, build_part_tables
 from log_validation.part_rust import (
-    ALIASES_FILE, RUST_FILES, emit_daemon_aliases, emit_part_source, emit_rust_files, rust_f64)
+    ALIASES_FILE, FIX_CLASS_NOTES, RUST_FILES, emit_daemon_aliases, emit_part_source,
+    emit_rust_files, rust_f64)
+from log_validation.th3seus_parts import OTHER, PARTS
 from log_validation.tests.part_fakes import BARO_OK, MAG_OK, noise_entry
 
 RUN = "2026-11-05"
@@ -99,9 +101,8 @@ def test_existing_entry_with_a_proposal():
 
 def test_entry_without_a_proposal_keeps_its_value():
     imu = emit_part_source("imu", build_part_tables([]), RUN)
-    assert ("            // Slightly noisier than MPU6000\n"
-            "            ImuChip::Mpu6500 => ImuProfile {\n"
-            "                gyro_noise_density: 9.4e-4,\n") in imu
+    assert _comment_above(imu, "ImuChip", "Mpu6500") is None
+    assert "                gyro_noise_density: 9.4e-4,\n" in imu.split("ImuChip::Mpu6500 =>")[1]
     assert "// was" not in imu
 
 
@@ -117,8 +118,8 @@ def test_empty_tables_are_the_0_13_1_structure():
     gps = emit_part_source("gps", EMPTY, RUN)
     assert "            GpsChipset::Other => GpsChipset::UbloxM8N.gps_profile(),\n" in gps
     baro = emit_part_source("baro", EMPTY, RUN)
-    assert ("            // best in class\n"
-            "            BaroChip::Dps310 => BaroProfile {\n"
+    assert _comment_above(baro, "BaroChip", "Dps310") is None
+    assert ("            BaroChip::Dps310 => BaroProfile {\n"
             "                noise_sigma_m: 0.05,\n"
             "            },\n") in baro
     assert ("            BaroChip::Other => BaroProfile {\n"
@@ -299,3 +300,90 @@ def test_unproposed_bad_name_does_not_raise():
 def test_alias_with_a_quote_raises():
     with pytest.raises(ValueError):
         emit_rust_files(bmi088_tables(), RUN, {"imu": {'BMI"088': "BMI088"}})
+
+
+def _comment_above(text, enum, name):
+    """The comment right above `enum::name =>`, without `// `, or None."""
+    lines = text.splitlines()
+    i = next(k for k, line in enumerate(lines) if line.strip().startswith(f"{enum}::{name} =>"))
+    above = lines[i - 1].strip()
+    return above[3:] if above.startswith("// ") else None
+
+
+def _imu_measured(chip="ICM42688P"):
+    return build_part_tables([noise_entry(f"l{i}", f"v{i}", IMU_M, imu=chip) for i in range(10)])
+
+
+def test_measured_entry_drops_its_figures_and_comparison():
+    imu = emit_part_source("imu", _imu_measured(), RUN)
+    assert _comment_above(imu, "ImuChip", "Icm42688p") == "modern flagship"
+
+
+def test_gps_entry_names_its_fix_class():
+    gps = emit_part_source("gps", build_part_tables(_gps_entries("UBX_8", 10)), RUN)
+    assert _comment_above(gps, "GpsChipset", "UbloxM8N") == \
+        "u-blox NEO-M8N; GPS+GLONASS; measured over standalone 3D fixes"
+
+
+def test_rtk_entry_names_the_rtk_class():
+    entries = _gps_entries("UBX_F9P", 10, **{"gps.fix_type_mode": 6.0})
+    gps = emit_part_source("gps", build_part_tables(entries), RUN)
+    assert _comment_above(gps, "GpsChipset", "UbloxF9P") == \
+        "u-blox ZED-F9P; measured over RTK fixed solutions"
+
+
+def test_new_gps_variant_names_its_fix_class():
+    gps = emit_part_source("gps", build_part_tables(_gps_entries("UBX_7", 10)), RUN)
+    assert _comment_above(gps, "GpsChipset", "Ubx7") == \
+        "PX4 log names UBX_7; new in run 2026-11-05; measured over standalone 3D fixes"
+
+
+def _m8n_tables_with(fix_class):
+    tables = build_part_tables(_gps_entries("UBX_8", 10))
+    first = next(r for r in tables.rows if r.variant == "UbloxM8N" and r.proposed is not None)
+    rows = tuple(dataclasses.replace(r, fix_class=fix_class) if r is first else r
+                 for r in tables.rows)
+    return PartTables(rows=rows, log_ids=tables.log_ids)
+
+
+@pytest.mark.parametrize("fix_class", ["rtk_fixed", None, "dgps"])
+def test_one_fix_class_per_gps_entry(fix_class):
+    with pytest.raises(ValueError, match="UbloxM8N"):
+        emit_part_source("gps", _m8n_tables_with(fix_class), RUN)
+
+
+CHANGED_WHEN_UNMEASURED = {
+    "Mpu6500": None,
+    "Dps310": None,
+    "Icm42688p": "0.0028 deg/s/sqrt(Hz); 70 ug/sqrt(Hz); modern flagship",
+    "Rm3100": "~0.013 mGauss",
+    "UbloxM10": "u-blox M10; lower power, single-band",
+}
+
+
+def test_measuring_nothing_keeps_every_comparison_free_comment():
+    for part, spec in PARTS.items():
+        text = emit_part_source(part, EMPTY, RUN)
+        for v in spec.variants:
+            if v.name != OTHER:
+                expected = CHANGED_WHEN_UNMEASURED.get(v.name, v.comment or None)
+                assert _comment_above(text, spec.enum, v.name) == expected, v.name
+
+
+def test_written_parts_come_from_the_mirror():
+    for tables in (EMPTY, _imu_measured(), build_part_tables(_gps_entries("UBX_8", 10)),
+                   build_part_tables(_gps_entries("HERE3", 10))):
+        for part, spec in PARTS.items():
+            text = emit_part_source(part, tables, RUN)
+            for v in spec.variants:
+                comment = None if v.name == OTHER else _comment_above(text, spec.enum, v.name)
+                for piece in (comment.split("; ") if comment else ()):
+                    if piece not in FIX_CLASS_NOTES.values():
+                        assert piece in v.comment, (v.name, piece)
+
+
+def test_here3_keeps_its_comment_and_adds_the_fix_class():
+    gps = emit_part_source("gps", build_part_tables(_gps_entries("HERE3", 10)), RUN)
+    assert _comment_above(gps, "GpsChipset", "Here3") == (
+        "CubePilot Here3 (CAN GPS): built on u-blox M9N; delay_ms 100.0 is CAN bus latency; "
+        "measured over standalone 3D fixes")
