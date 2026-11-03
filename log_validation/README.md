@@ -244,14 +244,20 @@ of one part type, in the structure of `hitl-physics` 0.13.1 `src/build.rs`;
 (`parse_imu_chip`, `parse_baro_chip`, `parse_mag_chip`, `parse_gps_chipset`). The GPS
 block is `if` lines to paste before the substring rules of `parse_gps_chipset`. A value
 with a proposed number carries a comment with the old value, its source, the run date
-and the vehicle count. The comment above each arm comes from the `hitl-physics` 0.13.1
-comment classified in `part_notes.py`: its facts are kept, a field figure is kept only while
-that field has no proposed value, and a comparison is never written. A GPS arm with a
-measured value names its fix class. A mirror bump must classify every new or changed
-comment in `part_notes.py`, or the pass fails naming the entry. The same inputs give byte-identical files, and all of them are
-ASCII: the JSON files write any other character of the input text (a board, part or log
-name) as a `\u` escape, and the pass refuses (exit 2) a new variant whose log name is not
-printable ASCII, as the Rust text would hold it as it is.
+and the vehicle count. The comment above the arm of each existing variant other than
+`Other` comes from the `hitl-physics` 0.13.1 comment classified in `part_notes.py`: its
+facts are kept, a field figure is kept only while that field has no proposed value, and
+a comparison is never written. The arm of a new variant names its PX4 log names and the
+run date; `Other` keeps its fallback comment. A GPS arm with a proposed value names the
+fix class it was measured over (standalone 3D fixes or RTK fixed solutions). The `///`
+doc of each profile function keeps the 0.13.1 summary (without "Datasheet-derived") and
+its sources, and says which values were measured in the run. A mirror bump fails (exit
+2) when a comment is not classified in `part_notes.py`, when a rebuilt doc line would
+pass 100 characters, or when a doc line still says "Datasheet-derived". The same inputs
+give byte-identical files, and all of them are ASCII: the JSON files write any other
+character of the input text (a board, part or log name) as a `\u` escape, and the pass
+refuses (exit 2) a new variant whose log name is not printable ASCII, as the Rust text
+would hold it as it is.
 
 The rules:
 
