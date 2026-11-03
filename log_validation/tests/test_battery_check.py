@@ -145,7 +145,7 @@ class TestResultWiring:
 
 EMIT_PATTERNS = [
     r"^const FITTED_R_TABLE: &\[\(u8, f64\)\] = &\[$",
-    r"^    \(\d+, \d+\.\d{4}\),  // n=\d+",
+    r"^    \(\d+, \d+\.\d{4}\), +// n=\d+",
     r"^const FITTED_R_DEFAULT_MOHM_PER_CELL: f64 = \d+\.\d{4};",
     r"^const OCV_TABLE: &\[\(f64, f64\)\] = &\[$",
     r"^    \(\d\.\d{4}, \d\.\d{4}\),$",

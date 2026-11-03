@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import shutil
+import subprocess
 from dataclasses import replace
 
 import numpy as np
@@ -148,12 +150,34 @@ def test_few_steps_deploy_the_vehicle_pooled_median():
     assert not six.low_n and six.deployed_mohm_per_cell == 2.0
 
 
+def test_rust_comments_align_like_rustfmt():
+    text = rust_constants_text(_battery_doc(
+        rows=[(2, 13.4364, 4732, False), (6, 3.2146, 441198, False)], pooled_vehicles=(5.5699, 6380)))
+    assert "    (2, 13.4364), // n=4732\n" in text
+    assert "    (6, 3.2146),  // n=441198\n" in text
+    assert "const FITTED_R_DEFAULT_MOHM_PER_CELL: f64 = 5.5699; // pooled over 6380 vehicles" in text
+
+
+@pytest.mark.skipif(shutil.which("rustfmt") is None, reason="rustfmt is not installed")
+def test_rust_constants_are_stable_under_rustfmt(tmp_path):
+    doc = _battery_doc(rows=[(2, 13.4364, 4732, False), (6, 3.2146, 441198, False), (9, 5.5699, 7, True)],
+                       pooled_vehicles=(5.5699, 6380))
+    # a real-sized OCV curve: rustfmt joins a table that fits one line, the tool never emits one
+    doc["ocv_curve"] = {"soc_knots": [k / 10 for k in range(11)],
+                        "v_per_cell_knots": [3.3 + 0.09 * k for k in range(11)]}
+    path = tmp_path / "battery_tables.rs"
+    path.write_text(rust_constants_text(doc) + "\n")
+    done = subprocess.run(["rustfmt", "--edition", "2021", "--check", str(path)],
+                          capture_output=True, text=True)
+    assert done.returncode == 0, done.stdout
+
+
 def test_rust_comments_name_the_fallback():  # dict shaped like result_to_dict
     text = rust_constants_text(_battery_doc(rows=[(6, 3.2, 446961, False), (9, 5.9, 7, True)],
                                             pooled_vehicles=(5.99, 3)))
-    assert "(6, 3.2000),  // n=446961\n" in text
-    assert "(9, 5.9000),  // n=7, fewer than 200 step events -> pooled over vehicles" in text
-    assert "FITTED_R_DEFAULT_MOHM_PER_CELL: f64 = 5.9900;  // pooled over 3 vehicles" in text
+    assert "(6, 3.2000), // n=446961\n" in text
+    assert "(9, 5.9000), // n=7, fewer than 200 step events -> pooled over vehicles" in text
+    assert "FITTED_R_DEFAULT_MOHM_PER_CELL: f64 = 5.9900; // pooled over 3 vehicles" in text
     assert "LOW-N" not in text
 
 
@@ -170,7 +194,7 @@ def test_rust_comments_of_an_older_battery_file():
 
 def test_rust_default_from_an_older_battery_file():
     doc = _battery_doc(rows=[(4, 9.0, 300, False)], pooled_vehicles=None)  # no new keys
-    assert "f64 = 9.5000;  // pooled over step events, n=300" in rust_constants_text(doc)
+    assert "f64 = 9.5000; // pooled over step events, n=300" in rust_constants_text(doc)
 
 
 def test_pooled_over_vehicles_takes_each_vehicles_median_over_all_its_steps():

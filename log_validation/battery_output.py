@@ -323,11 +323,13 @@ def _r_table_lines(battery: Mapping[str, Any]) -> list[str]:
         f"{_whole(battery, 'sim_log_count')} SIM excluded.",
         "const FITTED_R_TABLE: &[(u8, f64)] = &[",
     ]
+    rows = []
     for f in battery["r_fits"]:
         n = _whole(f, "n_observations")
-        lines.append(
-            f"    ({_whole(f, 'cell_count')}, {f['deployed_mohm_per_cell']:.4f}),  // {_r_note(battery, f, n)}"
-        )
+        entry = f"({_whole(f, 'cell_count')}, {f['deployed_mohm_per_cell']:.4f}),"
+        rows.append((entry, _r_note(battery, f, n)))
+    width = max((len(entry) for entry, _ in rows), default=0)  # rustfmt aligns the comments
+    lines.extend(f"    {entry:<{width}} // {note}" for entry, note in rows)
     return lines + ["];"]
 
 
@@ -337,9 +339,9 @@ def _default_line(battery: Mapping[str, Any]) -> str:
     head = "const FITTED_R_DEFAULT_MOHM_PER_CELL: f64 = "
     pooled = battery.get("pooled_r_over_vehicles_mohm_per_cell")
     if pooled is None:
-        return (f"{head}{battery['overall_r_median_mohm_per_cell']:.4f};  "
+        return (f"{head}{battery['overall_r_median_mohm_per_cell']:.4f}; "
                 f"// pooled over step events, n={_whole(battery, 'overall_r_n')}")
-    return f"{head}{pooled:.4f};  // pooled over {_whole(battery, 'pooled_r_vehicles')} vehicles"
+    return f"{head}{pooled:.4f}; // pooled over {_whole(battery, 'pooled_r_vehicles')} vehicles"
 
 
 def rust_constants_text(battery: Mapping[str, Any]) -> str:
