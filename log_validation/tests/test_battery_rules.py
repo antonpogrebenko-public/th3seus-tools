@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import shutil
 import subprocess
 from dataclasses import replace
 
@@ -150,6 +149,20 @@ def test_few_steps_deploy_the_vehicle_pooled_median():
     assert not six.low_n and six.deployed_mohm_per_cell == 2.0
 
 
+def _rustfmt_works() -> bool:
+    """True when `rustfmt --version` runs; a rustup proxy without the component fails."""
+    try:
+        return subprocess.run(["rustfmt", "--version"], capture_output=True).returncode == 0
+    except OSError:
+        return False
+
+
+def _rustfmt_check(path):
+    done = subprocess.run(["rustfmt", "--edition", "2021", "--check", str(path)],
+                          capture_output=True, text=True)
+    assert done.returncode == 0, f"stdout:\n{done.stdout}\nstderr:\n{done.stderr}"
+
+
 def test_rust_comments_align_like_rustfmt():
     text = rust_constants_text(_battery_doc(
         rows=[(2, 13.4364, 4732, False), (6, 3.2146, 441198, False)], pooled_vehicles=(5.5699, 6380)))
@@ -158,7 +171,7 @@ def test_rust_comments_align_like_rustfmt():
     assert "const FITTED_R_DEFAULT_MOHM_PER_CELL: f64 = 5.5699; // pooled over 6380 vehicles" in text
 
 
-@pytest.mark.skipif(shutil.which("rustfmt") is None, reason="rustfmt is not installed")
+@pytest.mark.skipif(not _rustfmt_works(), reason="rustfmt is not available")
 def test_rust_constants_are_stable_under_rustfmt(tmp_path):
     doc = _battery_doc(rows=[(2, 13.4364, 4732, False), (6, 3.2146, 441198, False), (9, 5.5699, 7, True)],
                        pooled_vehicles=(5.5699, 6380))
@@ -167,13 +180,11 @@ def test_rust_constants_are_stable_under_rustfmt(tmp_path):
                         "v_per_cell_knots": [3.3 + 0.09 * k for k in range(11)]}
     path = tmp_path / "battery_tables.rs"
     path.write_text(rust_constants_text(doc) + "\n")
-    done = subprocess.run(["rustfmt", "--edition", "2021", "--check", str(path)],
-                          capture_output=True, text=True)
-    assert done.returncode == 0, done.stdout
+    _rustfmt_check(path)
 
 
 def _long_row_doc():
-    # the 6S line is 101 columns with one pad space (n has 78 digits), the 12S row is wider
+    # the 6S line is 102 columns with its 2 pad spaces (100 unpadded; n has 78 digits)
     return _battery_doc(rows=[(12, 13.4364, 5, False), (6, 3.2146, 10 ** 77, False),
                               (7, 3.2146, 3, False)], pooled_vehicles=(5.5699, 6380))
 
@@ -187,16 +198,53 @@ def test_rust_comments_are_not_aligned_when_a_padded_row_would_pass_100_columns(
     assert "    (7, 3.2146), // n=3\n" in text
 
 
-@pytest.mark.skipif(shutil.which("rustfmt") is None, reason="rustfmt is not installed")
+@pytest.mark.skipif(not _rustfmt_works(), reason="rustfmt is not available")
 def test_long_battery_rows_are_stable_under_rustfmt(tmp_path):
     doc = _long_row_doc()
     doc["ocv_curve"] = {"soc_knots": [k / 10 for k in range(11)],
                         "v_per_cell_knots": [3.3 + 0.09 * k for k in range(11)]}
     path = tmp_path / "battery_tables.rs"
     path.write_text(rust_constants_text(doc) + "\n")
-    done = subprocess.run(["rustfmt", "--edition", "2021", "--check", str(path)],
-                          capture_output=True, text=True)
-    assert done.returncode == 0, done.stdout
+    _rustfmt_check(path)
+
+
+def _wide_table_doc(rows):
+    doc = _battery_doc(rows=rows, pooled_vehicles=(5.5699, 6380))
+    doc["ocv_curve"] = {"soc_knots": [k / 10 for k in range(11)],
+                        "v_per_cell_knots": [3.3 + 0.09 * k for k in range(11)]}
+    return doc
+
+
+# the 12S entry is 14 columns wide, the 6S entry 12 (2 pad spaces); a row is
+# 4 + 14 + 1 + 3 + len("n=" + digits) columns once padded
+EXACTLY_100_PADDED = [(12, 13.4364, 5, False), (6, 3.2146, 10 ** 75, False), (7, 3.2146, 3, False)]
+ONLY_WIDEST_OVER_100 = [(12, 13.4364, 10 ** 77, False), (6, 3.2146, 5, False),
+                        (7, 3.2146, 3, False)]
+
+
+def test_a_padded_row_of_exactly_100_columns_stays_aligned():
+    lines = rust_constants_text(_wide_table_doc(EXACTLY_100_PADDED)).splitlines()
+    rows = [line for line in lines if line.startswith("    (") and "// n=" in line]
+    assert len(rows) == 3 and max(len(r) for r in rows) == 100
+    assert "    (6, 3.2146),   // n=1" + "0" * 75 in rows[1]
+    assert rows[0] == "    (12, 13.4364), // n=5"
+    assert rows[2] == "    (7, 3.2146),   // n=3"
+
+
+def test_only_the_widest_row_past_100_columns_keeps_the_table_aligned():
+    lines = rust_constants_text(_wide_table_doc(ONLY_WIDEST_OVER_100)).splitlines()
+    rows = [line for line in lines if line.startswith("    (") and "// n=" in line]
+    assert len(rows[0]) == 102
+    assert rows[1] == "    (6, 3.2146),   // n=5"
+    assert rows[2] == "    (7, 3.2146),   // n=3"
+
+
+@pytest.mark.skipif(not _rustfmt_works(), reason="rustfmt is not available")
+@pytest.mark.parametrize("rows", [EXACTLY_100_PADDED, ONLY_WIDEST_OVER_100])
+def test_the_alignment_boundaries_are_stable_under_rustfmt(tmp_path, rows):
+    path = tmp_path / "battery_tables.rs"
+    path.write_text(rust_constants_text(_wide_table_doc(rows)) + "\n")
+    _rustfmt_check(path)
 
 
 def test_rust_comments_name_the_fallback():  # dict shaped like result_to_dict

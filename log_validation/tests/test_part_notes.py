@@ -58,6 +58,8 @@ def test_a_figure_for_a_field_that_keeps_its_value():
 def test_a_note_on_two_fields_drops_when_either_is_measured():
     assert existing_arm_comment("imu", "Mpu6000", frozenset({G})) == \
         "650 ug/sqrt(Hz); used in tests"
+    assert existing_arm_comment("imu", "Mpu6000", frozenset({A})) == \
+        "0.05 deg/s/sqrt(Hz); used in tests"
     assert existing_arm_comment("imu", "Mpu6000", frozenset({G, A})) == "used in tests"
 
 

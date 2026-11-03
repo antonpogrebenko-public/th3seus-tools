@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import dataclasses
-import shutil
 import subprocess
 
 import pytest
@@ -29,6 +28,20 @@ def _gps_entries(name, n, **extra):
     m = {"gps.eph_median_m": 0.7, "gps.epv_median_m": 1.1, "gps.speed_accuracy_median_m_s": 0.04,
          "gps.update_rate_hz": 9.0, "gps.fix_type_mode": 3.0, **extra}
     return [noise_entry(f"g{i}", f"gv{i}", m, gps=name) for i in range(n)]
+
+
+def _rustfmt_works() -> bool:
+    """True when `rustfmt --version` runs; a rustup proxy without the component fails."""
+    try:
+        return subprocess.run(["rustfmt", "--version"], capture_output=True).returncode == 0
+    except OSError:
+        return False
+
+
+def _rustfmt_check(path):
+    done = subprocess.run(["rustfmt", "--edition", "2021", "--check", str(path)],
+                          capture_output=True, text=True)
+    assert done.returncode == 0, f"stdout:\n{done.stdout}\nstderr:\n{done.stderr}"
 
 
 def _hand_candidate(part, name):
@@ -326,6 +339,14 @@ def test_gps_entry_names_its_fix_class():
         "u-blox NEO-M8N; GPS+GLONASS; measured over standalone 3D fixes"
 
 
+def test_a_lone_horizontal_proposal_keeps_the_other_figures():
+    entries = [noise_entry(f"g{i}", f"gv{i}", {"gps.eph_median_m": 3.0, "gps.fix_type_mode": 3.0},
+                           gps="UBX_8") for i in range(10)]
+    gps = emit_part_source("gps", build_part_tables(entries), RUN)
+    assert _comment_above(gps, "GpsChipset", "UbloxM8N") == \
+        "u-blox NEO-M8N; 18 Hz max (5 Hz default); GPS+GLONASS; measured over standalone 3D fixes"
+
+
 def test_rtk_entry_names_the_rtk_class():
     entries = _gps_entries("UBX_F9P", 10, **{"gps.fix_type_mode": 6.0})
     gps = emit_part_source("gps", build_part_tables(entries), RUN)
@@ -456,7 +477,7 @@ def test_a_leftover_datasheet_derived_phrase_is_refused():
         _baro_doc_lines("Altitude noise.", "", "Datasheet-derived figures.")
 
 
-@pytest.mark.skipif(shutil.which("rustfmt") is None, reason="rustfmt is not installed")
+@pytest.mark.skipif(not _rustfmt_works(), reason="rustfmt is not available")
 def test_emitted_parts_are_stable_under_rustfmt(tmp_path):
     for tables in (EMPTY, _imu_measured(), build_part_tables(_gps_entries("UBX_7", 10))):
         for name, text in emit_rust_files(tables, RUN).items():
@@ -464,6 +485,4 @@ def test_emitted_parts_are_stable_under_rustfmt(tmp_path):
                 continue  # paste fragments, not a Rust file
             path = tmp_path / name
             path.write_text(text)
-            done = subprocess.run(["rustfmt", "--edition", "2021", "--check", str(path)],
-                                  capture_output=True, text=True)
-            assert done.returncode == 0, done.stdout
+            _rustfmt_check(path)
