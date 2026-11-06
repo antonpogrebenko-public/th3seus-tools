@@ -25,6 +25,12 @@ Fits two models:
 CRITICAL: simulation logs are excluded via ``hardware.is_simulation()``.
 All fits and statistics are over real logs only.
 
+Two steps, so logs can be processed in batches: the extract step reads each
+selected log once and saves one compressed numpy file per usable real log
+(``extract_dir``); the fit step splits, fits and scores over those files
+(``fit_extracted``, ``fit_obs_dir``).  ``analyze_logs`` runs both over one
+folder through a temporary directory and gives the same numbers.
+
 Usage::
 
     python -m log_validation.battery_fit \\
@@ -32,18 +38,45 @@ Usage::
         --holdout-frac 0.20 \\
         --out-json results/battery_fit.json \\
         --out-md docs/superpowers/status/2026-06-23-battery-fit.md
+
+    # the same in two steps (each batch extracted into one folder, then fit)
+    python -m log_validation.battery_fit --log-dir BATCH --extract-to OBS --manifest M.csv
+    python -m log_validation.battery_fit --obs-dir OBS [OBS2 ...] --manifest M.csv --out-json ... --out-md ...
 """
 
 from __future__ import annotations
 
 import argparse
-import json
 import sys
+import tempfile
+from collections import Counter
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import numpy as np
+
+# The extract step, the result types and the outputs live in their own modules;
+# their public names are re-exported so `from log_validation.battery_fit import ...` works.
+from .battery_capacity import DEFAULT_CAPACITY_BOUNDS_MAH, add_capacity_args, capacity_class_fits
+from .battery_extract import (  # noqa: F401
+    BATTERY_TOPIC, MAX_CELL_COUNT, MIN_PEAK_CURRENT_A, MIN_VOLTAGE_RANGE_V, NO_DATA_STATUSES,
+    NPZ_SUFFIX, STATUS_LOAD_ERROR, STATUS_NO_MANIFEST_ROW, STATUS_OK, STATUS_SIM,
+    STATUS_UNUSABLE, STATUS_WORKER_DIED, STATUSES, LogBatteryData, extract_dir, extract_log,
+    load_battery_topics, load_extracted, load_named, read_obs_dirs, read_statuses, save_extracted,
+)
+from .battery_model import (  # noqa: F401
+    CELL_COUNT_CHECK_V_MAX, CELL_COUNT_CHECK_V_MIN,
+    MIN_R_OBSERVATIONS_PER_CLASS, BatteryFitResult, CellCountCheck, OcvCurve,
+    PerCellRFit, StepCheck,
+)
+from .battery_output import emit_rust_constants, result_to_dict, write_markdown_summary
+from .manifest import (
+    DEFAULT_MAX_PER_VEHICLE, add_selection_args, cap_per_vehicle,
+    check_max_per_vehicle, format_counts, read_manifest,
+)
+from .outputs import forbidden_strings, write_json
 
 # ---------------------------------------------------------------------------
 # Constants — all named with rationale
@@ -78,20 +111,6 @@ MIN_BIN_POINTS: int = 5
 # Number of equal-width SoC bins for the OCV curve.
 OCV_N_BINS: int = 20
 
-# Minimum number of step-event observations for a per-cell-count R median to be
-# trusted.  Cell counts below this fall back to the pooled median because their
-# sample is too small to be stable across runs.
-MIN_R_OBSERVATIONS_PER_CLASS: int = 200
-
-# Plausibility floor for a per-cell internal resistance (mΩ/cell).  A real
-# consumer LiPo cell does not sit below ~4 mΩ/cell; high-cell-count packs are
-# NOT 4× lower resistance per cell than low-cell packs.  When a class's fitted
-# median falls below this floor it indicates unreliable data (few packs, biased
-# current sensing — observed for 12S, which fits ~2 mΩ/cell).  Such classes
-# fall back to the pooled median.  Held-out validation confirmed the sub-floor
-# 12S value badly under-predicts sag, so this fallback is corrective, not cosmetic.
-R_PLAUSIBLE_FLOOR_MOHM_PER_CELL: float = 4.0
-
 # Fraction of logs reserved for held-out validation.
 DEFAULT_HOLDOUT_FRAC: float = 0.20
 
@@ -104,62 +123,20 @@ DEFAULT_SPLIT_SEED: int = 20260623
 V_CELL_MIN: float = 3.0  # V — never trust readings below this
 V_CELL_MAX: float = 4.25  # V — never trust readings above 4.25 V/cell
 
-
 # ---------------------------------------------------------------------------
-# Public types
+# Fit step constants (the values of the one-pass analysis, named)
 # ---------------------------------------------------------------------------
 
+# battery_status.remaining serves as SoC only when it moves: by more than this
+# for the OCV fit, by at least this for holdout scoring (as before).
+SOC_MIN_RANGE: float = 0.02
 
-@dataclass(frozen=True)
-class PerCellRFit:
-    """Fitted internal resistance for one cell-count class.
+# Depth of discharge assumed at the end of a log when SoC comes from
+# discharged_mah: the capacity estimate is max(discharged_mah) / this.
+ASSUMED_END_DEPTH_OF_DISCHARGE: float = 0.8
 
-    ``deployed_mohm_per_cell`` is the value actually used downstream (report,
-    validation, Rust): it equals ``median_mohm_per_cell`` when the class has
-    enough observations, otherwise it falls back to the pooled median.
-    ``low_n`` flags when the fallback was applied.
-    """
-
-    cell_count: int
-    median_mohm_per_cell: float
-    p25_mohm_per_cell: float
-    p75_mohm_per_cell: float
-    n_observations: int
-    deployed_mohm_per_cell: float
-    low_n: bool
-
-
-@dataclass(frozen=True)
-class OcvCurve:
-    """Fitted OCV curve: (soc, v_per_cell) table, monotone increasing."""
-
-    soc_knots: list[float]
-    v_per_cell_knots: list[float]
-    n_total_observations: int
-
-    def interpolate(self, soc: float) -> float:
-        """Return per-cell OCV at a given state of charge [0, 1]."""
-        return float(np.interp(soc, self.soc_knots, self.v_per_cell_knots))
-
-
-@dataclass
-class BatteryFitResult:
-    """Aggregate output of the battery fitting pipeline."""
-
-    real_log_count: int
-    sim_log_count: int
-    skipped_log_count: int
-    r_fits: list[PerCellRFit]
-    overall_r_median_mohm_per_cell: float
-    overall_r_n: int
-    ocv_curve: OcvCurve
-    holdout_log_count: int  # all real logs in the holdout split
-    holdout_scored_count: int  # holdout logs that passed filtering and were scored
-    holdout_median_mae_v_per_cell: float
-    holdout_mean_mae_v_per_cell: float
-    holdout_p75_mae_v_per_cell: float
-    validation_target_met: bool  # True if median MAE < 0.1 V/cell
-    split_seed: int  # seed used for the deterministic train/holdout split
+# Held-out median MAE below which the fit is reported as a PASS (V/cell).
+VALIDATION_TARGET_V_PER_CELL: float = 0.1
 
 
 # ---------------------------------------------------------------------------
@@ -170,22 +147,20 @@ class BatteryFitResult:
 def _isotonic_increasing(values: list[float]) -> list[float]:
     """Enforce monotone-increasing constraint via pool-adjacent-violators.
 
+    A stack of (sum, count) blocks: each value is pushed as its own block and
+    merged with the previous block while the previous mean is greater, so it
+    ends after at most n merges (repeated pairwise averaging could cycle
+    forever on values a few ULPs apart).  Each value becomes its block's mean.
     Returns a new list; the input is not modified (immutable pattern).
     """
-    out = list(values)
-    n = len(out)
-    changed = True
-    while changed:
-        changed = False
-        i = 0
-        while i < n - 1:
-            if out[i] > out[i + 1]:
-                avg = (out[i] + out[i + 1]) / 2.0
-                out[i] = avg
-                out[i + 1] = avg
-                changed = True
-            i += 1
-    return out
+    blocks: list[tuple[float, int]] = []
+    for value in values:
+        total, count = float(value), 1
+        while blocks and blocks[-1][0] / blocks[-1][1] > total / count:
+            prev_total, prev_count = blocks.pop()
+            total, count = total + prev_total, count + prev_count
+        blocks.append((total, count))
+    return [total / count for total, count in blocks for _ in range(count)]
 
 
 def _extract_r_observations(
@@ -195,18 +170,22 @@ def _extract_r_observations(
 
     For each adjacent sample pair where the current changed abruptly
     (|dI| > MIN_STEP_dI_A) and a corresponding voltage change is visible,
-    compute R = -dV/dI and normalise per cell.
+    compute R = -dV/dI and normalise per cell.  Pairs with a non-finite
+    current or voltage change (real logs carry +inf and NaN samples) are skipped.
 
     Returns a list of plausible R values in mΩ/cell.
     """
     if len(i) < 2:
         return []
-    dt = np.diff(t)
-    d_i = np.diff(i)
-    d_v = np.diff(v)
+    with np.errstate(invalid="ignore"):
+        dt = np.diff(t)
+        d_i = np.diff(i)
+        d_v = np.diff(v)
 
     step_mask = (
-        (dt < MAX_STEP_DT_S)
+        np.isfinite(d_i)
+        & np.isfinite(d_v)
+        & (dt < MAX_STEP_DT_S)
         & (np.abs(d_i) > MIN_STEP_dI_A)
         & (np.abs(d_v) > MIN_STEP_dV_V)
     )
@@ -312,459 +291,426 @@ def _predict_terminal_voltage(
 
 
 # ---------------------------------------------------------------------------
-# Core analysis functions
+# Split
 # ---------------------------------------------------------------------------
 
 
-def analyze_logs(
-    log_dir: str,
-    holdout_frac: float = DEFAULT_HOLDOUT_FRAC,
-    seed: int = DEFAULT_SPLIT_SEED,
-) -> BatteryFitResult:
-    """Scan all .ulg files in *log_dir* and fit battery models.
-
-    Simulation logs are detected via ``hardware.is_simulation()`` and
-    excluded from all fits and statistics.
-
-    Reproducibility
-    ---------------
-    The full pipeline is deterministic for a fixed (log_dir, holdout_frac,
-    seed): files are sorted by name, then a seeded ``numpy.random.default_rng``
-    permutation assigns the train/holdout split.  The same inputs always yield
-    the same fitted R table, OCV table, and held-out MAE.  This guarantees the
-    numbers written to Rust, the Markdown report, and the validation metric all
-    come from ONE canonical run.
-
-    Parameters
-    ----------
-    log_dir:
-        Directory containing ``*.ulg`` files.
-    holdout_frac:
-        Fraction of files reserved for validation.  Must be in (0, 1).
-    seed:
-        Seed for the deterministic train/holdout split permutation.
-
-    Returns
-    -------
-    BatteryFitResult
-        Fitted R per cell-count, OCV curve, and validation metrics.
-    """
-    from pathlib import Path as _Path
-    from pyulog import ULog
-    from .hardware import extract_hardware_info, is_simulation
-
-    paths = sorted(_Path(log_dir).glob("*.ulg"))
-    if not paths:
-        raise FileNotFoundError(f"No .ulg files found in {log_dir!r}")
+def _check_holdout_frac(holdout_frac: float) -> None:
     if not 0.0 < holdout_frac < 1.0:
         raise ValueError(f"holdout_frac must be in (0, 1), got {holdout_frac}")
 
-    # Deterministic, seeded train/holdout split.  Sorting first makes the
-    # permutation reproducible regardless of filesystem ordering.
-    n_holdout = max(1, int(len(paths) * holdout_frac))
-    rng = np.random.default_rng(seed)
-    order = rng.permutation(len(paths))
-    holdout_idx = set(order[:n_holdout].tolist())
-    fit_paths = [paths[j] for j in range(len(paths)) if j not in holdout_idx]
-    holdout_paths = [paths[j] for j in range(len(paths)) if j in holdout_idx]
 
-    total = 0
-    real_count = 0
-    sim_count = 0
-    skipped = 0
+def split_logs(
+    log_ids: Sequence[str],
+    vehicle_of: Mapping[str, str],
+    holdout_frac: float,
+    seed: int,
+) -> tuple[list[str], list[str]]:
+    """Seeded (fit, holdout) split of log IDs; both lists sorted.
 
-    # Accumulators keyed by cell_count
-    r_by_cc: dict[int, list[float]] = {}
-    ocv_all: list[tuple[float, float]] = []
+    Without a mapping (empty vehicle_of) the unit is the log, exactly as the
+    one-pass analysis: sort the IDs, permute with
+    ``np.random.default_rng(seed).permutation(n)``, and the first
+    ``max(1, int(n * holdout_frac))`` go to holdout.  With a mapping the same
+    runs over the sorted distinct vehicle IDs and every log of a holdout
+    vehicle goes to holdout, so no vehicle is on both sides.
+    """
+    _check_holdout_frac(holdout_frac)
+    ids = sorted(log_ids)
+    if len(set(ids)) != len(ids):
+        raise ValueError("a log ID is listed more than once")
+    unit_of = _unit_of(ids, vehicle_of)
+    units = sorted(set(unit_of.values()))
+    n_holdout = max(1, int(len(units) * holdout_frac))
+    order = np.random.default_rng(seed).permutation(len(units))
+    held = {units[j] for j in order[:n_holdout].tolist()}
+    return [i for i in ids if unit_of[i] not in held], [i for i in ids if unit_of[i] in held]
 
-    def _process_log(
-        lp: Path,
-    ) -> Optional[tuple[int, list[float], list[tuple[float, float]]]]:
-        """Return (cell_count, r_obs, ocv_obs) or None if log is unusable."""
-        try:
-            u = ULog(str(lp))
-        except Exception:
-            return None
 
-        hw = None
-        try:
-            hw = extract_hardware_info(u.msg_info_dict, u.initial_parameters)
-        except Exception:
-            pass
-        if hw is not None and is_simulation(hw):
-            return None  # caller tracks sim_count separately
+def _unit_of(ids: Sequence[str], vehicle_of: Mapping[str, str]) -> dict[str, str]:
+    if not vehicle_of:
+        return {i: i for i in ids}
+    missing = [i for i in ids if i not in vehicle_of]
+    if missing:
+        raise ValueError(f"{len(missing)} log ID(s) have no vehicle, e.g. {missing[0]}")
+    return {i: vehicle_of[i] for i in ids}
 
-        tnames = {d.name for d in u.data_list}
-        if "battery_status" not in tnames:
-            return None
 
-        try:
-            ds = u.get_dataset("battery_status", multi_instance=0)
-            v = np.asarray(ds.data["voltage_v"], dtype=float)
-            i = np.asarray(ds.data["current_a"], dtype=float)
-            t = np.asarray(ds.data["timestamp"], dtype=float) * 1e-6
-            cc = int(ds.data["cell_count"][0])
-        except (KeyError, IndexError):
-            return None
+# ---------------------------------------------------------------------------
+# Fit step: LogBatteryData -> BatteryFitResult
+# ---------------------------------------------------------------------------
 
-        # Reject clearly invalid packs
-        if cc <= 0 or cc > 14:
-            return None
-        if v.max() - v.min() < 0.1:
-            return None
-        if i.max() < 2.0:
-            return None
 
-        r_obs = _extract_r_observations(v, i, t, cc)
+@dataclass(frozen=True)
+class _LogObservations:
+    log_id: str
+    cell_count: int
+    r_obs: list[float]
+    ocv_obs: list[tuple[float, float]]
+    capacity_mah: float | None = None
 
-        # SoC: prefer 'remaining', fallback to 'discharged_mah' integration
-        soc: Optional[np.ndarray] = None
-        if "remaining" in ds.data:
-            soc_raw = np.asarray(ds.data["remaining"], dtype=float)
-            if soc_raw.max() - soc_raw.min() > 0.02:
-                soc = soc_raw
 
-        if soc is None and "discharged_mah" in ds.data:
-            disch = np.asarray(ds.data["discharged_mah"], dtype=float)
-            if disch.max() > 0 and disch.max() > disch.min():
-                # Estimate capacity from max discharged (conservative lower bound)
-                cap_mah = disch.max() / 0.8  # assume 80% DoD at end of log
-                soc = np.clip(1.0 - disch / cap_mah, 0.0, 1.0)
+def _soc_for_ocv(data: LogBatteryData) -> np.ndarray | None:
+    """SoC for the OCV fit: 'remaining' when it moves, else discharged_mah integration."""
+    remaining = data.remaining
+    if remaining is not None and remaining.max() - remaining.min() > SOC_MIN_RANGE:
+        return remaining
+    disch = data.discharged_mah
+    if disch is not None and disch.max() > 0 and disch.max() > disch.min():
+        # Estimate capacity from max discharged (conservative lower bound)
+        cap_mah = disch.max() / ASSUMED_END_DEPTH_OF_DISCHARGE
+        return np.clip(1.0 - disch / cap_mah, 0.0, 1.0)
+    return None
 
-        ocv_obs: list[tuple[float, float]] = []
-        if soc is not None:
-            ocv_obs = _extract_ocv_observations(v, i, soc, cc)
 
-        return cc, r_obs, ocv_obs
+def _observe(data: LogBatteryData) -> _LogObservations:
+    soc = _soc_for_ocv(data)
+    ocv_obs = (
+        [] if soc is None
+        else _extract_ocv_observations(data.v, data.i, soc, data.cell_count)
+    )
+    r_obs = _extract_r_observations(data.v, data.i, data.t_s, data.cell_count)
+    return _LogObservations(data.log_id, data.cell_count, r_obs, ocv_obs, data.capacity_mah)
 
-    # -----------------------------------------------------------------------
-    # Fit phase
-    # -----------------------------------------------------------------------
-    for lp in fit_paths:
-        total += 1
 
-        # Check sim status separately so we count sims even if _process_log skips
-        try:
-            u_check = ULog(str(lp))
-            hw_check = None
-            try:
-                hw_check = extract_hardware_info(
-                    u_check.msg_info_dict, u_check.initial_parameters
-                )
-            except Exception:
-                pass
-            if hw_check is not None and is_simulation(hw_check):
-                sim_count += 1
-                continue
-        except Exception:
-            skipped += 1
-            continue
+def _vehicle_key(log_id: str, vehicle_of: Mapping[str, str]) -> tuple[str, str]:
+    """A log's vehicle; a log without one counts as its own vehicle."""
+    return ("vehicle", vehicle_of[log_id]) if log_id in vehicle_of else ("log", log_id)
 
-        real_count += 1
-        result = _process_log(lp)
-        if result is None:
-            skipped += 1
-            continue
-        cc, r_obs, ocv_obs = result
-        if r_obs:
-            r_by_cc.setdefault(cc, []).extend(r_obs)
-        ocv_all.extend(ocv_obs)
 
-    # Count holdout sims too (for accurate totals)
-    holdout_real = 0
-    for lp in holdout_paths:
-        total += 1
-        try:
-            u_check = ULog(str(lp))
-            hw_check = None
-            try:
-                hw_check = extract_hardware_info(
-                    u_check.msg_info_dict, u_check.initial_parameters
-                )
-            except Exception:
-                pass
-            if hw_check is not None and is_simulation(hw_check):
-                sim_count += 1
-            else:
-                real_count += 1
-                holdout_real += 1
-        except Exception:
-            skipped += 1
+def _per_cell_fit(
+    cell_count: int, r_vals: list[float], n_vehicles: int, fallback: float
+) -> PerCellRFit:
+    vals = np.array(r_vals)
+    median = float(np.median(vals))
+    # A class with too few step events deploys the median pooled over vehicles;
+    # a measured median is deployed as it is, however low.  This is
+    # deterministic and drives report, validation, and Rust identically.
+    low_n = len(vals) < MIN_R_OBSERVATIONS_PER_CLASS
+    return PerCellRFit(
+        cell_count=cell_count,
+        median_mohm_per_cell=median,
+        p25_mohm_per_cell=float(np.percentile(vals, 25)),
+        p75_mohm_per_cell=float(np.percentile(vals, 75)),
+        n_observations=len(vals),
+        deployed_mohm_per_cell=fallback if low_n else median,
+        low_n=low_n,
+        p10_mohm_per_cell=float(np.percentile(vals, 10)),
+        p90_mohm_per_cell=float(np.percentile(vals, 90)),
+        n_vehicles=n_vehicles,
+    )
 
-    # -----------------------------------------------------------------------
-    # Build R summary.  Pooled median is computed first so low-n classes can
-    # fall back to it deterministically.  The deployed value (median or
-    # fallback) is what report, validation, and Rust all consume.
-    # -----------------------------------------------------------------------
-    all_r_vals: list[float] = []
-    for cc in sorted(r_by_cc.keys()):
-        all_r_vals.extend(r_by_cc[cc])
+
+def _r_table(
+    observations: Sequence[_LogObservations], vehicle_of: Mapping[str, str]
+) -> tuple[list[PerCellRFit], float, int, float, int]:
+    """(rows per cell count, median pooled over step events, step count, median
+    pooled over vehicles, vehicle count).
+
+    The vehicle-pooled median is a vehicle's median step resistance, then the
+    median over vehicles; it is computed first so low-n classes fall back to it.
+    """
+    with_r = [o for o in observations if o.r_obs]
+    cells = sorted({o.cell_count for o in with_r})
+    r_by_cc = {cc: [r for o in with_r if o.cell_count == cc for r in o.r_obs] for cc in cells}
+    all_r_vals = [r for cc in cells for r in r_by_cc[cc]]
     if not all_r_vals:
         raise ValueError("No valid R observations collected; check log quality.")
-    overall_r_median = float(np.median(all_r_vals))
+    overall = float(np.median(all_r_vals))
+    vehicles = {
+        cc: {_vehicle_key(o.log_id, vehicle_of) for o in with_r if o.cell_count == cc}
+        for cc in cells
+    }
+    r_by_vehicle: dict[tuple[str, str], list[float]] = {}
+    for o in with_r:
+        r_by_vehicle.setdefault(_vehicle_key(o.log_id, vehicle_of), []).extend(o.r_obs)
+    by_vehicles = float(np.median([np.median(v) for v in r_by_vehicle.values()]))
+    rows = [_per_cell_fit(cc, r_by_cc[cc], len(vehicles[cc]), by_vehicles) for cc in cells]
+    return rows, overall, len(all_r_vals), by_vehicles, len(r_by_vehicle)
 
-    r_fits: list[PerCellRFit] = []
-    for cc in sorted(r_by_cc.keys()):
-        vals = np.array(r_by_cc[cc])
-        median = float(np.median(vals))
-        # A class is "unreliable" if it has too few observations OR its fitted
-        # median is physically implausible (below the per-cell floor).  Either
-        # way it falls back to the pooled median.  This is deterministic and
-        # drives report, validation, and Rust identically.
-        too_few = len(vals) < MIN_R_OBSERVATIONS_PER_CLASS
-        implausible = median < R_PLAUSIBLE_FLOOR_MOHM_PER_CELL
-        low_n = too_few or implausible
-        deployed = overall_r_median if low_n else median
-        r_fits.append(
-            PerCellRFit(
-                cell_count=cc,
-                median_mohm_per_cell=median,
-                p25_mohm_per_cell=float(np.percentile(vals, 25)),
-                p75_mohm_per_cell=float(np.percentile(vals, 75)),
-                n_observations=len(vals),
-                deployed_mohm_per_cell=deployed,
-                low_n=low_n,
-            )
+
+def _per_log_r(
+    observations: Sequence[_LogObservations], vehicle_of: Mapping[str, str]
+) -> list[dict]:
+    return [
+        {
+            "log_id": o.log_id,
+            "vehicle_id": vehicle_of.get(o.log_id),
+            "cell_count": o.cell_count,
+            "median_mohm_per_cell": float(np.median(o.r_obs)),
+        }
+        for o in observations
+        if o.r_obs
+    ]
+
+
+def _deployed_r(cell_count: int, r_fits: Sequence[PerCellRFit], overall: float) -> float:
+    """Mirror the deployed Rust lookup EXACTLY.
+
+    The per-class deployed value (median, or the vehicle-pooled fallback for
+    low-n classes); for cell counts absent from the table, ``overall``, the
+    median pooled over vehicles (Rust's FITTED_R_DEFAULT_MOHM_PER_CELL).
+    """
+    return next((f.deployed_mohm_per_cell for f in r_fits if f.cell_count == cell_count), overall)
+
+
+def _holdout_mae(data: LogBatteryData, ocv: OcvCurve, r_mohm_per_cell: float) -> float | None:
+    """Median |predicted - measured| V/cell over the log's finite samples.
+
+    None, so the log is not scored, when 'remaining' is flat or absent or no
+    sample gives a finite error."""
+    soc = data.remaining
+    if soc is None or soc.max() - soc.min() < SOC_MIN_RANGE:
+        return None
+    v_pred = _predict_terminal_voltage(soc, data.i, data.cell_count, ocv, r_mohm_per_cell)
+    errors = np.abs(v_pred - data.v) / data.cell_count
+    finite = errors[np.isfinite(errors)]
+    return float(np.median(finite)) if finite.size else None
+
+
+def _signed_error(data: LogBatteryData, ocv: OcvCurve, r_mohm_per_cell: float) -> float:
+    """Median (predicted - measured) V/cell over the log's finite samples; nan without any."""
+    soc = data.remaining
+    v_pred = _predict_terminal_voltage(soc, data.i, data.cell_count, ocv, r_mohm_per_cell)
+    errors = (v_pred - data.v) / data.cell_count
+    finite = errors[np.isfinite(errors)]
+    return float(np.median(finite)) if finite.size else float("nan")
+
+
+def holdout_by_cell_count(
+    scored: Sequence[LogBatteryData], ocv: OcvCurve, deployed: Callable[[int], float]
+) -> tuple[CellCountCheck, ...]:
+    """The held-out voltage check per cell count, ascending; a cell count with no scored log has no row."""
+    per_count: dict[int, list[tuple[float, float]]] = {}
+    for d in scored:
+        r = deployed(d.cell_count)
+        mae = _holdout_mae(d, ocv, r)
+        if mae is not None:
+            per_count.setdefault(d.cell_count, []).append((mae, _signed_error(d, ocv, r)))
+    return tuple(
+        CellCountCheck(
+            cell_count=cells,
+            scored_logs=len(pairs),
+            deployed_mohm_per_cell=deployed(cells),
+            median_mae_v_per_cell=float(np.median([m for m, _ in pairs])),
+            median_signed_err_v_per_cell=float(np.median([s for _, s in pairs])),
         )
+        for cells, pairs in sorted(per_count.items())
+    )
 
-    # -----------------------------------------------------------------------
-    # Build OCV curve
-    # -----------------------------------------------------------------------
-    ocv_curve = _build_ocv_curve(ocv_all)
 
-    # -----------------------------------------------------------------------
-    # Validation: held-out log prediction
-    # -----------------------------------------------------------------------
-    holdout_maes: list[float] = []
-    for lp in holdout_paths:
-        result = _process_log(lp)
-        if result is None:
-            continue
-        cc, _, _ = result
-        try:
-            u2 = ULog(str(lp))
-            ds2 = u2.get_dataset("battery_status", multi_instance=0)
-            v2 = np.asarray(ds2.data["voltage_v"], dtype=float)
-            i2 = np.asarray(ds2.data["current_a"], dtype=float)
-            cc2 = int(ds2.data["cell_count"][0])
-            if cc2 <= 0 or cc2 > 14:
-                continue
-            if "remaining" not in ds2.data:
-                continue
-            soc2 = np.asarray(ds2.data["remaining"], dtype=float)
-            if soc2.max() - soc2.min() < 0.02:
-                continue
+def _step_errors(data: LogBatteryData, r_mohm_per_cell: float) -> np.ndarray:
+    """Per-cell voltage-change errors over the steps of one log (adjacent sample pairs)."""
+    with np.errstate(invalid="ignore"):
+        dt, d_i, d_v = np.diff(data.t_s), np.diff(data.i), np.diff(data.v)
+        is_step = (dt < MAX_STEP_DT_S) & (np.abs(d_i) > MIN_STEP_dI_A)
+    is_step &= np.isfinite(dt) & np.isfinite(d_i) & np.isfinite(d_v)
+    d_v_pred = -d_i[is_step] * data.cell_count * r_mohm_per_cell / 1000.0
+    return np.abs(d_v[is_step] - d_v_pred) / data.cell_count
 
-            # Mirror the deployed Rust lookup EXACTLY: use the per-class
-            # deployed value (median, or pooled fallback for low-n classes);
-            # for cell counts absent from the table, use the pooled median
-            # (which equals Rust's FITTED_R_DEFAULT_MOHM_PER_CELL).
-            r_for_cc = overall_r_median
-            for fit in r_fits:
-                if fit.cell_count == cc2:
-                    r_for_cc = fit.deployed_mohm_per_cell
-                    break
 
-            v_pred = _predict_terminal_voltage(soc2, i2, cc2, ocv_curve, r_for_cc)
-            mae_per_cell = float(np.median(np.abs(v_pred - v2) / cc2))
-            holdout_maes.append(mae_per_cell)
-        except Exception:
-            continue
+def step_check(
+    datas: Sequence[LogBatteryData],
+    r_mohm_for_cells: Callable[[int], float],
+    vehicle_of: Mapping[str, str],
+) -> StepCheck:
+    """Score R on the current steps of ``datas`` without using 'remaining'.
 
+    A step is an adjacent sample pair with dt < MAX_STEP_DT_S and
+    |dI| > MIN_STEP_dI_A; there is no voltage filter, which would bias the
+    check.  Pure: the inputs are not changed.
+    """
+    errs_by_log = [(d.log_id, _step_errors(d, r_mohm_for_cells(d.cell_count))) for d in datas]
+    stepped = [(i, e) for i, e in errs_by_log if len(e)]
+    if not stepped:
+        return StepCheck(0, 0, None, None)
+    pooled = np.concatenate([e for _, e in stepped])
+    return StepCheck(
+        n_steps=len(pooled),
+        n_vehicles=len({_vehicle_key(i, vehicle_of) for i, _ in stepped}),
+        median_err_v_per_cell=float(np.median(pooled)),
+        p75_err_v_per_cell=float(np.percentile(pooled, 75)),
+    )
+
+
+STATUS_CELL_MISMATCH = "cell_count_mismatch"
+
+
+def cell_count_matches(data: LogBatteryData) -> bool:
+    """True when the median pack voltage per logged cell is within the cell-count check range
+    (CELL_COUNT_CHECK_V_MIN to CELL_COUNT_CHECK_V_MAX)."""
+    finite = data.v[np.isfinite(data.v)]
+    if data.cell_count <= 0 or finite.size == 0:
+        return False
+    per_cell = float(np.median(finite)) / data.cell_count
+    return CELL_COUNT_CHECK_V_MIN <= per_cell <= CELL_COUNT_CHECK_V_MAX
+
+
+def _statuses_of(datas: Sequence[LogBatteryData], no_data: Mapping[str, str]) -> dict[str, str]:
+    ids = [d.log_id for d in datas] + list(no_data)
+    repeated = sorted(i for i, n in Counter(ids).items() if n > 1)
+    if repeated:
+        raise ValueError(f"log ID given more than once: {', '.join(repeated[:5])}")
+    unknown = sorted(set(no_data.values()) - NO_DATA_STATUSES)
+    if unknown:
+        raise ValueError(f"unknown extract status: {', '.join(unknown)}")
+    return {**{d.log_id: STATUS_OK for d in datas}, **no_data}
+
+
+def fit_extracted(
+    datas: Sequence[LogBatteryData],
+    vehicle_of: Mapping[str, str],
+    holdout_frac: float = DEFAULT_HOLDOUT_FRAC,
+    seed: int = DEFAULT_SPLIT_SEED,
+    *,
+    no_data: Mapping[str, str] | None = None,
+    logs_without_manifest_row: int = 0,
+    capacity_bounds: Sequence[float] = DEFAULT_CAPACITY_BOUNDS_MAH,
+) -> BatteryFitResult:
+    """Fit R and OCV on the fit side of the split; score the holdout side.
+
+    ``datas`` are the usable real logs.  ``no_data`` maps every other selected
+    log to its extract status ("sim", "unusable", "load_error", "worker_died"): those logs
+    keep their place in the split, as every .ulg file had in the one-pass
+    analysis, so a split without a manifest equals that analysis's split; they
+    give no observation and no score.  ``vehicle_of`` (empty without a
+    manifest) makes the split hold out whole vehicles and names the vehicles.
+    """
+    given = _statuses_of(datas, no_data or {})  # the inputs as given; the mismatch status is ours
+    mismatched = {d.log_id for d in datas if not cell_count_matches(d)}
+    datas = [d for d in datas if d.log_id not in mismatched]
+    statuses = {**given, **dict.fromkeys(mismatched, STATUS_CELL_MISMATCH)}
+    fit_ids, holdout_ids = split_logs(list(statuses), vehicle_of, holdout_frac, seed)
+    by_id = {d.log_id: d for d in datas}
+    observations = [_observe(by_id[i]) for i in fit_ids if i in by_id]
+    r_fits, overall, overall_n, by_vehicles, n_vehicles = _r_table(observations, vehicle_of)
+    ocv_curve = _build_ocv_curve([p for o in observations for p in o.ocv_obs])
+
+    scored = [by_id[i] for i in holdout_ids if i in by_id]
+    holdout_maes = [
+        mae for mae in (
+            _holdout_mae(d, ocv_curve, _deployed_r(d.cell_count, r_fits, by_vehicles)) for d in scored
+        ) if mae is not None
+    ]
     if not holdout_maes:
         raise ValueError("No holdout logs could be evaluated; check holdout fraction.")
-
     maes = np.array(holdout_maes)
     median_mae = float(np.median(maes))
+    def deployed(cells: int) -> float:
+        return _deployed_r(cells, r_fits, by_vehicles)
 
+    scored_by_steps = {d.log_id for d in scored if step_check([d], deployed, {}).n_steps}
+    scored_by_mae = {
+        d.log_id for d in scored if _holdout_mae(d, ocv_curve, deployed(d.cell_count)) is not None
+    }
+    real = (STATUS_OK, STATUS_UNUSABLE, STATUS_CELL_MISMATCH)  # loaded and not simulation, as before
+    holdout_real = [i for i in holdout_ids if statuses[i] in real]
+    fit_log_ids = [o.log_id for o in observations if o.r_obs or o.ocv_obs]
+    holdout_scored_log_ids = tuple(sorted(scored_by_steps | scored_by_mae))
     return BatteryFitResult(
-        real_log_count=real_count,
-        sim_log_count=sim_count,
-        skipped_log_count=skipped,
+        real_log_count=sum(1 for s in statuses.values() if s in real),
+        sim_log_count=sum(1 for s in statuses.values() if s == STATUS_SIM),
+        skipped_log_count=sum(1 for s in statuses.values() if s not in (STATUS_OK, STATUS_SIM, STATUS_CELL_MISMATCH)),
         r_fits=r_fits,
-        overall_r_median_mohm_per_cell=overall_r_median,
-        overall_r_n=len(all_r_vals),
+        overall_r_median_mohm_per_cell=overall,
+        overall_r_n=overall_n,
         ocv_curve=ocv_curve,
-        holdout_log_count=holdout_real,
+        holdout_log_count=len(holdout_real),
         holdout_scored_count=len(holdout_maes),
         holdout_median_mae_v_per_cell=median_mae,
         holdout_mean_mae_v_per_cell=float(np.mean(maes)),
         holdout_p75_mae_v_per_cell=float(np.percentile(maes, 75)),
-        validation_target_met=(median_mae < 0.1),
+        validation_target_met=(median_mae < VALIDATION_TARGET_V_PER_CELL),
         split_seed=seed,
+        per_log_r=_per_log_r(observations, vehicle_of),
+        fit_log_ids=fit_log_ids,
+        holdout_log_ids=holdout_real,
+        logs_without_manifest_row=logs_without_manifest_row,
+        step_check=step_check(scored, deployed, vehicle_of),
+        holdout_scored_log_ids=holdout_scored_log_ids,
+        fit_logs_without_samples=len(observations) - len(fit_log_ids),
+        holdout_logs_not_scored=len(scored) - len(holdout_scored_log_ids),
+        r_fits_by_capacity=capacity_class_fits(observations, vehicle_of, capacity_bounds),
+        capacity_bounds_mah=tuple(capacity_bounds),
+        cell_count_mismatch_count=sum(1 for s in statuses.values() if s == STATUS_CELL_MISMATCH),
+        pooled_r_over_vehicles_mohm_per_cell=by_vehicles,
+        pooled_r_vehicles=n_vehicles,
+        holdout_by_cell_count=holdout_by_cell_count(scored, ocv_curve, deployed),
     )
 
 
-# ---------------------------------------------------------------------------
-# Output helpers
-# ---------------------------------------------------------------------------
+def _select_extracted(
+    ids: Sequence[str], manifest_path: Path | None, max_per_vehicle: int
+) -> tuple[list[str], dict[str, str], int]:
+    """(kept log IDs, their vehicles, logs without a manifest row), as select_logs does for .ulg files."""
+    check_max_per_vehicle(max_per_vehicle)
+    if manifest_path is None:
+        return sorted(ids), {}, 0
+    manifest = read_manifest(manifest_path)
+    listed = [i for i in ids if i in manifest]
+    kept = cap_per_vehicle(listed, manifest, max_per_vehicle)
+    return kept, {i: manifest[i] for i in kept}, len(ids) - len(listed)
 
 
-def result_to_dict(r: BatteryFitResult) -> dict:
-    """Serialise BatteryFitResult to a JSON-compatible dict."""
-    return {
-        "real_log_count": r.real_log_count,
-        "sim_log_count": r.sim_log_count,
-        "skipped_log_count": r.skipped_log_count,
-        "split_seed": r.split_seed,
-        "r_fits": [
-            {
-                "cell_count": f.cell_count,
-                "median_mohm_per_cell": f.median_mohm_per_cell,
-                "p25_mohm_per_cell": f.p25_mohm_per_cell,
-                "p75_mohm_per_cell": f.p75_mohm_per_cell,
-                "n_observations": f.n_observations,
-                "deployed_mohm_per_cell": f.deployed_mohm_per_cell,
-                "low_n": f.low_n,
-            }
-            for f in r.r_fits
-        ],
-        "overall_r_median_mohm_per_cell": r.overall_r_median_mohm_per_cell,
-        "overall_r_n": r.overall_r_n,
-        "ocv_curve": {
-            "soc_knots": r.ocv_curve.soc_knots,
-            "v_per_cell_knots": r.ocv_curve.v_per_cell_knots,
-            "n_total_observations": r.ocv_curve.n_total_observations,
-        },
-        "holdout_log_count": r.holdout_log_count,
-        "holdout_scored_count": r.holdout_scored_count,
-        "holdout_median_mae_v_per_cell": r.holdout_median_mae_v_per_cell,
-        "holdout_mean_mae_v_per_cell": r.holdout_mean_mae_v_per_cell,
-        "holdout_p75_mae_v_per_cell": r.holdout_p75_mae_v_per_cell,
-        "validation_target_met": r.validation_target_met,
-    }
+def fit_obs_dir(
+    obs_dirs: Path | Sequence[Path],
+    manifest_path: Path | None = None,
+    max_per_vehicle: int = DEFAULT_MAX_PER_VEHICLE,
+    holdout_frac: float = DEFAULT_HOLDOUT_FRAC,
+    seed: int = DEFAULT_SPLIT_SEED,
+    capacity_bounds: Sequence[float] = DEFAULT_CAPACITY_BOUNDS_MAH,
+) -> BatteryFitResult:
+    """fit_extracted over the files that extract_dir left in one or more folders.
 
-
-def write_markdown_summary(r: BatteryFitResult, path: str) -> None:
-    """Write a short Markdown summary of the fit results."""
-    lines = [
-        "# Battery Model Fit — 2026-06-23",
-        "",
-        "Fit from real PX4 flight logs (SIM excluded via `hardware.is_simulation`).",
-        "",
-        f"Canonical run: deterministic, split seed = `{r.split_seed}`.  "
-        "The R table, OCV table, and held-out MAE below all derive from this "
-        "single run and are the exact values compiled into "
-        "`hitl-physics/src/battery.rs`.",
-        "",
-        "## Corpus",
-        "",
-        "| | Count |",
-        "|---|---|",
-        f"| Real logs used for fit | {r.real_log_count} |",
-        f"| SIM logs excluded | {r.sim_log_count} |",
-        f"| Skipped (load error / no battery topic) | {r.skipped_log_count} |",
-        f"| Holdout (validation only) | {r.holdout_log_count} |",
-        "",
-        "## Internal Resistance",
-        "",
-        f"Overall pooled median: **{r.overall_r_median_mohm_per_cell:.2f} mΩ/cell** "
-        f"(n={r.overall_r_n} step events)",
-        "",
-        f"A class falls back to the pooled median (the **Deployed** column, which "
-        f"is what Rust uses) when it has fewer than {MIN_R_OBSERVATIONS_PER_CLASS} "
-        f"step events OR its fitted median is implausibly low "
-        f"(< {R_PLAUSIBLE_FLOOR_MOHM_PER_CELL:.0f} mΩ/cell — a sign of biased data).",
-        "",
-        "| Cell count | Median (mΩ/cell) | Deployed (mΩ/cell) | IQR | n step events | fallback reason |",
-        "|---|---|---|---|---|---|",
-    ]
-    for f in r.r_fits:
-        iqr = f"{f.p25_mohm_per_cell:.2f}–{f.p75_mohm_per_cell:.2f}"
-        if not f.low_n:
-            reason = "—"
-        elif f.n_observations < MIN_R_OBSERVATIONS_PER_CLASS:
-            reason = f"low-n (<{MIN_R_OBSERVATIONS_PER_CLASS}) → pooled"
-        else:
-            reason = (
-                f"implausible (<{R_PLAUSIBLE_FLOOR_MOHM_PER_CELL:.0f} mΩ/cell) → pooled"
-            )
-        lines.append(
-            f"| {f.cell_count}S | {f.median_mohm_per_cell:.2f} | "
-            f"{f.deployed_mohm_per_cell:.2f} | {iqr} | {f.n_observations} | {reason} |"
-        )
-
-    lines += [
-        "",
-        "## OCV Curve (per cell, all cell counts pooled)",
-        "",
-        "| SoC | V/cell |",
-        "|---|---|",
-    ]
-    for soc, v in zip(r.ocv_curve.soc_knots, r.ocv_curve.v_per_cell_knots):
-        lines.append(f"| {soc:.3f} | {v:.4f} |")
-
-    lines += [
-        "",
-        "## Held-Out Validation",
-        "",
-        "| Metric | Value |",
-        "|---|---|",
-        f"| Holdout real logs in split | {r.holdout_log_count} |",
-        f"| Holdout logs scored (passed filters) | {r.holdout_scored_count} |",
-        f"| Median MAE (V/cell) | **{r.holdout_median_mae_v_per_cell:.4f}** |",
-        f"| Mean MAE (V/cell) | {r.holdout_mean_mae_v_per_cell:.4f} |",
-        f"| p75 MAE (V/cell) | {r.holdout_p75_mae_v_per_cell:.4f} |",
-        f"| Target < 0.1 V/cell | {'PASS' if r.validation_target_met else 'FAIL'} |",
-        "",
-        "## Method Notes",
-        "",
-        "- **R_internal:** regressed from rapid current-step events (`|dI| > 5 A`, `dt < 2 s`).  "
-        "C-rating is not reliably present in PX4 logs so the fit is keyed by cell_count only; "
-        "C-rating is preserved in the Rust signature as a fallback for configs without real-log coverage.",
-        "- **OCV:** sampled during low-current coast segments (`I < 3 A`).  "
-        "SoC source is `battery_status.remaining` (PX4's own estimator).  "
-        "Limitation: `capacity` is usually 0 in firmware (smart battery only), "
-        "so `discharged_mah` integration is unreliable without a known capacity.",
-        "- **Monotone enforcement:** isotonic regression (pool-adjacent-violators) applied to "
-        "bin medians before Rust porting.",
-        f"- **Low-n classes:** any cell-count class with < {MIN_R_OBSERVATIONS_PER_CLASS} "
-        "step events (e.g. 12S — very few packs in the corpus) is too noisy to trust and "
-        "falls back to the pooled median.  The **Deployed** column reflects this and matches Rust.",
-        "",
-    ]
-
-    out_path = Path(path)
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-
-
-def emit_rust_constants(r: BatteryFitResult) -> str:
-    """Render the deployed R table + OCV table as Rust source constants.
-
-    The output is copied verbatim into ``hitl-physics/src/battery.rs`` so the
-    deployed Rust values are guaranteed to equal the canonical run.
+    The folders (batches) merge as long as no log ID appears twice.  Logs
+    without a manifest row are left out and counted once each: those marked
+    <log_id>.no_manifest_row at extraction, plus extracted logs missing from
+    this manifest.  At most max_per_vehicle logs of each vehicle (the smallest
+    log IDs) are kept, so the result equals a one-pass run over the same logs.
     """
-    lines: list[str] = []
-    lines.append(
-        "// FITTED_R_TABLE — deployed per-cell R (mΩ/cell), keyed by cell count."
+    dirs = [Path(obs_dirs)] if isinstance(obs_dirs, (str, Path)) else [Path(d) for d in obs_dirs]
+    found = read_obs_dirs(dirs)
+    marked = [i for i, (s, _) in found.items() if s == STATUS_NO_MANIFEST_ROW]
+    statuses = {i: s for i, (s, _) in found.items() if s != STATUS_NO_MANIFEST_ROW}
+    if not statuses:
+        raise FileNotFoundError(f"No extracted battery files in {', '.join(map(str, dirs))}")
+    kept, vehicle_of, without_row = _select_extracted(list(statuses), manifest_path, max_per_vehicle)
+    datas = [load_named(found[i][1], i) for i in kept if statuses[i] == STATUS_OK]
+    no_data = {i: statuses[i] for i in kept if statuses[i] != STATUS_OK}
+    return fit_extracted(
+        datas, vehicle_of, holdout_frac, seed,
+        no_data=no_data, logs_without_manifest_row=without_row + len(marked),
+        capacity_bounds=capacity_bounds,
     )
-    lines.append(
-        f"// Canonical run, split seed={r.split_seed}, {r.real_log_count} real logs, "
-        f"{r.sim_log_count} SIM excluded."
-    )
-    lines.append("const FITTED_R_TABLE: &[(u8, f64)] = &[")
-    for f in r.r_fits:
-        note = (
-            f"n={f.n_observations} LOW-N → pooled median"
-            if f.low_n
-            else f"n={f.n_observations}"
+
+
+def analyze_logs(
+    log_dir: str | Path,
+    holdout_frac: float = DEFAULT_HOLDOUT_FRAC,
+    seed: int = DEFAULT_SPLIT_SEED,
+    manifest_path: Path | None = None,
+    max_per_vehicle: int = DEFAULT_MAX_PER_VEHICLE,
+    jobs: int = 1,
+    loader: Callable[[Path], Any] = load_battery_topics,
+    capacity_bounds: Sequence[float] = DEFAULT_CAPACITY_BOUNDS_MAH,
+) -> BatteryFitResult:
+    """Extract the selected .ulg files of *log_dir* to a temporary folder, then fit.
+
+    Simulation logs are detected via ``hardware.is_simulation()`` and
+    excluded from all fits and statistics.
+
+    Reproducibility: the pipeline is deterministic for fixed inputs.  Without
+    a manifest the split permutes every .ulg file of log_dir, sorted, with the
+    seed, as the one-pass analysis did (see ``split_logs``), so the numbers
+    written to Rust, the Markdown report and the validation metric all come
+    from ONE canonical run.
+    """
+    _check_holdout_frac(holdout_frac)
+    with tempfile.TemporaryDirectory() as tmp:
+        extract_dir(Path(log_dir), Path(tmp), manifest_path, max_per_vehicle, jobs, loader)
+        return fit_obs_dir(
+            Path(tmp), manifest_path, max_per_vehicle, holdout_frac, seed, capacity_bounds
         )
-        lines.append(
-            f"    ({f.cell_count}, {f.deployed_mohm_per_cell:.4f}),  // {note}"
-        )
-    lines.append("];")
-    lines.append("")
-    lines.append(
-        f"const FITTED_R_DEFAULT_MOHM_PER_CELL: f64 = "
-        f"{r.overall_r_median_mohm_per_cell:.4f};  // pooled, n={r.overall_r_n}"
-    )
-    lines.append("")
-    lines.append("const OCV_TABLE: &[(f64, f64)] = &[")
-    for soc, v in zip(r.ocv_curve.soc_knots, r.ocv_curve.v_per_cell_knots):
-        lines.append(f"    ({soc:.4f}, {v:.4f}),")
-    lines.append("];")
-    return "\n".join(lines)
 
 
 # ---------------------------------------------------------------------------
@@ -772,15 +718,28 @@ def emit_rust_constants(r: BatteryFitResult) -> str:
 # ---------------------------------------------------------------------------
 
 
-def main(argv: list[str] | None = None) -> int:
+def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Fit battery models (R_internal, OCV curve) from real PX4 flight logs."
+        description="Fit battery models (R_internal, OCV curve) from real PX4 flight logs.",
+        epilog="Exit status: 0 extract done or target met, 1 target missed, 2 error.",
     )
     parser.add_argument(
         "--log-dir",
         default="data/downloaded",
         help="Directory containing *.ulg files (default: data/downloaded)",
     )
+    source = parser.add_mutually_exclusive_group()
+    source.add_argument(
+        "--extract-to", type=Path, default=None, metavar="DIR",
+        help="extract the selected logs of --log-dir into DIR (one .npz per usable "
+             "real log) and exit without fitting",
+    )
+    source.add_argument(
+        "--obs-dir", type=Path, nargs="+", default=None, metavar="DIR",
+        help="fit from the folders of one or more --extract-to runs instead of --log-dir",
+    )
+    add_selection_args(parser)
+    add_capacity_args(parser)
     parser.add_argument(
         "--holdout-frac",
         type=float,
@@ -808,22 +767,43 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Print the deployed R + OCV tables as Rust constants to stdout and exit.",
     )
-    args = parser.parse_args(argv)
+    return parser
 
-    print(
-        f"Scanning logs in {args.log_dir!r} (seed={args.seed})…",
-        file=sys.stderr,
-        flush=True,
+
+def _run_extract(args: argparse.Namespace) -> int:
+    print(f"Extracting battery data from {args.log_dir!r}...", file=sys.stderr, flush=True)
+    counts = extract_dir(
+        Path(args.log_dir), args.extract_to, args.manifest, args.max_per_vehicle, args.jobs
     )
-    result = analyze_logs(args.log_dir, holdout_frac=args.holdout_frac, seed=args.seed)
+    print(format_counts(counts), file=sys.stderr)
+    return 0
 
+
+def _run_fit(args: argparse.Namespace) -> int:
+    sources = args.obs_dir if args.obs_dir is not None else [args.log_dir]
+    print(f"Fitting from {', '.join(map(str, sources))} (seed={args.seed})...",
+          file=sys.stderr, flush=True)
+    if args.obs_dir is not None:
+        result = fit_obs_dir(
+            args.obs_dir, args.manifest, args.max_per_vehicle, args.holdout_frac, args.seed,
+            args.capacity_bounds,
+        )
+    else:
+        result = analyze_logs(
+            args.log_dir, args.holdout_frac, args.seed,
+            args.manifest, args.max_per_vehicle, args.jobs,
+            capacity_bounds=args.capacity_bounds,
+        )
     print(
         f"Real logs: {result.real_log_count} | SIM excluded: {result.sim_log_count} | "
-        f"Skipped: {result.skipped_log_count}",
+        f"Skipped: {result.skipped_log_count} | "
+        f"Cell count mismatch: {result.cell_count_mismatch_count}",
         file=sys.stderr,
     )
     print(
-        f"Overall R median: {result.overall_r_median_mohm_per_cell:.2f} mOhm/cell (n={result.overall_r_n})",
+        f"Overall R median: {result.overall_r_median_mohm_per_cell:.2f} mOhm/cell (n={result.overall_r_n}) | "
+        f"pooled over vehicles: {result.pooled_r_over_vehicles_mohm_per_cell:.2f} mOhm/cell "
+        f"({result.pooled_r_vehicles} vehicles)",
         file=sys.stderr,
     )
     print(
@@ -832,14 +812,10 @@ def main(argv: list[str] | None = None) -> int:
         file=sys.stderr,
     )
 
-    # Write JSON
-    out_json = Path(args.out_json)
-    out_json.parent.mkdir(parents=True, exist_ok=True)
-    out_json.write_text(json.dumps(result_to_dict(result), indent=2), encoding="utf-8")
-    print(f"JSON results written to {out_json}", file=sys.stderr)
-
-    # Write Markdown
-    write_markdown_summary(result, args.out_md)
+    forbidden = forbidden_strings(*sources)
+    write_json(Path(args.out_json), result_to_dict(result), forbidden)
+    print(f"JSON results written to {args.out_json}", file=sys.stderr)
+    write_markdown_summary(result, args.out_md, forbidden)
     print(f"Markdown summary written to {args.out_md}", file=sys.stderr)
 
     # Emit Rust constants for verbatim porting (same canonical run)
@@ -847,6 +823,24 @@ def main(argv: list[str] | None = None) -> int:
         print(emit_rust_constants(result))
 
     return 0 if result.validation_target_met else 1
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = _build_parser().parse_args(argv)
+    # Exit 2 with one line for any refused input: ValueError covers ManifestError,
+    # PrivateDataError, duplicate or unreadable extract files and a fit with no
+    # holdout scored; OSError covers missing files.  Any other exception is a fault,
+    # also exit 2 with its type, so that exit 1 only ever means target missed.
+    try:
+        if args.extract_to is not None:
+            return _run_extract(args)
+        return _run_fit(args)
+    except (ValueError, OSError) as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 2
+    except Exception as e:
+        print(f"Error: unexpected {type(e).__name__}: {e}", file=sys.stderr)
+        return 2
 
 
 if __name__ == "__main__":

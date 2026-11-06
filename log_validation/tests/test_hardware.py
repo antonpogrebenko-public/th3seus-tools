@@ -97,3 +97,36 @@ def test_extract_hardware_primary_imu_from_gyro_id():
     assert hw.fc_board == "PX4_FMU_V5"
     assert hw.imu_name == "ICM20689"
     assert hw.imu_devtype == 0x3C
+
+
+SPI_ICM20689_GYRO_ID = 0x3C000A
+
+
+def _hw_with_params(params: dict) -> HardwareInfo:
+    return extract_hardware_info({"ver_hw": "PX4_FMU_V5"}, params)
+
+
+def test_sys_hitl_1_or_2_is_simulation_with_a_real_primary_gyro():
+    # SYS_HITL 1 = HITL, 2 = SIH on the board: the sensors are simulated.
+    for value in (1, 2):
+        hw = _hw_with_params({"CAL_GYRO0_ID": SPI_ICM20689_GYRO_ID, "SYS_HITL": value})
+        assert hw.sys_hitl == value
+        assert is_simulation(hw)
+
+
+def test_sys_hitl_minus_1_external_hitl_is_simulation_with_a_real_primary_gyro():
+    hw = _hw_with_params({"CAL_GYRO0_ID": SPI_ICM20689_GYRO_ID, "SYS_HITL": -1})
+    assert hw.sys_hitl == -1
+    assert is_simulation(hw)
+
+
+def test_infinite_sys_hitl_is_read_as_absent():
+    hw = _hw_with_params({"CAL_GYRO0_ID": SPI_ICM20689_GYRO_ID, "SYS_HITL": float("inf")})
+    assert hw.sys_hitl is None
+
+
+def test_sys_hitl_0_or_absent_is_not_simulation():
+    off = _hw_with_params({"CAL_GYRO0_ID": SPI_ICM20689_GYRO_ID, "SYS_HITL": 0})
+    absent = _hw_with_params({"CAL_GYRO0_ID": SPI_ICM20689_GYRO_ID})
+    assert off.sys_hitl == 0 and not is_simulation(off)
+    assert absent.sys_hitl is None and not is_simulation(absent)

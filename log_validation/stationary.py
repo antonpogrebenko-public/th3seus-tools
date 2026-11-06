@@ -2,8 +2,9 @@
 
 Pre-arm rest is the cleanest noise floor: motors off, no airframe vibration,
 true angular rate is zero. We find the longest contiguous run where the gyro
-magnitude stays below a small threshold. This avoids depending on PX4 arming
-enum values (which vary across firmware versions).
+magnitude stays below a small threshold. Quiet alone also matches a smooth
+armed hover, so the caller restricts the window to disarmed samples via
+`eligible` (see the arming module).
 
 The threshold is applied to a short *moving average of each (signed) axis*, not
 the raw per-sample magnitude. Raw high-rate gyro noise can itself exceed the
@@ -26,12 +27,16 @@ DEFAULT_MIN_DURATION_S = 3.0
 
 
 def _smoothed_magnitude(t_s: np.ndarray, gyro_xyz: np.ndarray, smooth_s: float) -> np.ndarray:
-    """Magnitude of the per-axis moving average (noise averaged toward zero)."""
+    """Magnitude of the per-axis moving average (noise averaged toward zero).
+
+    One value per sample: the averaging window is clamped to the stream
+    length, so a short stream still gives one value per sample.
+    """
     g = np.asarray(gyro_xyz, float)
     diffs = np.diff(np.asarray(t_s, float))
     diffs = diffs[diffs > 0]
     dt = float(np.median(diffs)) if diffs.size else 0.0
-    win = max(1, int(round(smooth_s / dt))) if dt > 0 else 1
+    win = max(1, min(int(round(smooth_s / dt)), len(g))) if dt > 0 else 1
     if win <= 1:
         return np.linalg.norm(g, axis=1)
     kernel = np.ones(win) / win
@@ -61,13 +66,24 @@ def find_stationary_window(
     gyro_threshold: float = DEFAULT_GYRO_THRESHOLD,
     min_duration_s: float = DEFAULT_MIN_DURATION_S,
     smooth_s: float = DEFAULT_SMOOTH_S,
+    *,
+    eligible: np.ndarray | None = None,
 ) -> Window | None:
     """Longest contiguous run where the smoothed gyro magnitude < threshold.
 
-    Returns None if no qualifying run reaches `min_duration_s`.
+    When `eligible` (one bool per sample) is given, only eligible samples can
+    belong to the run. Returns None if no qualifying run reaches
+    `min_duration_s`.
     """
     mag = _smoothed_magnitude(t_s, gyro_xyz, smooth_s)
     quiet = mag < gyro_threshold
+    if eligible is not None:
+        eligible = np.asarray(eligible, bool)
+        if eligible.shape != (len(t_s),):
+            raise ValueError(
+                f"eligible has shape {eligible.shape}, expected ({len(t_s)},)"
+            )
+        quiet = quiet & eligible
 
     best: tuple[int, int] | None = None
     best_len = 0

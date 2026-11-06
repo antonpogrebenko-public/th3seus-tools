@@ -79,6 +79,10 @@ def noise_density(samples: np.ndarray, dt_s: float) -> float:
     return white_noise_std(samples) * math.sqrt(dt_s)
 
 
+# The shortest series `allan_deviation` accepts.
+ALLAN_MIN_SAMPLES = 16
+
+
 @dataclass(frozen=True)
 class AllanResult:
     """Allan-deviation summary for a bias process."""
@@ -101,8 +105,8 @@ def allan_deviation(samples: np.ndarray, dt_s: float, n_taus: int = 30) -> Allan
     """
     x = np.asarray(samples, dtype=float)
     n = x.size
-    if n < 16:
-        raise ValueError("need at least 16 samples for Allan deviation")
+    if n < ALLAN_MIN_SAMPLES:
+        raise ValueError(f"need at least {ALLAN_MIN_SAMPLES} samples for Allan deviation")
 
     theta = np.cumsum(x) * dt_s  # integrated signal
     max_m = (n - 1) // 2
@@ -158,3 +162,68 @@ def horizontal_position_noise(north_m: np.ndarray, east_m: np.ndarray) -> float:
     sn = white_noise_std(north_m)
     se = white_noise_std(east_m)
     return float(math.sqrt(0.5 * (sn**2 + se**2)))
+
+
+# Allan taus of 1 to this many samples carry the white-noise slope of a series.
+ALLAN_SLOPE_MAX_SAMPLES = 10
+_ALLAN_SLOPE_MIN_POINTS = 3
+_ALLAN_SLOPE_TAU_POINTS = 100
+
+
+def distinct_samples(t_s: np.ndarray, values: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """The samples that differ from the previous one (2-D: in any column); the first is kept.
+
+    A sensor logged faster than it updates repeats its last reading; those repeats are
+    not new samples."""
+    t = np.asarray(t_s, dtype=float)
+    v = np.asarray(values, dtype=float)
+    if v.shape[0] == 0:
+        return t, v
+    changed = v[1:] != v[:-1]
+    if v.ndim > 1:
+        changed = changed.any(axis=tuple(range(1, v.ndim)))
+    keep = np.concatenate(([True], changed))
+    return t[keep], v[keep]
+
+
+def new_readings(t_s: np.ndarray, values: np.ndarray, sample_times: np.ndarray | None = None
+                 ) -> tuple[np.ndarray, np.ndarray]:
+    """The samples that are new readings of the sensor; the first is kept.
+
+    With `sample_times` (when the sensor took each sample, such as PX4's `timestamp_sample`),
+    a sample whose time equals the previous sample's is the same reading published again,
+    while a genuine reading equal to the previous one is kept. Without them, a sample equal
+    to the previous one is taken as a repeat (`distinct_samples`)."""
+    if sample_times is None:
+        return distinct_samples(t_s, values)
+    t = np.asarray(t_s, dtype=float)
+    v = np.asarray(values, dtype=float)
+    s = np.asarray(sample_times, dtype=float)
+    if s.size == 0:
+        return t, v
+    keep = np.concatenate(([True], s[1:] != s[:-1]))
+    return t[keep], v[keep]
+
+
+def allan_slope(samples: np.ndarray, max_samples: int = ALLAN_SLOPE_MAX_SAMPLES) -> float:
+    """Least-squares slope of log(Allan deviation) on log(tau) over taus of 1 to max_samples.
+
+    White noise gives -0.5 and a random walk +0.5. Raises ValueError with fewer than three
+    taus or a deviation that is not positive."""
+    result = allan_deviation(samples, 1.0, n_taus=_ALLAN_SLOPE_TAU_POINTS)
+    use = result.taus_s <= max_samples
+    taus, devs = result.taus_s[use], result.devs[use]
+    if taus.size < _ALLAN_SLOPE_MIN_POINTS:
+        raise ValueError("too few Allan taus for a slope")
+    if not np.all(np.isfinite(devs)) or np.any(devs <= 0):
+        raise ValueError("Allan deviation is not positive")
+    return float(np.polyfit(np.log(taus), np.log(devs), 1)[0])
+
+
+def resolution(samples: np.ndarray) -> float:
+    """Smallest positive absolute step between consecutive samples."""
+    steps = np.abs(np.diff(np.asarray(samples, dtype=float)))
+    steps = steps[steps > 0]
+    if steps.size == 0:
+        raise ValueError("no step between consecutive samples")
+    return float(np.min(steps))

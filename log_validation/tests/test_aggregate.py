@@ -1,0 +1,172 @@
+"""Tests for grouped noise profiles."""
+
+from __future__ import annotations
+
+import dataclasses
+import json
+from pathlib import Path
+
+import numpy as np
+import pytest
+
+from log_validation.aggregate import main as aggregate_main
+from log_validation.aggregate import (
+    ProfileGroup,
+    SensorStats,
+    aggregate_profiles,
+    mcu_family,
+    to_json,
+)
+
+GYRO = "gyro.gyro_noise_density"
+
+
+def _entry(value, mcu="STM32F7xx", board="fmu-v5", imu="ICM20689"):
+    return {
+        "log_id": f"log-{value}",
+        "hardware": {"fc_board": board, "imu_name": imu, "mcu": mcu},
+        "measurements": {GYRO: value},
+    }
+
+
+def _by_key(groups):
+    return {(g.kind, g.key): g for g in groups}
+
+
+@pytest.mark.parametrize(
+    "mcu, expected",
+    [
+        ("STM32F4xx", "STM32F4"),
+        ("stm32f7xx", "STM32F7"),
+        ("STM32H743", "STM32H7"),
+        ("Kinetis K66", "NXP_K66"),
+        ("MK66FN2M0", "NXP_K66"),
+        ("ESP32", None),
+        ("", None),
+        (None, None),
+    ],
+)
+def test_mcu_family_mapping(mcu, expected):
+    assert mcu_family(mcu) == expected
+
+
+def test_mcu_family_profile():
+    results = [_entry(0.001 * (i + 1), mcu="STM32F7xx", board=f"b{i}", imu=f"i{i}") for i in range(10)]
+    results += [_entry(0.002 * (i + 1), mcu="STM32H743", board=f"h{i}", imu=f"j{i}") for i in range(2)]
+    groups = aggregate_profiles(results)
+    keys = {(g.kind, g.key): g.sample_count for g in groups}
+    assert keys[("mcu_family", "STM32F7")] == 10
+    assert ("mcu_family", "STM32H7") not in keys
+    assert keys[("mcu_family", "ALL")] == 12
+
+
+def test_percentiles_after_outlier_filter():
+    values = [float(v) for v in range(1, 21)] + [1000.0]
+    results = [_entry(v) for v in values]
+    group = _by_key(aggregate_profiles(results))[("mcu_family", "STM32F7")]
+    stats = group.sensors[GYRO]
+    base = np.arange(1, 21, dtype=float)
+    assert stats.count == 20
+    assert stats.p5 == pytest.approx(np.percentile(base, 5))
+    assert stats.p25 == pytest.approx(np.percentile(base, 25))
+    assert stats.median == pytest.approx(np.median(base))
+    assert stats.p75 == pytest.approx(np.percentile(base, 75))
+    assert stats.p95 == pytest.approx(np.percentile(base, 95))
+    assert group.sample_count == 21
+
+
+def test_board_and_imu_groups():
+    results = [_entry(0.001 * (i + 1)) for i in range(3)]
+    keys = {(g.kind, g.key): g.sample_count for g in aggregate_profiles(results)}
+    assert keys[("board", "fmu-v5")] == 3
+    assert keys[("imu", "ICM20689")] == 3
+
+
+def test_min_logs_and_missing_fields():
+    results = [_entry(0.001 * (i + 1), board=None, imu=None) for i in range(3)]
+    keys = {(g.kind, g.key) for g in aggregate_profiles(results)}
+    assert not any(k[0] in ("board", "imu") for k in keys)
+    assert aggregate_profiles(results[:2]) == []
+    assert ("mcu_family", "ALL") in {(g.kind, g.key) for g in aggregate_profiles(results[:2], min_logs=2)}
+
+
+def test_sorted_by_kind_then_count_then_key():
+    results = [_entry(0.001 * (i + 1), board="a", imu="x") for i in range(3)]
+    results += [_entry(0.01 * (i + 1), board="b", imu="y") for i in range(4)]
+    order = [(g.kind, g.key, g.sample_count) for g in aggregate_profiles(results)]
+    assert order == sorted(order, key=lambda t: (t[0], -t[2], t[1]))
+    assert order[0][0] == "board"
+
+
+def test_inputs_not_mutated_and_frozen():
+    results = [_entry(0.001 * (i + 1)) for i in range(3)]
+    snapshot = repr(results)
+    groups = aggregate_profiles(results)
+    assert repr(results) == snapshot
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        groups[0].key = "x"
+    assert isinstance(groups[0], ProfileGroup)
+    assert isinstance(next(iter(groups[0].sensors.values())), SensorStats)
+
+
+def test_to_json_includes_kind_key_and_percentiles():
+    out = to_json(aggregate_profiles([_entry(0.001 * (i + 1)) for i in range(3)]))
+    row = out[0]
+    assert {"kind", "key", "sample_count", "sensors"} <= set(row)
+    sensor = row["sensors"][GYRO]
+    assert "p5" in sensor and "p95" in sensor
+
+
+def test_nan_and_inf_values_are_dropped_not_poisoning_group():
+    results = [_entry(0.001 * (i + 1)) for i in range(5)]
+    results.append(_entry(float("nan")))
+    results.append(_entry(float("inf")))
+    results.append(_entry(None))
+    group = _by_key(aggregate_profiles(results))[("mcu_family", "STM32F7")]
+    assert group.sample_count == 5
+    stats = group.sensors[GYRO]
+    assert stats.count == 5
+    assert np.isfinite([stats.p5, stats.median, stats.p95, stats.std]).all()
+
+
+def test_small_group_with_nan_stays_finite():
+    results = [_entry(0.001), _entry(0.002), _entry(0.003), _entry(float("nan"))]
+    group = _by_key(aggregate_profiles(results))[("mcu_family", "ALL")]
+    assert group.sample_count == 3
+    assert np.isfinite(group.sensors[GYRO].median)
+
+
+def test_all_nan_log_is_skipped_everywhere():
+    results = [_entry(0.001 * (i + 1)) for i in range(3)]
+    results.append(_entry(float("nan")))
+    groups = _by_key(aggregate_profiles(results))
+    assert all(g.sample_count == 3 for g in groups.values())
+
+
+def test_param_below_min_logs_omitted_but_group_kept():
+    results = [_entry(0.001 * (i + 1)) for i in range(3)]
+    for r in results[:2]:
+        r["measurements"]["accel.accel_noise_density"] = 0.01
+    group = _by_key(aggregate_profiles(results))[("mcu_family", "STM32F7")]
+    assert group.sample_count == 3
+    assert GYRO in group.sensors
+    assert "accel.accel_noise_density" not in group.sensors
+
+
+def test_cli_refuses_a_private_string(tmp_path, capsys):
+    board = str(Path.home() / "private-board")
+    source = tmp_path / "results.json"
+    source.write_text(json.dumps([_entry(1e-3 * (1 + i / 10), board=board) for i in range(5)]))
+    out = tmp_path / "aggregated.json"
+    assert aggregate_main([str(source), "-o", str(out)]) == 1
+    assert "private data" in capsys.readouterr().err
+    assert not out.exists()
+
+
+def test_cli_writes_through_the_guarded_writer(tmp_path):
+    source = tmp_path / "results.json"
+    source.write_text(json.dumps([_entry(1e-3 * (1 + i / 10)) for i in range(5)]))
+    out = tmp_path / "aggregated.json"
+    assert aggregate_main([str(source), "-o", str(out)]) == 0
+    text = out.read_text()
+    assert text.endswith("\n") and json.loads(text)[0]["sensors"]

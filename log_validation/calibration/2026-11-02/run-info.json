@@ -1,0 +1,73 @@
+{
+ "commands": [
+  "# In the cloud, per batch NNNN (LOGS/ holds the batch's downloaded logs and is deleted after the batch):",
+  "python -m log_validation.batch_analyze LOGS/ -o noise-NNNN.json --manifest manifest-noise.csv --jobs 8",
+  "python -m log_validation.battery_fit --log-dir LOGS/ --extract-to battery-obs/ --manifest manifest-noise.csv --jobs 8",
+  "python -m log_validation.response LOGS/ -o response-NNNN.json --manifest manifest-response.csv --jobs 8",
+  "# The runner keeps noise-NNNN.json and response-NNNN.json as RUN/parts/ and packs the files of battery-obs/ (by name, no folders) into RUN/battery-obs/NNNN.tar:",
+  "(cd battery-obs/ && tar -cf ../NNNN.tar -- *)",
+  "# Locally, on the downloaded run folder RUN/ (manifests, parts/ and battery-obs/*.tar; no raw logs):",
+  "python -m log_validation.outputs merge -o noise-results.json --manifest RUN/manifest-noise.csv RUN/parts/noise-*.json",
+  "python -m log_validation.outputs merge -o response-results.json --manifest RUN/manifest-response.csv RUN/parts/response-*.json",
+  "mkdir -p battery-obs/",
+  "for t in RUN/battery-obs/*.tar; do tar -xf \"$t\" -C battery-obs/; done",
+  "python -m log_validation.battery_fit --obs-dir battery-obs/ --manifest RUN/manifest-noise.csv --out-json battery-fit.json --out-md battery-fit.md",
+  "python -m log_validation.reference_airframes response-results.json --kits log_validation/reference_kits.json -o airframes.json --min-vehicles 5",
+  "python -m log_validation.part_tables noise-results.json --out-dir parts --run-date 2026-11-02",
+  "python -m log_validation.calibration_report --noise noise-results.json --battery battery-fit.json --response response-results.json --airframes airframes.json --run-info run-info.json --parts parts --out-dir log_validation/calibration/2026-11-02 --forbid PRIVATE"
+ ],
+ "date": "2026-11-02",
+ "inputs": {
+  "candidates_noise_and_battery": 169883,
+  "candidates_response": 4689,
+  "capped_out_noise_and_battery": 74718,
+  "capped_out_response": 2247,
+  "copies_removed_noise_and_battery": 42595,
+  "copies_removed_response": 1087,
+  "download_failed": 0,
+  "errors_removed_noise_and_battery": 296,
+  "logs_downloaded": 36474,
+  "logs_in_both_sets": 849,
+  "logs_only_in_noise_and_battery_set": 35119,
+  "logs_only_in_response_set": 506,
+  "manifest_rows": 37323,
+  "rows_without_log": 0,
+  "selected_noise_and_battery": 35968,
+  "selected_response": 1355,
+  "simulation_removed_noise_and_battery": 16306
+ },
+ "parameters": {
+  "at_rest_window": "every at-rest value (IMU, barometer and magnetometer noise, GPS rest spread) comes from a still run of at least 3 s while the vehicle is disarmed (actuator_armed, else vehicle_status.arming_state 0 or 1), starting at least 10 s after a disarm; a log recorded only while armed has no at-rest values",
+  "batches": "32 batches of up to 20 GB; each batch folder holds the logs of both sets, so the noise and battery passes skip the logs only in the response set (506 in all) as logs without a manifest row, and the response pass skips the logs only in the noise and battery set (35,119 in all)",
+  "battery_capacity_bounds_mah": "1000,2500,5000,10000,20000",
+  "battery_holdout_frac": 0.2,
+  "battery_split_seed": 20260623,
+  "gps_rest_min_s": 60.0,
+  "jobs": 8,
+  "local_tool_commit": "d7981748df2ce01e7b9e9bfaea34a88dcc406d67",
+  "max_per_vehicle": 3,
+  "noise_and_battery_set": "every log of the mirror that the catalog step could read and marked as real hardware (a log marked as simulated, or whose simulation flag is unknown, is left out); all vehicle types",
+  "part_tables": {
+   "allan_slope_tolerance": 0.15,
+   "catalog_spellings": "none",
+   "min_vehicles": 10,
+   "sim_rate_baro_hz": 50.0,
+   "sim_rate_mag_hz": 50.0
+  },
+  "reference_min_vehicles": 5,
+  "reproduce": "the catalog step, the rate-loop data screen and the step that builds the manifests are not public; every entry of noise-results.json and response-results.json carries its Flight Review log ID and hashed vehicle ID, so the two manifests can be rebuilt from them, and log-ids/ lists the logs behind each pass's numbers",
+  "response_gates": {
+   "min_first_stage_r2": 0.05,
+   "min_motor_cmd_std": 0.02,
+   "min_motor_r2": 0.5,
+   "min_r2": 0.1,
+   "min_torque_std": 0.002,
+   "noise_cutoff_hz": 20.0
+  },
+  "response_min_logged_rate_hz": "200 with 5 % tolerance, on the torque setpoint, rate and rate setpoint",
+  "response_set": "the logs that the rate-loop data screen kept as full-rate (quadrotors); the response pass checks the logged rates again and refuses the logs not logged at the rate controller's rate (see Counts)",
+  "selection": "duplicate uploads removed (the same file content in the noise and battery set; the copies the data screen marked in the response set); at most 3 logs per vehicle (the smallest log IDs); vehicle IDs hashed; the passes found further simulation logs among them (SYS_HITL set, or a simulated sensor or board) and skipped them (see Counts)",
+  "source": "public PX4 Flight Review logs, read from a mirror; raw logs never left the cloud runner"
+ },
+ "tool_commit": "9f8a749b6ebb95d5b78255742cb74db94b987f49"
+}

@@ -40,6 +40,11 @@ def topic_names(ulog: ULog) -> dict[str, int]:
     return out
 
 
+def instances(ulog: ULog, topic: str) -> list[int]:
+    """Sorted multi-instance IDs of a topic, [] when the topic is not in the log."""
+    return sorted({getattr(d, "multi_id", 0) for d in ulog.data_list if d.name == topic})
+
+
 def _dataset(ulog: ULog, topic: str, instance: int):
     try:
         return ulog.get_dataset(topic, multi_instance=instance)
@@ -81,4 +86,21 @@ def xyz(ulog: ULog, topic: str, instance: int = 0) -> tuple[np.ndarray, np.ndarr
             np.asarray(ds.data["z"], float),
         ]
     )
+    return t_s, arr
+
+
+def vec3(
+    ulog: ULog, topic: str, field: str, instance: int = 0
+) -> tuple[np.ndarray, np.ndarray]:
+    """Return (t_s, Nx3 array) for an array field exposed as `field[0]` to `field[2]`."""
+    ds = _dataset(ulog, topic, instance)
+    names = [f"{field}[{i}]" for i in range(3)]
+    for name in names:
+        if name not in ds.data:
+            raise KeyError(
+                f"topic '{topic}' missing field '{name}'. "
+                f"Available fields: {sorted(ds.data.keys())}"
+            )
+    t_s = np.asarray(ds.data["timestamp"], dtype=float) * US_TO_S
+    arr = np.column_stack([np.asarray(ds.data[n], float) for n in names])
     return t_s, arr

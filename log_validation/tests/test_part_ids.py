@@ -1,0 +1,366 @@
+"""Part identification: which IMU, barometer, magnetometer and GPS receiver made a log."""
+
+from __future__ import annotations
+
+import json
+
+import numpy as np
+import pytest
+
+from log_validation import report
+from log_validation.batch_analyze import analyze_log, batch_analyze
+from log_validation.part_ids import empty_parts_json, gps_topic, identify_parts
+from log_validation.response import ResponseGates, analyze_response
+from log_validation.tests.part_fakes import InstanceULog, device_id, topic
+from log_validation.tests.response_fakes import quad_log
+from log_validation.tests.test_batch_analyze import _fake, _touch, load_by_stem
+from log_validation.tests.test_pipeline import RAW_BARO_PA_PER_M, _build_log
+
+BMI088, ICM20602, MPU6000, ICM42688P = 0x66, 0x38, 0x21, 0x26
+MS5611, RM3100, IST8310, UBX_F9P = 0x3D, 0x07, 0x06, 0xAA
+BMP280 = 0x3F
+
+
+def _primary_gyro(devtype: int) -> dict:
+    return topic(5, 1, gyro_device_id_primary=device_id(devtype))
+
+
+def test_entry_carries_the_part_records():
+    log = InstanceULog({"sensors_status_imu": topic(5, 1, gyro_device_id_primary=device_id(BMI088)),
+                        "sensor_baro": topic(5, 1, device_id=device_id(MS5611)),
+                        "sensor_mag": topic(5, 1, device_id=device_id(RM3100)),
+                        "vehicle_gps_position": topic(5, 1, device_id=device_id(UBX_F9P))})
+    parts = identify_parts(log, {}).to_json()
+    assert set(parts) == {"imu", "baro", "mag", "gps"}
+    assert all(set(r) == {"name", "devtype", "device_id", "source"} for r in parts.values())
+
+
+def test_primary_gyro_wins_over_the_first_calibration_slot():
+    log = InstanceULog({"sensors_status_imu": _primary_gyro(BMI088)})
+    imu = identify_parts(log, {"CAL_GYRO0_ID": device_id(ICM20602)}).imu
+    assert (imu.name, imu.source) == ("BMI088", "sensors_status_imu")
+
+
+def test_first_vehicle_imu_without_a_sensor_selection():
+    log = InstanceULog({("vehicle_imu", 1): topic(5, 1, gyro_device_id=device_id(MPU6000)),
+                        ("vehicle_imu", 0): topic(5, 1, gyro_device_id=device_id(ICM42688P))})
+    imu = identify_parts(log, {"CAL_GYRO0_ID": device_id(ICM20602)}).imu
+    assert (imu.name, imu.source) == ("ICM42688P", "vehicle_imu")
+
+
+def test_only_calibration_slots():
+    imu = identify_parts(InstanceULog({}),
+                         {"CAL_GYRO0_ID": 0, "CAL_GYRO1_ID": device_id(MPU6000)}).imu
+    assert (imu.name, imu.source) == ("MPU6000", "CAL_GYRO1_ID")
+
+
+@pytest.mark.parametrize("bad", [float("nan"), float("inf"), -5, 2.5, "abc", True])
+def test_malformed_calibration_id_is_noted_and_skipped(bad):
+    parts = identify_parts(InstanceULog({}),
+                           {"CAL_GYRO0_ID": bad, "CAL_GYRO1_ID": device_id(MPU6000)})
+    assert (parts.imu.name, parts.imu.source) == ("MPU6000", "CAL_GYRO1_ID")
+    assert parts.notes == ("CAL_GYRO0_ID is not a device ID",)
+
+
+def test_a_numpy_calibration_id_is_read():
+    imu = identify_parts(InstanceULog({}), {"CAL_GYRO0_ID": np.int32(device_id(MPU6000))}).imu
+    assert (imu.name, imu.source) == ("MPU6000", "CAL_GYRO0_ID")
+
+
+def test_absent_or_zero_calibration_ids_give_no_note():
+    parts = identify_parts(InstanceULog({}), {"CAL_GYRO0_ID": 0, "CAL_BARO0_ID": 0.0})
+    assert parts.notes == () and parts.imu.name is None
+
+
+def test_malformed_barometer_calibration_id_is_noted():
+    parts = identify_parts(InstanceULog({"sensor_baro": topic(5, 1, pressure=95000.0)}),
+                           {"CAL_BARO0_ID": -1})
+    assert parts.baro.name is None and parts.notes == ("CAL_BARO0_ID is not a device ID",)
+
+
+def test_calibration_ids_not_read_give_no_note():
+    log = InstanceULog({"sensors_status_imu": _primary_gyro(BMI088)})
+    assert identify_parts(log, {"CAL_GYRO0_ID": float("nan")}).notes == ()
+
+
+def test_malformed_calibration_id_is_an_entry_error(tmp_path):
+    log = InstanceULog({"sensor_baro": topic(5, 1, pressure=95000.0)},
+                       params={"CAL_BARO0_ID": float("inf")})
+    entry = analyze_log(tmp_path / "c1.ulg", loader=lambda p: log)
+    assert "parts: CAL_BARO0_ID is not a device ID" in entry.errors
+
+
+def test_imu_id_in_the_accelerometer_table_only():
+    # Any devtype of ACC_DEVTYPES that is not in IMU_DEVTYPES decodes through the second table.
+    from log_validation.hardware import ACC_DEVTYPES, IMU_DEVTYPES
+    devtype = next(t for t in ACC_DEVTYPES if t not in IMU_DEVTYPES)
+    imu = identify_parts(InstanceULog({}), {"CAL_GYRO0_ID": device_id(devtype)}).imu
+    assert (imu.name, imu.devtype) == (ACC_DEVTYPES[devtype], devtype)
+
+
+def test_unknown_imu_type_stays_unknown():
+    imu = identify_parts(InstanceULog({}), {"CAL_GYRO0_ID": device_id(0x99)}).imu
+    assert (imu.name, imu.devtype) == ("UNKNOWN_0x99", 0x99)
+
+
+def test_barometer_on_current_firmware():
+    baro = identify_parts(InstanceULog({"sensor_baro": topic(5, 1, device_id=device_id(MS5611))}),
+                          {}).baro
+    assert (baro.name, baro.devtype, baro.source) == ("MS5611", 0x3D, "sensor_baro")
+
+
+def test_magnetometer_from_its_topic():
+    log = InstanceULog({"sensor_mag": topic(5, 1, device_id=device_id(RM3100))})
+    assert identify_parts(log, {}).mag.name == "RM3100"
+
+
+def _two_mags(primary: dict | None) -> InstanceULog:
+    datasets = {("sensor_mag", 0): topic(5, 1, device_id=device_id(IST8310)),
+                ("sensor_mag", 1): topic(5, 1, device_id=device_id(RM3100))}
+    if primary is not None:
+        datasets["sensors_status_mag"] = primary
+    return InstanceULog(datasets)
+
+
+def test_measured_magnetometer_is_the_primary_instance():
+    parts = identify_parts(
+        _two_mags(topic(5, 1, device_id_primary=device_id(RM3100))), {})
+    assert (parts.mag.name, parts.mag_instance) == ("RM3100", 1)
+
+
+def test_primary_not_among_the_instances_falls_back_to_instance_0():
+    parts = identify_parts(
+        _two_mags(topic(5, 1, device_id_primary=device_id(MS5611))), {})
+    assert (parts.mag.name, parts.mag_instance) == ("IST8310", 0)
+
+
+def test_lowest_logged_instance_without_a_primary():
+    log = InstanceULog({("sensor_mag", 2): topic(5, 1, device_id=device_id(RM3100)),
+                        ("sensor_mag", 1): topic(5, 1, device_id=device_id(IST8310))})
+    parts = identify_parts(log, {})
+    assert (parts.mag.name, parts.mag_instance) == ("IST8310", 1)
+
+
+def test_most_common_primary_after_a_failover():
+    ids = [device_id(IST8310)] * 3 + [device_id(RM3100)] * 7
+    parts = identify_parts(_two_mags(topic(10, 1, device_id_primary=ids)), {})
+    assert (parts.mag.name, parts.mag_instance) == ("RM3100", 1)
+
+
+@pytest.mark.parametrize("first, second, name", [(RM3100, IST8310, "RM3100"),
+                                                 (IST8310, RM3100, "IST8310")])
+def test_tie_goes_to_the_value_logged_first(first, second, name):
+    ids = [device_id(first)] * 2 + [device_id(second)] * 2
+    parts = identify_parts(_two_mags(topic(4, 1, device_id_primary=ids)), {})
+    assert parts.mag.name == name
+
+
+def test_zero_device_ids_are_ignored():
+    ids = [0, 0, 0, device_id(RM3100)]
+    log = InstanceULog({"sensor_mag": topic(4, 1, device_id=ids)})
+    assert identify_parts(log, {}).mag.name == "RM3100"
+
+
+def test_instance_without_a_device_id_uses_its_calibration_parameter():
+    baro = identify_parts(InstanceULog({"sensor_baro": topic(5, 1, pressure=95000.0)}),
+                          {"CAL_BARO0_ID": device_id(MS5611)}).baro
+    assert (baro.name, baro.source) == ("MS5611", "CAL_BARO0_ID")
+
+
+def test_instance_1_without_a_device_id_uses_its_own_calibration_parameter():
+    params = {"CAL_MAG0_ID": device_id(IST8310), "CAL_MAG1_ID": device_id(RM3100),
+              "CAL_BARO0_ID": device_id(MS5611), "CAL_BARO1_ID": device_id(BMP280)}
+    log = InstanceULog({("sensor_mag", 1): topic(5, 1, x=0.2),
+                        ("sensor_baro", 1): topic(5, 1, pressure=95000.0)})
+    parts = identify_parts(log, params)
+    assert (parts.mag_instance, parts.mag.name, parts.mag.source) == (1, "RM3100", "CAL_MAG1_ID")
+    assert (parts.baro_instance, parts.baro.name, parts.baro.source) == (
+        1, "BMP280", "CAL_BARO1_ID")
+
+
+def test_ublox_f9p():
+    log = InstanceULog({"vehicle_gps_position": topic(5, 1, device_id=device_id(UBX_F9P))})
+    gps = identify_parts(log, {}).gps
+    assert (gps.name, gps.source) == ("UBX_F9P", "vehicle_gps_position")
+
+
+def test_gps_topic_without_a_device_id():
+    parts = identify_parts(InstanceULog({"vehicle_gps_position": topic(5, 1, fix_type=3)}), {})
+    assert (parts.gps.name, parts.gps.devtype, parts.gps_topic) == (None, None,
+                                                                    "vehicle_gps_position")
+    assert parts.gps.source == "vehicle_gps_position"
+
+
+def test_two_receivers_name_the_instance_the_measurements_read():
+    # The GPS measurements read instance 0 of the topic; the part is named from it too.
+    log = InstanceULog({("sensor_gps", 0): topic(5, 1, device_id=device_id(UBX_F9P)),
+                        ("sensor_gps", 1): topic(5, 1, device_id=device_id(0xA9))})
+    parts = identify_parts(log, {})
+    assert (parts.gps.name, parts.gps_topic) == ("UBX_F9P", "sensor_gps")
+
+
+def test_sensor_gps_when_vehicle_gps_position_is_absent():
+    log = InstanceULog({"sensor_gps": topic(5, 1, fix_type=3)})
+    assert identify_parts(log, {}).gps_topic == "sensor_gps"
+
+
+def test_vehicle_gps_position_wins_when_both_topics_are_logged():
+    # sensor_gps is logged first; vehicle_gps_position is still the one read and named.
+    log = InstanceULog({"sensor_gps": topic(5, 1, device_id=device_id(0xA9)),
+                        "vehicle_gps_position": topic(5, 1, device_id=device_id(UBX_F9P))})
+    parts = identify_parts(log, {})
+    assert (parts.gps_topic, parts.gps.name, parts.gps.source) == (
+        "vehicle_gps_position", "UBX_F9P", "vehicle_gps_position")
+    assert gps_topic(log) == "vehicle_gps_position"
+
+
+def test_unknown_barometer_type():
+    log = InstanceULog({"sensor_baro": topic(5, 1, device_id=device_id(0x99))})
+    baro = identify_parts(log, {}).baro
+    assert (baro.devtype, baro.name) == (0x99, "UNKNOWN_0x99")
+
+
+def test_log_without_part_data():
+    parts = identify_parts(InstanceULog({}), {})
+    assert all(r["name"] is None for r in parts.to_json().values()) and parts.gps_topic is None
+    assert parts.to_json() == empty_parts_json()
+
+
+# ---------------------------------------------------------------------------
+# Wiring
+# ---------------------------------------------------------------------------
+
+
+def test_noise_entry_has_parts(tmp_path):
+    out = tmp_path / "out" / "r.json"
+    batch_analyze(_touch(tmp_path, ["a1"]), out, loader=load_by_stem)
+    entry = json.loads(out.read_text())[0]
+    assert entry["parts"]["imu"] == {"name": "ICM20689", "devtype": 0x3C,
+                                     "device_id": 0x3C000A, "source": "sensors_status_imu"}
+
+
+def test_failed_load_entry_has_empty_parts(tmp_path):
+    out = tmp_path / "out" / "r.json"
+    batch_analyze(_touch(tmp_path, ["bad"]), out, loader=load_by_stem)
+    assert json.loads(out.read_text())[0]["parts"] == empty_parts_json()
+
+
+def test_response_entry_carries_the_identified_parts():
+    # quad_log has no sensor selection or IMU topic with device IDs: CAL_GYRO0_ID names it.
+    result = analyze_response(quad_log(), "r1", None, ResponseGates())
+    assert result.parts["imu"] == {"name": "ICM20689", "devtype": 0x3C, "device_id": 0x3C000A,
+                                   "source": "CAL_GYRO0_ID"}
+    assert set(result.parts) == {"imu", "baro", "mag", "gps"}
+
+
+def test_failed_part_identification_in_the_response_pass(monkeypatch):
+    import log_validation.response as module
+
+    def broken(_ulog, _params):
+        raise RuntimeError("secret detail at /some/private/path")
+
+    monkeypatch.setattr(module, "identify_parts", broken)
+    result = analyze_response(quad_log(), "r1", None, ResponseGates())
+    assert "part identification failed: RuntimeError" in result.errors
+    assert result.parts == empty_parts_json()
+
+
+def _measured(rows, sensor, param):
+    return next(r.measured for r in rows if r.sensor == sensor and r.param == param)
+
+
+def test_mag_noise_is_measured_on_the_primary_instance():
+    base = _build_log()
+    datasets = {d.name: d.data for d in base.data_list}
+    n = len(datasets["sensor_mag"]["timestamp"])
+    rng = np.random.default_rng(3)
+
+    def mag(sigma):
+        return {"timestamp": datasets["sensor_mag"]["timestamp"],
+                "device_id": np.full(n, device_id(IST8310)),
+                **{a: 0.2 + rng.normal(0, sigma, n) for a in "xyz"}}
+
+    noisy, quiet = mag(0.02), mag(0.004)
+    quiet["device_id"] = np.full(n, device_id(RM3100))
+    datasets = {k: v for k, v in datasets.items() if k != "sensor_mag"}
+    log = InstanceULog({**datasets, ("sensor_mag", 0): noisy, ("sensor_mag", 1): quiet,
+                        "sensors_status_mag": topic(n, 50, device_id_primary=device_id(RM3100))})
+    assert abs(_measured(report.analyze(log), "mag", "noise_sigma_gauss") - 0.004) / 0.004 < 0.15
+
+
+def test_part_identification_failure_is_an_entry_error(tmp_path, monkeypatch):
+    import log_validation.batch_analyze as module
+
+    def broken(_ulog, _params):
+        raise RuntimeError("secret detail at /some/private/path")
+
+    monkeypatch.setattr(module, "identify_parts", broken)
+    out = tmp_path / "out" / "r.json"
+    batch_analyze(_touch(tmp_path, ["a1"]), out, loader=load_by_stem)
+    entry = json.loads(out.read_text())[0]
+    assert "part identification failed: RuntimeError" in entry["errors"]
+    assert entry["parts"] == empty_parts_json()
+    assert entry["measurements"]  # the noise analysis still ran
+
+
+def test_failed_identification_still_reads_the_sensor_gps_topic(tmp_path, monkeypatch):
+    import log_validation.batch_analyze as module
+
+    def broken(_ulog, _params):
+        raise RuntimeError("no parts")
+
+    base = _build_log()
+    log = InstanceULog({("sensor_gps" if d.name == "vehicle_gps_position" else d.name): d.data
+                        for d in base.data_list})
+    monkeypatch.setattr(module, "identify_parts", broken)
+    entry = analyze_log(tmp_path / "g1.ulg", loader=lambda p: log)
+    assert "part identification failed: RuntimeError" in entry.errors
+    m = entry.measurements
+    assert m["gps.eph_median_m"] == pytest.approx(1.0)
+    assert abs(m["gps.horizontal_noise_sigma"] - 1.2) / 1.2 < 0.25
+    assert "gps.rest_spread_horizontal_m" in m
+
+
+def test_no_header_results_do_not_share_a_parts_dict():
+    from log_validation.response import _no_header
+
+    assert _no_header().parts is not _no_header().parts
+
+
+def _baro(n: int, rate_hz: float, sigma_m: float, devtype: int, seed: int) -> dict:
+    """Raw barometer at rate_hz: 95000 Pa plus white noise of sigma_m of altitude."""
+    rng = np.random.default_rng(seed)
+    return topic(n, rate_hz, device_id=device_id(devtype),
+                 pressure=95000.0 + rng.normal(0, sigma_m * RAW_BARO_PA_PER_M, n))
+
+
+def _mag(t_us: np.ndarray, sigma: float, devtype: int, seed: int, quantum=None) -> dict:
+    rng = np.random.default_rng(seed)
+    data = {"timestamp": t_us, "device_id": np.full(t_us.size, device_id(devtype))}
+    for axis, base in zip("xyz", (0.21, 0.03, 0.49)):
+        x = base + rng.normal(0, sigma, t_us.size)
+        data[axis] = x if quantum is None else np.round(x / quantum) * quantum
+    return data
+
+
+def test_chip_and_evidence_values_come_from_the_primary_instances():
+    datasets = {d.name: d.data for d in _build_log().data_list
+                if d.name not in ("sensor_baro", "sensor_mag")}
+    n50, n25, n100 = 70 * 50, 70 * 25, 70 * 100
+    log = InstanceULog({
+        **datasets,
+        ("sensor_baro", 0): _baro(n50, 50.0, 0.2, MS5611, 4),
+        ("sensor_baro", 1): _baro(n25, 25.0, 0.05, BMP280, 5),
+        "sensors_status_baro": topic(10, 1, device_id_primary=device_id(BMP280)),
+        ("sensor_mag", 0): _mag(topic(n50, 50.0)["timestamp"], 0.004, IST8310, 6),
+        ("sensor_mag", 1): _mag(topic(n100, 100.0)["timestamp"], 0.004, RM3100, 7,
+                                quantum=0.001),
+        "sensors_status_mag": topic(10, 1, device_id_primary=device_id(RM3100)),
+    })
+    parts = identify_parts(log, {})
+    assert (parts.baro_instance, parts.baro.name, parts.mag_instance) == (1, "BMP280", 1)
+    rows = report.analyze(log, parts)
+    assert abs(_measured(rows, "baro", "chip_noise_sigma") - 0.05) / 0.05 < 0.15
+    assert abs(_measured(rows, "baro", "chip_rate_hz") - 25.0) / 25.0 < 0.01
+    assert abs(_measured(rows, "mag", "rate_hz") - 100.0) / 100.0 < 0.01
+    assert _measured(rows, "mag", "resolution_gauss") == pytest.approx(0.001)
